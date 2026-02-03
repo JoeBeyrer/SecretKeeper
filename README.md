@@ -4,11 +4,11 @@ SecretKeeper is a privacy first messenger where all messages are end-to-end encr
 ## Members
 - Joe Beyrer  
 - Christian Farese  
-- Gabe Kravets  
+- Gabriel Kravets  
 - David Edelstein
 
 ## Roles
 For this project, the intention is for every team member to gain exposure to both front-end AngularJS development and backend GO programming. We do not plan to strictly adhere to the roles below.
 As a temporary placeholder, the role assignments will be:
 - Front-End Engineers: Joe Beyrer, Christian Farese
-- Back-End Engineers: Gabe Kravets, David Edelstein
+- Back-End Engineers: Gabriel Kravets, David Edelstein
