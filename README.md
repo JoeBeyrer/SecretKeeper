@@ -12,3 +12,15 @@ For this project, the intention is for every team member to gain exposure to bot
 As a temporary placeholder, the role assignments will be:
 - Front-End Engineers: Joe Beyrer, Christian Farese
 - Back-End Engineers: Gabriel Kravets, David Edelstein
+
+## Project Setup
+- Install Go using [here](https://go.dev/dl/)
+- Run Go server using `go run main.go` from the secret-keeper-app/backend directory
+- Run `go get github.com/rs/cors` to install CORS middleware
+
+- Run `npm install -g @angular/cli` to install Angular CLI
+- Install node.js [here](https://nodejs.org/en/download)
+- Run `ng serve` from the secret-keeper-app/frontend/secret-keeper-frontend directory to run the website at http://localhost:4200
+  - May need to run `npm install zone.js` if a Zone.js error is encountered
+
+- To create a new component, `run ng g c components/[NAME]` from the secret-keeper-frontend directory
