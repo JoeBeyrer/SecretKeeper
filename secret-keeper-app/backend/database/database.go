@@ -1,4 +1,4 @@
-package main
+package database
 
 import (
 	"database/sql"
@@ -6,28 +6,28 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-func main() {
-	connection, db_error := sql.Open("sqlite", "user_management.db")
-	if db_error != nil {
-		log.Fatal(db_error)
+func InitDB(path string) *sql.DB {
+    db, err := sql.Open("sqlite", path)
+    if err != nil {
+        log.Fatal(err)
 	}
-	db_error = connection.Ping()
-	if db_error != nil {
-		log.Fatal(db_error)
-	}
-	result, db_error := connection.Exec(
-		`CREATE TABLE IF NOT EXISTS authentication_data (
-			username TEXT NOT NULL,
-			password TEXT NOT NULL
-		)`,
-	)
-	initial_query, db_error := connection.Exec(
-		`INSERT INTO authentication_data (username, password)
-		VALUES ("admin","coolpassword")`,
-	)
-	_ = initial_query
-	_ = result
-	log.Printf("Succesfully created database")
+	
+	if err := db.Ping(); err != nil {
+        log.Fatal(err)
+    }
 
-	defer connection.Close()
+    db.Exec(`PRAGMA journal_mode=WAL;`) // fewer db locked issues
+
+    _, err = db.Exec(`
+        CREATE TABLE IF NOT EXISTS authentication_data (
+            username TEXT PRIMARY KEY,
+            password TEXT NOT NULL
+        )
+    `)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    log.Println("Database initialized")
+    return db
 }
