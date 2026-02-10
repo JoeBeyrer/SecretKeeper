@@ -1,13 +1,15 @@
+package main
 
 import (
     "log"
     "net/http"
     "github.com/rs/cors"
     "secret-keeper-app/backend/database"
+    "time"
 )
 
 func main() {
-    db := database.InitDB("./backend/data/secretkeeper.db")
+    db := database.InitDB("./database/secretkeeper.db")
     defer db.Close()
 
     mux := http.NewServeMux()
@@ -36,4 +38,6 @@ func main() {
         WriteTimeout: 10 * time.Second,
         IdleTimeout:  60 * time.Second,
     }
+
+    log.Fatal(server.ListenAndServe())
 }
