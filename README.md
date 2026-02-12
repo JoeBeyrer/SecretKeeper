@@ -20,6 +20,7 @@ As a temporary placeholder, the role assignments will be:
 
 - Run `npm install -g @angular/cli` to install Angular CLI
 - Install node.js [here](https://nodejs.org/en/download)
+- Run `npm install` to install all required packages
 - Run `ng serve` from the secret-keeper-app/frontend/secret-keeper-frontend directory to run the website at http://localhost:4200
   - May need to run `npm install zone.js` if a Zone.js error is encountered
 
