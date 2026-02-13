@@ -16,11 +16,8 @@ func InitDB(path string) *sql.DB {
         log.Fatal(err)
     }
 
-
     execOrFatal(db, `PRAGMA journal_mode=WAL;`) // WAL makes fewer db locked issues
     execOrFatal(db, `PRAGMA foreign_keys = ON;`) // explicitly allow foreing keys
-
-
 
     execOrFatal(db, `
         CREATE TABLE IF NOT EXISTS authentication_data (
@@ -29,15 +26,12 @@ func InitDB(path string) *sql.DB {
         )
     `)
 
-
     execOrFatal(db, `
         CREATE TABLE IF NOT EXISTS conversations (
             id TEXT PRIMARY KEY,
             created_at INTEGER
         )
     `)
-    
-
 
     execOrFatal(db, `
         CREATE TABLE IF NOT EXISTS conversation_members (
@@ -48,7 +42,6 @@ func InitDB(path string) *sql.DB {
             FOREIGN KEY (conversation_id) REFERENCES conversations(id)
         )
     `)
-
 
     execOrFatal(db, `
         CREATE TABLE IF NOT EXISTS messages (
@@ -61,6 +54,11 @@ func InitDB(path string) *sql.DB {
             FOREIGN KEY (conversation_id) REFERENCES conversations(id),
             FOREIGN KEY (sender_id) REFERENCES authentication_data(username)
         )
+    `)
+
+    execOrFatal(db, `
+		INSERT INTO authentication_data (username, password_hash)
+		VALUES ("admin","coolpassword")
     `)
 
     log.Println("Database initialized")
