@@ -23,12 +23,45 @@ func InitDB(path string) *sql.DB {
 
 
     execOrFatal(db, `
-        CREATE TABLE IF NOT EXISTS authentication_data (
-            username TEXT PRIMARY KEY,
-            password_hash TEXT NOT NULL
+        CREATE TABLE IF NOT EXISTS users (
+            id TEXT PRIMARY KEY,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            created_at INTEGER NOT NULL
         )
     `)
-
+    
+    execOrFatal(db, `
+        CREATE TABLE user_profiles (
+            user_id TEXT PRIMARY KEY,
+            display_name TEXT,
+            bio TEXT,
+            profile_picture_url TEXT,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    `)
+    
+    execOrFatal(db, `
+        CREATE TABLE sessions (
+            id TEXT PRIMARY KEY,               
+            user_id TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            expires_at INTEGER NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    `)
+    
+    execOrFatal(db, `
+        CREATE TABLE password_resets (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            token TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            expires_at INTEGER NOT NULL,
+            used INTEGER DEFAULT 0,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    `)
 
     execOrFatal(db, `
         CREATE TABLE IF NOT EXISTS conversations (
@@ -36,8 +69,6 @@ func InitDB(path string) *sql.DB {
             created_at INTEGER
         )
     `)
-    
-
 
     execOrFatal(db, `
         CREATE TABLE IF NOT EXISTS conversation_members (
@@ -46,6 +77,7 @@ func InitDB(path string) *sql.DB {
             joined_at INTEGER,
             PRIMARY KEY (conversation_id, user_id),
             FOREIGN KEY (conversation_id) REFERENCES conversations(id)
+            FOREIGN KEY (user_id) REFERENCES users(id)
         )
     `)
 
@@ -54,12 +86,12 @@ func InitDB(path string) *sql.DB {
         CREATE TABLE IF NOT EXISTS messages (
             id TEXT PRIMARY KEY,
             conversation_id TEXT,
-            sender_id TEXT,
+            user_id TEXT,
             ciphertext BLOB NOT NULL,
             created_at INTEGER,
             expires_at INTEGER,
             FOREIGN KEY (conversation_id) REFERENCES conversations(id),
-            FOREIGN KEY (sender_id) REFERENCES authentication_data(username)
+            FOREIGN KEY (user_id) REFERENCES users(id)
         )
     `)
 
