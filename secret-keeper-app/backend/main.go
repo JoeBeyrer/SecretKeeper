@@ -3,9 +3,11 @@ package main
 import (
     "log"
     "net/http"
+    "time"
+
     "github.com/rs/cors"
     "secret-keeper-app/backend/database"
-    "time"
+    "secret-keeper-app/backend/handlers"
 )
 
 func main() {
@@ -14,23 +16,42 @@ func main() {
 
     mux := http.NewServeMux()
 
-    // API routes
+    // Health check
     mux.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
         w.Header().Set("Content-Type", "application/json")
-        if _, err := w.Write([]byte(`{"status":"ok"}`)); err != nil {
-            log.Println("write error:", err)
-        }
+        w.Write([]byte(`{"status":"ok"}`))
     })
 
-    // Wrap the mux with CORS middleware
+    // PUBLIC ROUTES
+    mux.HandleFunc("/api/register", handlers.RegisterHandler(db))
+    mux.HandleFunc("/api/login", handlers.LoginHandler(db, 24*time.Hour))
+
+    // // PROTECTED ROUTES
+    // auth := handlers.AuthMiddleware(db)
+    // mux.Handle("/api/conversations/create", auth(http.HandlerFunc(handlers.CreateConversationHandler(db))))
+    // mux.Handle("/api/messages/send", auth(http.HandlerFunc(handlers.SendMessageHandler(db))))
+
+    // TEMPORARY FOR TESTING _ REMOVE OR COMMENT
+    auth := handlers.AuthMiddleware(db)
+    mux.Handle("/api/test-auth", auth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        userID, ok := handlers.GetUserIDFromContext(r)
+        if !ok {
+            http.Error(w, "no user in context", http.StatusInternalServerError)
+            return
+        }
+
+        w.Write([]byte("Authenticated user ID: " + userID))
+    })))
+
+
+    // CORS
     handler := cors.New(cors.Options{
-        AllowedOrigins: []string{"http://localhost:4200"},
-        AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-        AllowedHeaders: []string{"Content-Type", "Authorization"},
+        AllowedOrigins:   []string{"http://localhost:4200"},
+        AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+        AllowedHeaders:   []string{"Content-Type"},
         AllowCredentials: true,
     }).Handler(mux)
 
-    log.Println("Server running on http://localhost:8080")
     server := &http.Server{
         Addr:         ":8080",
         Handler:      handler,
@@ -39,5 +60,6 @@ func main() {
         IdleTimeout:  60 * time.Second,
     }
 
+    log.Println("Server running on http://localhost:8080")
     log.Fatal(server.ListenAndServe())
 }

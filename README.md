@@ -17,6 +17,8 @@ As a temporary placeholder, the role assignments will be:
 - Install Go using [here](https://go.dev/dl/)
 - Run Go server using `go run main.go` from the secret-keeper-app/backend directory
 - Run `go get github.com/rs/cors` to install CORS middleware
+- Run `go get golang.org/x/crypto/bcrypt` for bcrypt password hashing
+- Run `go get github.com/google/uuid` for UUID use in database
 
 - Run `npm install -g @angular/cli` to install Angular CLI
 - Install node.js [here](https://nodejs.org/en/download)
@@ -24,4 +26,7 @@ As a temporary placeholder, the role assignments will be:
 - Run `ng serve` from the secret-keeper-app/frontend/secret-keeper-frontend directory to run the website at http://localhost:4200
   - May need to run `npm install zone.js` if a Zone.js error is encountered
 
+
+## Notes While Writing Code
 - To create a new component, `run ng g c components/[NAME]` from the secret-keeper-frontend directory
+- Every request in Angular must include `this.http.post(url, body, { withCredentials: true })` so cookies are sent
