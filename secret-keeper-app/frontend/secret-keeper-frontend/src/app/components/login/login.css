@@ -73,3 +73,20 @@
   margin-bottom: 15px;
   font-size: 14px;
 }
+
+.signup-link {
+  text-align: center;
+  margin-top: 20px;
+  color: white;
+  font-size: 14px;
+}
+
+.signup-link a {
+  color: #34c9eb;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.signup-link a:hover {
+  text-decoration: underline;
+}

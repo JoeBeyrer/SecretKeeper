@@ -55,4 +55,8 @@ export class Login implements OnInit {
       this.errorMessage = 'Fill in all fields';
     }
   }
+
+  goToSignup() {
+    this.router.navigate(['/signup']);
+  }
 }
