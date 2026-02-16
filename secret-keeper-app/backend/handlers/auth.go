@@ -3,7 +3,7 @@ package handlers
 import (
     "database/sql"
     "encoding/json"
-	"context"
+    "context"
     "net/http"
     "time"
 
@@ -17,6 +17,7 @@ const userIDKey contextKey = "userID"
 
 type registerReq struct {
     Username string `json:"username"`
+    Email    string `json:"email"`
     Password string `json:"password"`
 }
 
@@ -29,6 +30,7 @@ func RegisterHandler(db *sql.DB) http.HandlerFunc {
         }
 
         // basic validation
+        // might want to change since validation happens before sending request
         if req.Username == "" || req.Password == "" || len(req.Password) < 8 {
             http.Error(w, "invalid username or password (min 8 chars)", http.StatusBadRequest)
             return
@@ -42,7 +44,7 @@ func RegisterHandler(db *sql.DB) http.HandlerFunc {
 
         id := uuid.New().String()
         now := time.Now().Unix()
-        _, err = db.Exec(`INSERT INTO users (id, username, password_hash, created_at) VALUES (?, ?, ?, ?)`, id, req.Username, hashed, now)
+        _, err = db.Exec(`INSERT INTO users (id, username, email, password_hash, created_at) VALUES (?, ?, ?, ?, ?)`, id, req.Username, req.Email, hashed, now)
         if err != nil {
             http.Error(w, "could not create user", http.StatusConflict)
             return
@@ -52,8 +54,6 @@ func RegisterHandler(db *sql.DB) http.HandlerFunc {
         w.Write([]byte(`{"user_id":"` + id + `"}`))
     }
 }
-
-
 
 type loginReq struct {
     Username string `json:"username"`
@@ -125,10 +125,7 @@ func AuthMiddleware(db *sql.DB) func(http.Handler) http.Handler {
     }
 }
 
-
 func GetUserIDFromContext(r *http.Request) (string, bool) {
     userID, ok := r.Context().Value(userIDKey).(string)
     return userID, ok
 }
-
-
