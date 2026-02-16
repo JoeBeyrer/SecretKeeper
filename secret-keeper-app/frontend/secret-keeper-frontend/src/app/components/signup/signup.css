@@ -1,4 +1,4 @@
-.login-container {
+.signup-container {
   display: flex;
   justify-content: center;
   align-items: center;
@@ -6,7 +6,7 @@
   padding: 20px;
 }
 
-.login-card {
+.signup-card {
   background: #303742;
   padding: 40px;
   border-radius: 8px;
@@ -15,7 +15,7 @@
   max-width: 400px;
 }
 
-.login-card h1 {
+.signup-card h1 {
   text-align: center;
   margin-bottom: 30px;
   font-size: 24px;
@@ -46,7 +46,7 @@
   color: #999;
 }
 
-.login-button {
+.signup-button {
   width: 100%;
   padding: 12px;
   background-color: #1a702b;
@@ -59,34 +59,10 @@
   transition: background-color 0.3s;
 }
 
-.login-button:hover {
+.signup-button:hover {
   background-color: #1a702b;
 }
 
-.login-button:active {
+.signup-button:active {
   background-color: #1a702b;
-}
-
-.error-message {
-  color: red;
-  text-align: center;
-  margin-bottom: 15px;
-  font-size: 14px;
-}
-
-.signup-link {
-  text-align: center;
-  margin-top: 20px;
-  color: white;
-  font-size: 14px;
-}
-
-.signup-link a {
-  color: #34c9eb;
-  cursor: pointer;
-  font-weight: 600;
-}
-
-.signup-link a:hover {
-  text-decoration: underline;
 }

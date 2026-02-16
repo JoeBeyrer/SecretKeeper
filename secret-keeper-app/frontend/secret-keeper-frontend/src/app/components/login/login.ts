@@ -1,7 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
-import { HttpClient } from '@angular/common/http';
 
 @Component({
   selector: 'app-login',
@@ -9,7 +8,6 @@ import { HttpClient } from '@angular/common/http';
   templateUrl: './login.html',
   styleUrl: './login.css',
 })
-
 export class Login implements OnInit {
   loginForm: FormGroup;
   errorMessage: string = '';
@@ -17,8 +15,7 @@ export class Login implements OnInit {
 
   constructor(
     private fb: FormBuilder,
-    private router: Router,
-    private http: HttpClient
+    private router: Router
   ) {
     this.loginForm = this.fb.group({
       username: ['', [Validators.required]],
@@ -26,21 +23,16 @@ export class Login implements OnInit {
     });
   }
 
-  ngOnInit() {
-    this.http.get('app/components/login/login.txt', { responseType: 'text' }) //getting info from login.txt
-      .subscribe({
-        next: (data) => {
-          try {
-            this.validCredentials = JSON.parse(data);
-            console.log('got the credentials', this.validCredentials);
-          } catch (error) {
-            console.error('something went wrong parsing login.txt', error);
-          }
-        },
-        error: (error) => {
-          console.error('something went wrong loading login.txt', error);
-        }
-      });
+  async ngOnInit() {
+    try {
+      const response = await fetch('/login.txt');
+      const text = await response.text();
+      const cleanText = text.replace(/^\uFEFF/, '').trim();
+      
+      this.validCredentials = JSON.parse(cleanText);
+    } catch (error) {
+      console.error('something went wrong loading the login text file', error);
+    }
   }
 
   onSubmit() {
@@ -53,14 +45,18 @@ export class Login implements OnInit {
       
       if (isValid) {
         this.errorMessage = '';
-        console.log('login worked', { username });
+        console.log('login worked with username ', { username });
         this.router.navigate(['/messaging']);
       } else {
-        this.errorMessage = 'Login incorrect';
-        console.log("login didn't work", { username });
+        this.errorMessage = 'Login Incorrect';
+        console.log('login did not work with username ', { username });
       }
     } else {
       this.errorMessage = 'Fill in all fields';
     }
+  }
+
+  goToSignup() {
+    this.router.navigate(['/signup']);
   }
 }
