@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
+import { HttpClient } from '@angular/common/http';
 
 @Component({
   selector: 'app-login',
@@ -12,8 +13,8 @@ export class Login implements OnInit {
   loginForm: FormGroup;
   errorMessage: string = '';
   validCredentials: [string, string][] = [];
-
   constructor(
+    private http: HttpClient,
     private fb: FormBuilder,
     private router: Router
   ) {
@@ -34,32 +35,30 @@ export class Login implements OnInit {
     // }
   }
 
-  async onSubmit() {
-    console.log("On submit triggered")  
+  onSubmit() {
+    console.log("On submit triggered");
     if (this.loginForm.valid) {
-      const { username, password } = this.loginForm.value;
-      try{
-        const response = await fetch('http://localhost:8080/api/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, password })
+      const {username, password} = this.loginForm.value;
+        this.http.post('http://localhost:8080/api/login', {username, password}).subscribe({
+          next: () => { //successful request
+            this.errorMessage = '';
+            console.log('Login worked with username', username);
+            this.router.navigate(['/messaging']);
+          },
+          error: (err) => {
+            this.errorMessage = 'Invalid username or password';
+            console.log('Error with request ',  err);
+            return;
+          },
+          complete: () => {
+            console.log('Login request finished');
+          }
         });
-        if (response.ok) {
-          this.errorMessage = '';
-          console.log('Login worked with username ', { username });
-          this.router.navigate(['/messaging']);
-        } else {
-          this.errorMessage = 'Login Incorrect';
-          console.log('Login did not work with username ', { username });
-        }
-      } catch (error){
-          console.log('Error with request');
-        }
     } else {
-      this.errorMessage = 'Fill in all fields';
+      this.errorMessage = 'Please fill in all fields with valid entries';
+      console.log('Invalid loginForm');
     }
   }
-
   goToSignup() {
     this.router.navigate(['/signup']);
   }

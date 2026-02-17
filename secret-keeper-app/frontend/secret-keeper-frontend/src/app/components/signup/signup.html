@@ -38,6 +38,9 @@
           class="form-control"
         />
       </div>
+      @if (errorMessage) {
+        <div class="error-message">{{ errorMessage }}</div>
+      }
       <button type="submit" class="signup-button">Sign Up</button>
     </form>
   </div>

@@ -1,6 +1,7 @@
 import { Component } from '@angular/core';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
+import { HttpClient } from '@angular/common/http';
 
 @Component({
   selector: 'app-signup',
@@ -13,6 +14,7 @@ export class Signup {
   errorMessage: string = '';
 
   constructor(
+    private http: HttpClient,
     private fb: FormBuilder,
     private router: Router
   ) {
@@ -24,35 +26,33 @@ export class Signup {
     });
   }
 
-  async onSubmit() {
+  onSubmit() {
     const {username,email,password,confirmPassword} = this.signupForm.value;
-    if (this.signupForm.invalid) {
-      this.errorMessage = 'Please fill out all fields correctly.';
-      return;
-    }
-    if(password != confirmPassword){
-      this.errorMessage = 'Passwords do not match, please fix';
-      return;
-    }
-    console.log('Information passed basic checks, sending request')
-    try{
-      const response = await fetch('http://localhost:8080/api/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({username, email, password})
-      });
-      if (response.ok) {
-        this.errorMessage = '';
-        console.log('Successfully registered with username ', { username });
-        this.router.navigate(['/login']);
-      } else {
-        this.errorMessage = 'Error with registering';
-        console.log('Register did not work with username ', { username });
+    if (this.signupForm.valid) {
+      if(password != confirmPassword){
+        this.errorMessage = 'Passwords do not match, please fix';
         return;
       }
-    } catch (error){
-        console.log('Error with request');
-        return;
+      console.log('Information passed basic checks, sending request')
+      this.http.post('http://localhost:8080/api/register', {username, email, password}).subscribe({
+        next: () => {
+          this.errorMessage = '';
+          console.log('Successfully registered with username ', { username });
+          this.router.navigate(['/login']);
+        },
+        error: (err) => {
+          this.errorMessage = err;
+          console.log('Register did not work with username ', { username });
+          return;
+        },
+        complete: () => {
+          this.errorMessage = '';
+          console.log('Sign up request finished');
+        }
+      });
+    } else {
+      this.errorMessage = 'Please fill in all fields with valid entries';
+      console.log('Invalid loginForm');
     }
   this.router.navigate(['/login']);
   }
