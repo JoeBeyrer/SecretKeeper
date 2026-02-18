@@ -29,6 +29,11 @@ func main() {
     mux.HandleFunc("/api/register", handlers.RegisterHandler(db))
     mux.HandleFunc("/api/login", handlers.LoginHandler(db, 24*time.Hour))
 
+    // PASSWORD RESET ROUTES
+    mux.HandleFunc("/api/password-reset/request", handlers.ForgotPasswordHandler(db))
+    mux.HandleFunc("/api/password-reset/validate", handlers.ValidateResetTokenHandler(db))
+    mux.HandleFunc("/api/password-reset/confirm", handlers.ResetPasswordHandler(db))
+
     // PROTECTED ROUTES
     auth := handlers.AuthMiddleware(db)
     mux.Handle("/ws", auth(http.HandlerFunc(handlers.WebSocketHandler(hub, db))))
