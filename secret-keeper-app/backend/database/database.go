@@ -83,12 +83,12 @@ func InitDB(path string) *sql.DB {
         CREATE TABLE IF NOT EXISTS messages (
             id TEXT PRIMARY KEY,
             conversation_id TEXT,
-            user_id TEXT,
+            sender_id TEXT,
             ciphertext BLOB NOT NULL,
             created_at INTEGER,
             expires_at INTEGER,
             FOREIGN KEY (conversation_id) REFERENCES conversations(id),
-            FOREIGN KEY (user_id) REFERENCES users(id)
+            FOREIGN KEY (sender_id) REFERENCES users(id)
         )
     `)
 
