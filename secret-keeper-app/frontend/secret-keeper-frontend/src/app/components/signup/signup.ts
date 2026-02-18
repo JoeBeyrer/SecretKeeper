@@ -54,6 +54,38 @@ export class Signup {
       this.errorMessage = 'Please fill in all fields with valid entries';
       console.log('Invalid loginForm');
     }
-  this.router.navigate(['/login']);
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      this.errorMessage = 'Email must be a valid email address';
+      return;
+    }
+    if (password && password.length < 8) {
+      this.errorMessage = 'Password must be at least 8 characters long';
+      return;
+    }
+    if (confirmPassword && confirmPassword.length < 8) {
+      this.errorMessage = 'Confirm Password must be at least 8 characters long';
+      return;
+    }
+    if (username && username.length < 3) {
+      this.errorMessage = 'Username must be at least 3 characters long';
+      return;
+    }
+    if (!username) {
+      this.errorMessage = 'Username is required';
+      return;
+    }
+    if (!email) {
+      this.errorMessage = 'Email is required';
+      return;
+    }
+    if (!password) {
+      this.errorMessage = 'Password is required';
+      return;
+    }
+    if (!confirmPassword) {
+      this.errorMessage = 'Confirm Password is required';
+      return;
+    }
+    this.errorMessage = 'error';
   }
 }
