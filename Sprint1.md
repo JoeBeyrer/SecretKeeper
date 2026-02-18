@@ -25,12 +25,33 @@
 22. As a user, I want to access the app through the web, so that I can conveniently interface from any device
 
 ## Planned Issues
-
+### Password Reset
+- Move SMTP credentials out of mailer.go and into environment variables to prevent secret exposure in version control
+- Add rate limiting to prevent repeated submissions of the same email address from flooding a user's inbox with reset emails
+- Add email verification at signup so that the email stored in the database is confirmed to belong to the user before a reset can be triggered
+- Perhaps move used/expired reset tokens out of the password_resets table into a separate audit log table to keep the active table small and queryable
 
 ## Successfully Completed
-
+- Account creation — users can register with a username, email, and password; passwords are hashed with bcrypt before storage
+- Login — users can authenticate with their username and password; a secure session cookie is issued on success with a 24-hour TTL
+- Password reset — users can request a reset link via email, receive a secure one-time token valid for 1 hour, and set a new password through a dedicated page; all active sessions are invalidated on reset
+- Secure credential storage — passwords are hashed using bcrypt, never stored in plaintext; session tokens are stored as UUIDs with expiration enforcement
+- Web access — the app runs in the browser via Angular at localhost:4200, communicating with the Go backend at localhost:8080
+- Backend session management — sessions are created, validated, and deleted from the database; expired sessions are rejected automatically
+- Database schema — SQLite database initialized with tables for users, sessions, password resets, conversations, conversation members, and messages with foreign key enforcement
+- Messaging infrastructure — WebSocket handler implemented with a hub that manages connected clients, routes messages to conversation members, and saves ciphertext to the database
+- Conversation creation — backend endpoint to create conversations and add members, with deduplication logic
+- Basic messaging UI — frontend messaging page renders messages with username, timestamp, and content; supports sending new messages with Enter key or button click
+- CORS configuration — backend configured to accept requests from the Angular frontend origin with credentials
 
 ## Incomplete / Carried Over
+- Messaging UI is not yet connected to the backend WebSocket — messages are currently loaded from a static messaging.txt file
+- Signup form validation logic needs to be cleaned up
+- No logout endpoint implemented
+- User profiles table exists in the database but has no corresponding handlers or frontend: display name, bio, and profile picture are not usable yet
+- Password reset SMTP credentials are hardcoded in source code — will expose secrets if not revoked from public repository and hidden
+- No end-to-end encryption implemented yet - messages are stored as ciphertext but no key exchange or encryption logic exists on the frontend
+- No user search functionality
+- No friends/contacts system 
 
-
-## Demo Videos
+## Demo Video
