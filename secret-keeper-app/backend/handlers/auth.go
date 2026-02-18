@@ -93,7 +93,7 @@ func LoginHandler(db *sql.DB, sessionTTL time.Duration) http.HandlerFunc {
             Value:    sessionID,
             Path:     "/",
             HttpOnly: true,
-            Secure:   true, // must be HTTPS
+            Secure:   false, // must be HTTPS - set to False only for testing
             SameSite: http.SameSiteLaxMode,
             Expires:  time.Unix(expires, 0),
         }

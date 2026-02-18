@@ -10,8 +10,8 @@ SecretKeeper is a privacy first messenger where all messages are end-to-end encr
 ## Roles
 For this project, the intention is for every team member to gain exposure to both front-end AngularJS development and backend GO programming. We do not plan to strictly adhere to the roles below.
 As a temporary placeholder, the role assignments will be:
-- Front-End Engineers: Joe Beyrer, Christian Farese
-- Back-End Engineers: Gabriel Kravets, David Edelstein
+- Front-End Engineers: David Edelstein, Christian Farese
+- Back-End Engineers: Gabriel Kravets, Joe Beyrer
 
 ## Project Setup
 - Install Go using [here](https://go.dev/dl/)
@@ -19,6 +19,7 @@ As a temporary placeholder, the role assignments will be:
 - Run `go get github.com/rs/cors` to install CORS middleware
 - Run `go get golang.org/x/crypto/bcrypt` for bcrypt password hashing
 - Run `go get github.com/google/uuid` for UUID use in database
+- Run `go get github.com/gorilla/websocket` for messaging with websockets
 
 - Run `npm install -g @angular/cli` to install Angular CLI
 - Install node.js [here](https://nodejs.org/en/download)

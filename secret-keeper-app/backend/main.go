@@ -8,6 +8,7 @@ import (
     "github.com/rs/cors"
     "secret-keeper-app/backend/database"
     "secret-keeper-app/backend/handlers"
+    "secret-keeper-app/backend/messaging"
 )
 
 func main() {
@@ -15,6 +16,8 @@ func main() {
     defer db.Close()
 
     mux := http.NewServeMux()
+
+    hub := messaging.NewHub() // messaging
 
     // Health check
     mux.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
@@ -26,13 +29,12 @@ func main() {
     mux.HandleFunc("/api/register", handlers.RegisterHandler(db))
     mux.HandleFunc("/api/login", handlers.LoginHandler(db, 24*time.Hour))
 
-    // // PROTECTED ROUTES
-    // auth := handlers.AuthMiddleware(db)
-    // mux.Handle("/api/conversations/create", auth(http.HandlerFunc(handlers.CreateConversationHandler(db))))
-    // mux.Handle("/api/messages/send", auth(http.HandlerFunc(handlers.SendMessageHandler(db))))
+    // PROTECTED ROUTES
+    auth := handlers.AuthMiddleware(db)
+    mux.Handle("/ws", auth(http.HandlerFunc(handlers.WebSocketHandler(hub, db))))
+    mux.Handle("/api/conversations", auth(http.HandlerFunc(handlers.CreateConversationHandler(db))))
 
     // TEMPORARY FOR TESTING _ REMOVE OR COMMENT
-    auth := handlers.AuthMiddleware(db)
     mux.Handle("/api/test-auth", auth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
         userID, ok := handlers.GetUserIDFromContext(r)
         if !ok {
