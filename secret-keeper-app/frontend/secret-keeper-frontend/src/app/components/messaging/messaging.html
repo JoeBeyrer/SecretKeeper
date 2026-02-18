@@ -1,1 +1,34 @@
-<p>messaging works!</p>
+<div class="messaging-container">
+  <div class="messaging-card">
+    <h1>Messages</h1>
+
+    @if (errorMessage) {
+      <div class="error-message">{{ errorMessage }}</div>
+    }
+
+    <div class="message-list">
+      @for (msg of messages; track msg.time + msg.username) {
+        <div class="message-item">
+          <div class="message-header">
+            <span class="message-username">{{ msg.username }}</span>
+            <span class="message-time">{{ msg.time }}</span>
+          </div>
+          <div class="message-content">{{ msg.content }}</div>
+        </div>
+      }
+    </div>
+
+    <div class="message-input-area">
+      <div class="form-group">
+        <input
+          type="text"
+          [(ngModel)]="newMessage"
+          placeholder="Send a message"
+          class="form-control"
+          (keydown.enter)="sendMessage()"
+        />
+      </div>
+      <button class="send-button" (click)="sendMessage()">Send</button>
+    </div>
+  </div>
+</div>
