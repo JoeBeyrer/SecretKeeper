@@ -25,7 +25,29 @@
 22. As a user, I want to access the app through the web, so that I can conveniently interface from any device
 
 ## Planned Issues
-
+### Messaging
+- Design database schema for conversations, conversation_members, and messages tables with proper foreign key relationships
+- Implement backend to create a new conversation and add members
+- Set up WebSocket for real-time bidirectional messaging
+- Create a connection hub to manage active clients and route messages to the correct conversation participants
+- Persist messages to the database before broadcasting to ensure durability
+- Restrict message visibility to users who are members of the conversation
+- Implement end-to-end encryption so that message content is encrypted on the sender’s device and only decrypted on recipient devices
+### User Registration
+- Implement user signup to allow new users to create accounts with username, email, and password
+- Hash passwords using bcrypt before storing them in the database
+- Validate input fields (non-empty username, properly formatted email, password length requirements)
+- Enforce uniqueness constraints on username and email at the database level
+- Create a corresponding frontend signup page that sends registration data to the backend
+- Establish database schema for users table with appropriate fields and constraints
+### User Login and Authentication
+- Implement login to verify credentials against stored bcrypt hashes
+- Create session management system using session identifiers
+- Store active sessions in the database with expiration timestamps
+- Issue secure HTTP-only session cookies upon successful login
+- Add middleware to protect authenticated routes and verify session validity
+- Ensure expired or invalid sessions are rejected automatically
+- Plan for logout functionality that deletes sessions from the database and clears cookies
 
 ## Successfully Completed
 - Account creation — users can register with a username, email, and password; passwords are hashed with bcrypt before storage
@@ -55,4 +77,4 @@
 - Used/expired reset tokens are not archived from the password_resets table 
 
 ## Demo Video
-https://youtu.be/LeLfc1uK1j0?si=p0fjT9530ZNbSFug
+[Sprint 1 Demo Video](https://www.youtube.com/watch?v=LeLfc1uK1j0)
