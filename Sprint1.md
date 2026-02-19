@@ -25,11 +25,7 @@
 22. As a user, I want to access the app through the web, so that I can conveniently interface from any device
 
 ## Planned Issues
-### Password Reset
-- Move SMTP credentials out of mailer.go and into environment variables to prevent secret exposure in version control
-- Add rate limiting to prevent repeated submissions of the same email address from flooding a user's inbox with reset emails
-- Add email verification at signup so that the email stored in the database is confirmed to belong to the user before a reset can be triggered
-- Perhaps move used/expired reset tokens out of the password_resets table into a separate audit log table to keep the active table small and queryable
+
 
 ## Successfully Completed
 - Account creation — users can register with a username, email, and password; passwords are hashed with bcrypt before storage
@@ -52,6 +48,11 @@
 - Password reset SMTP credentials are hardcoded in source code — will expose secrets if not revoked from public repository and hidden
 - No end-to-end encryption implemented yet - messages are stored as ciphertext but no key exchange or encryption logic exists on the frontend
 - No user search functionality
-- No friends/contacts system 
+- No friends/contacts system
+- Password reset SMTP credentials are hardcoded in source code — should be moved to environment variables to avoid secret exposure
+- No rate limiting on password reset requests
+- No email verification at signup before allowing password resets
+- Used/expired reset tokens are not archived from the password_resets table 
 
 ## Demo Video
+https://youtu.be/LeLfc1uK1j0?si=p0fjT9530ZNbSFug
