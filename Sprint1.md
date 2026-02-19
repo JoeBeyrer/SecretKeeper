@@ -25,6 +25,7 @@
 22. As a user, I want to access the app through the web, so that I can conveniently interface from any device
 
 ## Planned Issues
+We plan to implement functionality to support user stories 1, 2, 5, 9, 17, 18, 19, and 22.
 ### Messaging
 - Design database schema for conversations, conversation_members, and messages tables with proper foreign key relationships
 - Implement backend to create a new conversation and add members
