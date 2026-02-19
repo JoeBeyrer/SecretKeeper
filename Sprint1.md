@@ -26,14 +26,6 @@
 
 ## Planned Issues
 We plan to implement functionality to support user stories 1, 2, 5, 9, 17, 18, 19, and 22.
-### Messaging
-- Design database schema for conversations, conversation_members, and messages tables with proper foreign key relationships
-- Implement backend to create a new conversation and add members
-- Set up WebSocket for real-time bidirectional messaging
-- Create a connection hub to manage active clients and route messages to the correct conversation participants
-- Persist messages to the database before broadcasting to ensure durability
-- Restrict message visibility to users who are members of the conversation
-- Implement end-to-end encryption so that message content is encrypted on the sender’s device and only decrypted on recipient devices
 ### User Registration
 - Implement user signup to allow new users to create accounts with username, email, and password
 - Hash passwords using bcrypt before storing them in the database
@@ -49,6 +41,24 @@ We plan to implement functionality to support user stories 1, 2, 5, 9, 17, 18, 1
 - Add middleware to protect authenticated routes and verify session validity
 - Ensure expired or invalid sessions are rejected automatically
 - Plan for logout functionality that deletes sessions from the database and clears cookies
+### Password Reset
+- Password Reset
+- Implement functionality allowing users to request a password reset via email
+- Generate a secure one-time token valid for 1 hour
+- Store reset tokens in the password_resets table with expiration tracking
+- Send reset link to the user’s registered email
+- Create a dedicated frontend page for setting a new password
+- Hash new password using bcrypt before storing it
+- Invalidate all active sessions upon successful password reset
+- Ensure expired or invalid reset tokens are rejected
+### Messaging
+- Design database schema for conversations, conversation_members, and messages tables with proper foreign key relationships
+- Implement backend to create a new conversation and add members
+- Set up WebSocket for real-time bidirectional messaging
+- Create a connection hub to manage active clients and route messages to the correct conversation participants
+- Persist messages to the database before broadcasting to ensure durability
+- Restrict message visibility to users who are members of the conversation
+- Implement end-to-end encryption so that message content is encrypted on the sender’s device and only decrypted on recipient devices
 
 ## Successfully Completed
 - Account creation — users can register with a username, email, and password; passwords are hashed with bcrypt before storage
@@ -64,6 +74,7 @@ We plan to implement functionality to support user stories 1, 2, 5, 9, 17, 18, 1
 - CORS configuration — backend configured to accept requests from the Angular frontend origin with credentials
 
 ## Incomplete / Carried Over
+All issues that were incomplete are due to time constraints. The team decided to be ambitious with initial issue selection, planning to carry over any features that were not fully implemented into the next sprint. As such, these will be completed as part of Sprint 2.
 - Messaging UI is not yet connected to the backend WebSocket — messages are currently loaded from a static messaging.txt file
 - Signup form validation logic needs to be cleaned up
 - No logout endpoint implemented
