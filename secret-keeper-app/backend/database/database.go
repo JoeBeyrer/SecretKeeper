@@ -25,7 +25,8 @@ func InitDB(path string) *sql.DB {
             username TEXT UNIQUE NOT NULL,
             email TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
-            created_at INTEGER NOT NULL
+            created_at INTEGER NOT NULL,
+            email_verified INTEGER NOT NULL DEFAULT 0
         )
     `)
 
@@ -50,6 +51,17 @@ func InitDB(path string) *sql.DB {
     `)
 
 	execOrFatal(db, `
+        CREATE TABLE IF NOT EXISTS email_verifications (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            token TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            expires_at INTEGER NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    `)
+
+	execOrFatal(db, `
         CREATE TABLE IF NOT EXISTS password_resets (
             id TEXT PRIMARY KEY,
             user_id TEXT NOT NULL,
@@ -58,6 +70,18 @@ func InitDB(path string) *sql.DB {
             expires_at INTEGER NOT NULL,
             used INTEGER DEFAULT 0,
             FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    `)
+
+	execOrFatal(db, `
+        CREATE TABLE IF NOT EXISTS password_reset_audit (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            token TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            expires_at INTEGER NOT NULL,
+            archived_at INTEGER NOT NULL,
+            reason TEXT NOT NULL
         )
     `)
 
