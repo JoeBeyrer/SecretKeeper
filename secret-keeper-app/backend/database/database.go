@@ -16,8 +16,8 @@ func InitDB(path string) *sql.DB {
 		log.Fatal(err)
 	}
 
-	execOrFatal(db, `PRAGMA journal_mode=WAL;`)
-	execOrFatal(db, `PRAGMA foreign_keys = ON;`)
+	execOrFatal(db, `PRAGMA journal_mode=WAL;`)  // WAL makes fewer db locked issues
+	execOrFatal(db, `PRAGMA foreign_keys = ON;`) // explicitly allow foreing keys
 
 	execOrFatal(db, `
         CREATE TABLE IF NOT EXISTS users (
@@ -25,14 +25,9 @@ func InitDB(path string) *sql.DB {
             username TEXT UNIQUE NOT NULL,
             email TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
-            created_at INTEGER NOT NULL,
-            email_verified INTEGER NOT NULL DEFAULT 0
+            created_at INTEGER NOT NULL
         )
     `)
-
-	// email_verified column may not exist in older databases — add it if missing.
-	// This is safe to run on every startup; it's a no-op if the column already exists.
-	db.Exec(`ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0`)
 
 	execOrFatal(db, `
         CREATE TABLE IF NOT EXISTS user_profiles (
@@ -46,7 +41,7 @@ func InitDB(path string) *sql.DB {
 
 	execOrFatal(db, `
         CREATE TABLE IF NOT EXISTS sessions (
-            id TEXT PRIMARY KEY,
+            id TEXT PRIMARY KEY,               
             user_id TEXT NOT NULL,
             created_at INTEGER NOT NULL,
             expires_at INTEGER NOT NULL,
@@ -54,19 +49,6 @@ func InitDB(path string) *sql.DB {
         )
     `)
 
-	// Stores pending one-time tokens sent to users at signup to verify their email.
-	execOrFatal(db, `
-        CREATE TABLE IF NOT EXISTS email_verifications (
-            id TEXT PRIMARY KEY,
-            user_id TEXT NOT NULL,
-            token TEXT NOT NULL,
-            created_at INTEGER NOT NULL,
-            expires_at INTEGER NOT NULL,
-            FOREIGN KEY (user_id) REFERENCES users(id)
-        )
-    `)
-
-	// Active reset tokens — only unused, non-expired rows live here.
 	execOrFatal(db, `
         CREATE TABLE IF NOT EXISTS password_resets (
             id TEXT PRIMARY KEY,
@@ -76,19 +58,6 @@ func InitDB(path string) *sql.DB {
             expires_at INTEGER NOT NULL,
             used INTEGER DEFAULT 0,
             FOREIGN KEY (user_id) REFERENCES users(id)
-        )
-    `)
-
-	// Audit trail — rows are moved here from password_resets once used or expired.
-	execOrFatal(db, `
-        CREATE TABLE IF NOT EXISTS password_reset_audit (
-            id TEXT PRIMARY KEY,
-            user_id TEXT NOT NULL,
-            token TEXT NOT NULL,
-            created_at INTEGER NOT NULL,
-            expires_at INTEGER NOT NULL,
-            archived_at INTEGER NOT NULL,
-            reason TEXT NOT NULL
         )
     `)
 
