@@ -15,6 +15,9 @@ func main() {
     db := database.InitDB("./database/secretkeeper.db")
     defer db.Close()
 
+    // Background goroutine that sweeps expired reset tokens
+    handlers.StartTokenCleanup(db)
+
     mux := http.NewServeMux()
 
     hub := messaging.NewHub() // messaging
@@ -28,6 +31,7 @@ func main() {
     // PUBLIC ROUTES
     mux.HandleFunc("/api/register", handlers.RegisterHandler(db))
     mux.HandleFunc("/api/login", handlers.LoginHandler(db, 24*time.Hour))
+    mux.HandleFunc("/api/verify-email", handlers.VerifyEmailHandler(db))
 
     // PASSWORD RESET ROUTES
     mux.HandleFunc("/api/password-reset/request", handlers.ForgotPasswordHandler(db))
