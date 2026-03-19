@@ -1,14 +1,18 @@
 package handlers
 
 import (
-    "database/sql"
-    "encoding/json"
     "context"
+    "crypto/rand"
+    "database/sql"
+    "encoding/hex"
+    "encoding/json"
+    "log"
     "net/http"
     "time"
 
     "secret-keeper-app/backend/auth"
     "secret-keeper-app/backend/database"
+    "secret-keeper-app/backend/email"
     "github.com/google/uuid"
 )
 
@@ -44,14 +48,72 @@ func RegisterHandler(db *sql.DB) http.HandlerFunc {
 
         id := uuid.New().String()
         now := time.Now().Unix()
-        _, err = db.Exec(`INSERT INTO users (id, username, email, password_hash, created_at) VALUES (?, ?, ?, ?, ?)`, id, req.Username, req.Email, hashed, now)
+        _, err = db.Exec(`INSERT INTO users (id, username, email, password_hash, created_at, email_verified) VALUES (?, ?, ?, ?, ?, 0)`, id, req.Username, req.Email, hashed, now)
         if err != nil {
             http.Error(w, "could not create user", http.StatusConflict)
             return
         }
 
+        tokenBytes := make([]byte, 32)
+        if _, err := rand.Read(tokenBytes); err != nil {
+            http.Error(w, "server error", http.StatusInternalServerError)
+            return
+        }
+        token := hex.EncodeToString(tokenBytes)
+        verifyID := uuid.New().String()
+        expiresAt := time.Now().Add(24 * time.Hour).Unix()
+
+        _, err = db.Exec(`INSERT INTO email_verifications (id, user_id, token, created_at, expires_at) VALUES (?, ?, ?, ?, ?)`, verifyID, id, token, now, expiresAt)
+        if err != nil {
+            log.Printf("[REGISTER] failed to store verification token for user %s: %v", id, err)
+        } else {
+            if err := email.SendVerificationEmail(req.Email, token); err != nil {
+                log.Printf("[REGISTER] verification email failed for user %s: %v", id, err)
+            } else {
+                log.Printf("[REGISTER] verification email sent to %s", req.Email)
+            }
+        }
+
         w.WriteHeader(http.StatusCreated)
-        w.Write([]byte(`{"user_id":"` + id + `"}`))
+        w.Write([]byte(`{"user_id":"` + id + `","message":"Account created. Please check your email to verify your address before logging in."}`))
+    }
+}
+
+func VerifyEmailHandler(db *sql.DB) http.HandlerFunc {
+    return func(w http.ResponseWriter, r *http.Request) {
+        token := r.URL.Query().Get("token")
+        if token == "" {
+            http.Error(w, "token required", http.StatusBadRequest)
+            return
+        }
+
+        var verifyID, userID string
+        var expiresAt int64
+        err := db.QueryRow(
+            `SELECT id, user_id, expires_at FROM email_verifications WHERE token = ?`, token,
+        ).Scan(&verifyID, &userID, &expiresAt)
+
+        if err != nil {
+            http.Error(w, "invalid or expired verification link", http.StatusUnprocessableEntity)
+            return
+        }
+        if time.Now().Unix() > expiresAt {
+            db.Exec(`DELETE FROM email_verifications WHERE id = ?`, verifyID)
+            http.Error(w, "verification link has expired", http.StatusUnprocessableEntity)
+            return
+        }
+
+        if _, err := db.Exec(`UPDATE users SET email_verified = 1 WHERE id = ?`, userID); err != nil {
+            http.Error(w, "server error", http.StatusInternalServerError)
+            return
+        }
+
+        db.Exec(`DELETE FROM email_verifications WHERE id = ?`, verifyID)
+
+        log.Printf("[VERIFY EMAIL] user %s verified successfully", userID)
+
+        // Redirect to the login page
+        http.Redirect(w, r, "http://localhost:4200/login?verified=true", http.StatusFound)
     }
 }
 
@@ -70,7 +132,8 @@ func LoginHandler(db *sql.DB, sessionTTL time.Duration) http.HandlerFunc {
 
         var userID string
         var pwHash []byte
-        err := db.QueryRow(`SELECT id, password_hash FROM users WHERE username = ?`, req.Username).Scan(&userID, &pwHash)
+        var emailVerified int
+        err := db.QueryRow(`SELECT id, password_hash, email_verified FROM users WHERE username = ?`, req.Username).Scan(&userID, &pwHash, &emailVerified)
         if err != nil {
             http.Error(w, "invalid credentials", http.StatusUnauthorized)
             return
@@ -78,6 +141,11 @@ func LoginHandler(db *sql.DB, sessionTTL time.Duration) http.HandlerFunc {
 
         if err := auth.CheckPasswordHash(pwHash, req.Password); err != nil {
             http.Error(w, "invalid credentials", http.StatusUnauthorized)
+            return
+        }
+
+        if emailVerified == 0 {
+            http.Error(w, "please verify your email address before logging in", http.StatusForbidden)
             return
         }
 
