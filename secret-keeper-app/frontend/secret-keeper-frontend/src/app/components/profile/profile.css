@@ -284,3 +284,27 @@
 .remove-picture-button:hover {
   background: rgba(255, 107, 107, 0.1);
 }
+
+.section-divider {
+  display: flex;
+  align-items: center;
+  margin: 30px 0 24px;
+  gap: 12px;
+}
+
+.section-divider span {
+  color: #aab0ba;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.section-divider::before,
+.section-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #4a5260;
+}
