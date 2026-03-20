@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 
 @Component({
@@ -12,11 +12,13 @@ import { HttpClient } from '@angular/common/http';
 export class Login implements OnInit {
   loginForm: FormGroup;
   errorMessage: string = '';
+  successMessage: string = '';
   validCredentials: [string, string][] = [];
   constructor(
     private http: HttpClient,
     private fb: FormBuilder,
-    private router: Router
+    private router: Router,
+    private route: ActivatedRoute
   ) {
     this.loginForm = this.fb.group({
       username: ['', [Validators.required, Validators.minLength(3)]],
@@ -24,7 +26,13 @@ export class Login implements OnInit {
     });
   }
 
-  async ngOnInit() {
+  ngOnInit() {
+    // Show a confirmation message if the user just verified their email.
+    this.route.queryParams.subscribe(params => {
+      if (params['verified'] === 'true') {
+        this.successMessage = 'Email verified! You can now log in.';
+      }
+    });
     // try {
     //   const response = await fetch('/login.txt');
     //   const text = await response.text();
@@ -42,11 +50,16 @@ export class Login implements OnInit {
         this.http.post('http://localhost:8080/api/login', {username, password}).subscribe({
           next: () => { //successful request
             this.errorMessage = '';
+            this.successMessage = '';
             console.log('Login worked with username', username);
             this.router.navigate(['/messaging']);
           },
           error: (err) => {
-            this.errorMessage = 'Invalid username or password';
+            if (err.status === 403) {
+              this.errorMessage = 'Please verify your email address before logging in. Check your inbox.';
+            } else {
+              this.errorMessage = 'Invalid username or password';
+            }
             console.log('Error with request ',  err);
             return;
           },
