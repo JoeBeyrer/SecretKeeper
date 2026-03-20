@@ -87,6 +87,62 @@
         </button>
       </form>
 
+
+      <!-- Account Settings section -->
+      <div class="section-divider">
+        <span>Account</span>
+      </div>
+
+      <form [formGroup]="accountForm" (ngSubmit)="onSaveAccount()">
+        <div class="form-group">
+          <label class="form-label">New Username</label>
+          <input
+            type="text"
+            formControlName="new_username"
+            placeholder="Leave blank to keep current"
+            class="form-control"
+          />
+        </div>
+        <div class="form-group">
+          <label class="form-label">New Email</label>
+          <input
+            type="email"
+            formControlName="new_email"
+            placeholder="Leave blank to keep current"
+            class="form-control"
+          />
+        </div>
+        <div class="form-group">
+          <label class="form-label">New Password</label>
+          <input
+            type="password"
+            formControlName="new_password"
+            placeholder="Leave blank to keep current"
+            class="form-control"
+          />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Confirm New Password</label>
+          <input
+            type="password"
+            formControlName="confirm_new_password"
+            placeholder="Repeat new password"
+            class="form-control"
+          />
+        </div>
+
+        @if (accountErrorMessage) {
+          <div class="error-message">{{ accountErrorMessage }}</div>
+        }
+        @if (accountSuccessMessage) {
+          <div class="success-message">{{ accountSuccessMessage }}</div>
+        }
+
+        <button type="submit" class="save-button" [disabled]="isSavingAccount">
+          {{ isSavingAccount ? 'Saving…' : 'Update Account' }}
+        </button>
+      </form>
+
       <!-- Change password link -->
       <div class="footer-link">
         <p>Want to change your password? <a (click)="goToLogin()">Use the reset link on the login page</a></p>
