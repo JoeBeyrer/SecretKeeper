@@ -42,7 +42,7 @@ export class Profile implements OnInit {
     });
 
     this.accountForm = this.fb.group({
-      new_username: ['', [Validators.minLength(3), Validators.maxLength(30)]],
+      new_username: ['', [Validators.minLength(3)]],
       new_email: ['', [Validators.email]],
       new_password: ['', [Validators.minLength(8)]],
       confirm_new_password: [''],
