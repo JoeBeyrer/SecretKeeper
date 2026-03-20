@@ -47,7 +47,7 @@ export class Login implements OnInit {
     console.log("On submit triggered");
     if (this.loginForm.valid) {
       const {username, password} = this.loginForm.value;
-        this.http.post('http://localhost:8080/api/login', {username, password}).subscribe({
+        this.http.post('http://localhost:8080/api/login', {username, password}, { withCredentials: true }).subscribe({
           next: () => { //successful request
             this.errorMessage = '';
             this.successMessage = '';
