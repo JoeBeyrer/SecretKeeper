@@ -173,3 +173,20 @@ func buildMessage(from, to, subject, htmlBody, plainLink string) []byte {
 	buf.WriteString("--" + boundary + "--\r\n")
 	return buf.Bytes()
 }
+
+func SendEmailChangeVerificationEmail(toAddress, token string) error {
+	host, port, user, pass, from, _ := smtpCfg()
+	verifyLink := fmt.Sprintf("http://localhost:8080/api/verify-email-change?token=%s", token)
+
+	var htmlBody bytes.Buffer
+	if err := verifyEmailTmpl.Execute(&htmlBody, verifyLink); err != nil {
+		return fmt.Errorf("email: failed to render template: %w", err)
+	}
+
+	msg := buildMessage(from, toAddress, "Confirm your new SecretKeeper email", htmlBody.String(), verifyLink)
+	auth := smtp.PlainAuth("", user, pass, host)
+	if err := smtp.SendMail(host+":"+port, auth, from, []string{toAddress}, msg); err != nil {
+		return fmt.Errorf("email: smtp.SendMail failed: %w", err)
+	}
+	return nil
+}
