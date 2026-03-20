@@ -1,6 +1,9 @@
 <div class="messaging-container">
   <div class="messaging-card">
-    <h1>Messages</h1>
+    <div class="messaging-header">
+      <h1>Messages</h1>
+      <button class="profile-button" (click)="goToProfile()">My Profile</button>
+    </div>
 
     @if (errorMessage) {
       <div class="error-message">{{ errorMessage }}</div>
