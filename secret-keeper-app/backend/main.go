@@ -32,6 +32,7 @@ func main() {
     mux.HandleFunc("/api/register", handlers.RegisterHandler(db))
     mux.HandleFunc("/api/login", handlers.LoginHandler(db, 24*time.Hour))
     mux.HandleFunc("/api/verify-email", handlers.VerifyEmailHandler(db))
+    mux.HandleFunc("/api/verify-email-change", handlers.VerifyEmailChangeHandler(db))
     mux.HandleFunc("/api/logout", handlers.LogoutHandler(db))
 
     // PASSWORD RESET ROUTES
@@ -46,6 +47,7 @@ func main() {
     mux.Handle("/api/profile", auth(http.HandlerFunc(handlers.GetProfileHandler(db))))
     mux.Handle("/api/profile/update", auth(http.HandlerFunc(handlers.UpdateProfileHandler(db))))
     mux.Handle("/api/profile/picture", auth(http.HandlerFunc(handlers.UploadProfilePictureHandler(db))))
+    mux.Handle("/api/account", auth(http.HandlerFunc(handlers.UpdateAccountHandler(db))))
 
     // TEMPORARY FOR TESTING _ REMOVE OR COMMENT
     mux.Handle("/api/test-auth", auth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
