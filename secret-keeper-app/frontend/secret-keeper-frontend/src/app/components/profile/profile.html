@@ -1,0 +1,97 @@
+<div class="profile-container">
+  <div class="profile-card">
+
+    @if (isLoading) {
+      <div class="spinner"></div>
+    }
+
+    @if (!isLoading) {
+      <div class="profile-header">
+        <h1>Account Settings</h1>
+        <div class="header-actions">
+          <button class="nav-button" (click)="goToMessaging()">Messages</button>
+          <button class="logout-button" (click)="onLogout()">Log Out</button>
+        </div>
+      </div>
+
+      <!-- Profile Picture -->
+      <div class="picture-section">
+        <div class="avatar-wrapper">
+          @if (profile?.profile_picture_url) {
+            <img [src]="profile!.profile_picture_url" alt="Profile picture" class="avatar" />
+          }
+          @if (!profile?.profile_picture_url) {
+            <div class="avatar-placeholder">{{ profile?.username?.charAt(0)?.toUpperCase() }}</div>
+          }
+        </div>
+        <div class="picture-controls">
+          <label class="upload-label" for="pictureInput">
+            {{ isUploadingPicture ? 'Uploading…' : 'Change Picture' }}
+          </label>
+          <input
+            id="pictureInput"
+            type="file"
+            accept="image/jpeg,image/png,image/gif,image/webp"
+            (change)="onPictureSelected($event)"
+            class="file-input"
+          />
+          <p class="upload-hint">JPEG, PNG, GIF or WebP · max 2 MB</p>
+          @if (profile?.profile_picture_url) {
+            <button type="button" class="remove-picture-button" (click)="onRemovePicture()">Remove Picture</button>
+          }
+        </div>
+      </div>
+
+      <!-- Read-only info -->
+      <div class="info-section">
+        <div class="info-row">
+          <span class="info-label">Username</span>
+          <span class="info-value">{{ profile?.username }}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Email</span>
+          <span class="info-value">{{ profile?.email }}</span>
+        </div>
+      </div>
+
+      <!-- Editable fields -->
+      <form [formGroup]="profileForm" (ngSubmit)="onSave()">
+        <div class="form-group">
+          <label class="form-label">Display Name</label>
+          <input
+            type="text"
+            formControlName="display_name"
+            placeholder="How others see your name"
+            class="form-control"
+          />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Bio</label>
+          <textarea
+            formControlName="bio"
+            placeholder="Tell people a little about yourself"
+            class="form-control textarea"
+            rows="3"
+          ></textarea>
+        </div>
+
+        @if (errorMessage) {
+          <div class="error-message">{{ errorMessage }}</div>
+        }
+        @if (successMessage) {
+          <div class="success-message">{{ successMessage }}</div>
+        }
+
+        <button type="submit" class="save-button" [disabled]="isSaving">
+          {{ isSaving ? 'Saving…' : 'Save Changes' }}
+        </button>
+      </form>
+
+      <!-- Change password link -->
+      <div class="footer-link">
+        <p>Want to change your password? <a (click)="goToLogin()">Use the reset link on the login page</a></p>
+      </div>
+    }
+
+  </div>
+</div>
