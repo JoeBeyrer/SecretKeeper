@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 
 interface ProfileData {
@@ -20,25 +20,42 @@ interface ProfileData {
 export class Profile implements OnInit {
   profile: ProfileData | null = null;
   profileForm: FormGroup;
+  accountForm: FormGroup;
   errorMessage: string = '';
   successMessage: string = '';
+  accountErrorMessage: string = '';
+  accountSuccessMessage: string = '';
   isLoading: boolean = true;
   isSaving: boolean = false;
+  isSavingAccount: boolean = false;
   isUploadingPicture: boolean = false;
 
   constructor(
     private http: HttpClient,
     private fb: FormBuilder,
-    private router: Router
+    private router: Router,
+    private route: ActivatedRoute
   ) {
     this.profileForm = this.fb.group({
       display_name: ['', [Validators.maxLength(50)]],
       bio: ['', [Validators.maxLength(200)]],
     });
+
+    this.accountForm = this.fb.group({
+      new_username: ['', [Validators.minLength(3), Validators.maxLength(30)]],
+      new_email: ['', [Validators.email]],
+      new_password: ['', [Validators.minLength(8)]],
+      confirm_new_password: [''],
+    });
   }
 
   ngOnInit(): void {
     this.loadProfile();
+    this.route.queryParams.subscribe(params => {
+      if (params['email_updated'] === 'true') {
+        this.accountSuccessMessage = 'Email address updated successfully.';
+      }
+    });
   }
 
   loadProfile(): void {
@@ -88,6 +105,57 @@ export class Profile implements OnInit {
       error: () => {
         this.errorMessage = 'Failed to save profile. Please try again.';
         this.isSaving = false;
+      },
+    });
+  }
+
+  onSaveAccount(): void {
+    const { new_username, new_email, new_password, confirm_new_password } = this.accountForm.value;
+
+    if (!new_username && !new_email && !new_password) {
+      this.accountErrorMessage = 'Please fill in at least one field to update.';
+      return;
+    }
+
+    if (new_password && new_password !== confirm_new_password) {
+      this.accountErrorMessage = 'New passwords do not match.';
+      return;
+    }
+
+    this.isSavingAccount = true;
+    this.accountErrorMessage = '';
+    this.accountSuccessMessage = '';
+
+    const payload: any = {};
+    if (new_username) payload.new_username = new_username;
+    if (new_email) payload.new_email = new_email;
+    if (new_password) {
+      payload.new_password = new_password;
+    }
+
+    this.http.put<{ message: string }>(
+      'http://localhost:8080/api/account',
+      payload,
+      { withCredentials: true }
+    ).subscribe({
+      next: (res) => {
+        this.accountSuccessMessage = res.message;
+        this.isSavingAccount = false;
+        this.accountForm.reset();
+        if (this.profile) {
+          if (new_username) this.profile.username = new_username;
+          if (new_email) this.profile.email = new_email;
+        }
+      },
+      error: (err) => {
+        if (err.status === 409) {
+          this.accountErrorMessage = 'Username or email is already taken.';
+        } else if (err.status === 400 && err.error === 'that is already your current email') {
+          this.accountErrorMessage = 'That is already your current email.';
+        } else {
+          this.accountErrorMessage = 'Failed to update account. Please try again.';
+        }
+        this.isSavingAccount = false;
       },
     });
   }
