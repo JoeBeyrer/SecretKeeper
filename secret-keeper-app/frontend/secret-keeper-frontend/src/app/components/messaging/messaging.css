@@ -18,6 +18,36 @@
   max-height: 80vh;
 }
 
+.messaging-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+}
+
+.messaging-header h1 {
+  font-size: 24px;
+  font-weight: 600;
+  color: white;
+  margin: 0;
+}
+
+.profile-button {
+  padding: 8px 16px;
+  background: transparent;
+  color: #34c9eb;
+  border: 1px solid #34c9eb;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.profile-button:hover {
+  background: rgba(52, 201, 235, 0.1);
+}
+
 .messaging-card h1 {
   text-align: center;
   margin-bottom: 30px;
