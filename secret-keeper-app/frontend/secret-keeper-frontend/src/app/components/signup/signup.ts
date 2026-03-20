@@ -12,6 +12,7 @@ import { HttpClient } from '@angular/common/http';
 export class Signup {
   signupForm: FormGroup;
   errorMessage: string = '';
+  successMessage: string = '';
 
   constructor(
     private http: HttpClient,
@@ -27,65 +28,64 @@ export class Signup {
   }
 
   onSubmit() {
-    const {username,email,password,confirmPassword} = this.signupForm.value;
-    if (this.signupForm.valid) {
-      if(password != confirmPassword){
-        this.errorMessage = 'Passwords do not match, please fix';
-        return;
-      }
-      console.log('Information passed basic checks, sending request')
-      this.http.post('http://localhost:8080/api/register', {username, email, password}).subscribe({
-        next: () => {
-          this.errorMessage = '';
-          console.log('Successfully registered with username ', { username });
-          this.router.navigate(['/login']);
-        },
-        error: (err) => {
-          this.errorMessage = err;
-          console.log('Register did not work with username ', { username });
-          return;
-        },
-        complete: () => {
-          this.errorMessage = '';
-          console.log('Sign up request finished');
-        }
-      });
-    } else {
-      this.errorMessage = 'Please fill in all fields with valid entries';
-      console.log('Invalid loginForm');
-    }
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      this.errorMessage = 'Email must be a valid email address';
-      return;
-    }
-    if (password && password.length < 8) {
-      this.errorMessage = 'Password must be at least 8 characters long';
-      return;
-    }
-    if (confirmPassword && confirmPassword.length < 8) {
-      this.errorMessage = 'Confirm Password must be at least 8 characters long';
-      return;
-    }
-    if (username && username.length < 3) {
-      this.errorMessage = 'Username must be at least 3 characters long';
-      return;
-    }
+    const { username, email, password, confirmPassword } = this.signupForm.value;
+    const controls = this.signupForm.controls;
+
     if (!username) {
       this.errorMessage = 'Username is required';
+      return;
+    }
+    if (controls['username'].errors?.['minlength']) {
+      this.errorMessage = 'Username must be at least 3 characters';
       return;
     }
     if (!email) {
       this.errorMessage = 'Email is required';
       return;
     }
+    if (controls['email'].errors?.['email']) {
+      this.errorMessage = 'Email must be a valid email address';
+      return;
+    }
     if (!password) {
       this.errorMessage = 'Password is required';
       return;
     }
-    if (!confirmPassword) {
-      this.errorMessage = 'Confirm Password is required';
+    if (controls['password'].errors?.['minlength']) {
+      this.errorMessage = 'Password must be at least 8 characters';
       return;
     }
-    this.errorMessage = 'error';
+    if (!confirmPassword) {
+      this.errorMessage = 'Please confirm your password';
+      return;
+    }
+    if (password !== confirmPassword) {
+      this.errorMessage = 'Passwords do not match';
+      return;
+    }
+
+    this.errorMessage = '';
+    console.log('Information passed basic checks, sending request');
+    this.http.post<{ message: string }>('http://localhost:8080/api/register', { username, email, password }).subscribe({
+      next: (res) => {
+        this.errorMessage = '';
+        this.successMessage = res.message || 'Account created! Please check your email to verify your address before logging in.';
+        this.signupForm.reset();
+        console.log('Successfully registered with username', username);
+      },
+      error: (err) => {
+        this.successMessage = '';
+        if (err.status === 409) {
+          this.errorMessage = 'Username or email is already taken.';
+        } else {
+          this.errorMessage = 'Something went wrong. Please try again.';
+        }
+        console.log('Register did not work:', err);
+      },
+    });
+  }
+
+  goToLogin() {
+    this.router.navigate(['/login']);
   }
 }
