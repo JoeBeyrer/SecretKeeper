@@ -228,10 +228,6 @@ export class Profile implements OnInit {
     });
   }
 
-  goToLogin(): void {
-    this.router.navigate(['/login']);
-  }
-
   goToMessaging(): void {
     this.router.navigate(['/messaging']);
   }
