@@ -57,9 +57,11 @@ func InitDB(path string) *sql.DB {
             token TEXT NOT NULL,
             created_at INTEGER NOT NULL,
             expires_at INTEGER NOT NULL,
+            new_email TEXT DEFAULT '',
             FOREIGN KEY (user_id) REFERENCES users(id)
         )
     `)
+
 
 	execOrFatal(db, `
         CREATE TABLE IF NOT EXISTS password_resets (
