@@ -236,23 +236,6 @@
   font-size: 14px;
 }
 
-.footer-link {
-  text-align: center;
-  margin-top: 20px;
-  color: white;
-  font-size: 14px;
-}
-
-.footer-link a {
-  color: #34c9eb;
-  cursor: pointer;
-  font-weight: 600;
-}
-
-.footer-link a:hover {
-  text-decoration: underline;
-}
-
 /* Spinner */
 .spinner {
   width: 40px;
