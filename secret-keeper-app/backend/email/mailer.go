@@ -129,7 +129,7 @@ var verifyEmailTmpl = template.Must(template.New("verify").Parse(`<!DOCTYPE html
 </html>`))
 
 func SendVerificationEmail(toAddress, token string) error {
-	host, port, user, pass, from, baseURL := smtpCfg()
+	host, port, user, pass, from, _ := smtpCfg()
 	verifyLink := fmt.Sprintf("http://localhost:8080/api/verify-email?token=%s", token)
 
 	var htmlBody bytes.Buffer
