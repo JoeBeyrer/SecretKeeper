@@ -1,5 +1,6 @@
 import { Component, NgZone, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 
 interface Message {
   username: string;
@@ -19,7 +20,7 @@ export class Messaging implements OnInit {
   currentUser: string = 'User1';
   errorMessage: string = '';
 
-  constructor(private ngZone: NgZone) {}
+  constructor(private ngZone: NgZone, private router: Router) {}
 
   async ngOnInit() { //this one loads messages from messages.txt
     try {
@@ -71,5 +72,9 @@ export class Messaging implements OnInit {
     });
 
     this.newMessage = '';
+  }
+
+  goToProfile() {
+    this.router.navigate(['/profile']);
   }
 }
