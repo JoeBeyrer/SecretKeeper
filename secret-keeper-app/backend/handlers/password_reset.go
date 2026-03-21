@@ -108,6 +108,21 @@ func cleanupExpiredTokens(db *sql.DB) {
 	if len(expired) > 0 {
 		log.Printf("[TOKEN CLEANUP] archived %d expired token(s)", len(expired))
 	}
+
+	// This prevents abandoned signups from permanently claiming a username or email in users table.
+	result, err := db.Exec(`
+		DELETE FROM users WHERE email_verified = 0 AND id IN (
+			SELECT user_id FROM email_verifications WHERE expires_at < ? AND new_email = ''
+		)
+	`, now)
+	if err != nil {
+		log.Printf("[TOKEN CLEANUP] failed to delete unverified users: %v", err)
+	} else if n, _ := result.RowsAffected(); n > 0 {
+		log.Printf("[TOKEN CLEANUP] deleted %d unverified user(s) with expired tokens", n)
+	}
+
+	// Also clean up the expired verification token rows themselves.
+	db.Exec(`DELETE FROM email_verifications WHERE expires_at < ? AND new_email = ''`, now)
 }
 
 // Requests
