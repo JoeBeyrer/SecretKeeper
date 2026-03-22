@@ -17,7 +17,7 @@ import (
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
-		return true // adjust for final submission
+		return true
 	},
 }
 
@@ -47,7 +47,7 @@ func WebSocketHandler(hub *messaging.Hub, db *sql.DB) http.HandlerFunc {
 		client := &messaging.Client{
 			UserID: userID,
 			Conn:   conn,
-			Send:   make(chan []byte),
+			Send:   make(chan []byte, 256), // buffered to avoid blocking hub
 		}
 
 		hub.Register(client)
@@ -56,8 +56,6 @@ func WebSocketHandler(hub *messaging.Hub, db *sql.DB) http.HandlerFunc {
 		go readPump(client, hub, db)
 	}
 }
-
-
 
 func writePump(c *messaging.Client, hub *messaging.Hub) {
 	defer func() {
@@ -100,9 +98,7 @@ func readPump(c *messaging.Client, hub *messaging.Hub, db *sql.DB) {
 			ciphertext := msg.Ciphertext
 			createdAt := time.Now().Unix()
 
-			// Make sure user is part of the conversation
 			if !database.IsUserInConversation(db, senderID, convID) {
-				log.Println("User not in conversation")
 				continue
 			}
 
@@ -112,23 +108,29 @@ func readPump(c *messaging.Client, hub *messaging.Hub, db *sql.DB) {
 				continue
 			}
 
-			// broadcast
+			senderUsername, err := database.GetUsernameByID(db, senderID)
+			if err != nil {
+				continue
+			}
+
 			outgoing := models.WSMessage{
 				Type:           "new_message",
 				ConversationID: convID,
 				Ciphertext:     ciphertext,
+				SenderID:       senderUsername,
 			}
 
-			jsonData, _ := json.Marshal(outgoing)
-
-			// Get conversation members
-			members, err := database.GetConversationMembers(db, convID)
+			jsonData, err := json.Marshal(outgoing)
 			if err != nil {
-				log.Println("Failed to get members:", err)
 				continue
 			}
 
-			// Send to each member
+			// Get conversation members and broadcast to all of them
+			members, err := database.GetConversationMembers(db, convID)
+			if err != nil {
+				continue
+			}
+
 			for _, userID := range members {
 				hub.SendToUser(userID, jsonData)
 			}

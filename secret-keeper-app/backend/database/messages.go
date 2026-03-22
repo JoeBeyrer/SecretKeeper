@@ -25,6 +25,12 @@ func IsUserInConversation(db *sql.DB, userID, conversationID string) bool {
 	return err == nil
 }
 
+func GetUsernameByID(db *sql.DB, userID string) (string, error) {
+	var username string
+	err := db.QueryRow(`SELECT username FROM users WHERE id = ?`, userID).Scan(&username)
+	return username, err
+}
+
 func GetConversationMembers(db *sql.DB, conversationID string) ([]string, error) {
 	rows, err := db.Query(`
 		SELECT user_id FROM conversation_members
