@@ -36,12 +36,24 @@ func CreateConversationHandler(db *sql.DB) http.HandlerFunc {
             return
         }
 
-        // add the requester
-        members := append(req.MemberIDs, userID)
-        // deduplicate in case requester included themselves
+        // Get UUIDs using usernames
+        var resolvedIDs []string
+        for _, username := range req.MemberIDs {
+            var resolvedID string
+            err := db.QueryRow(`SELECT id FROM users WHERE username = ?`, username).Scan(&resolvedID)
+            if err != nil {
+                http.Error(w, "user not found: "+username, http.StatusBadRequest)
+                return
+            }
+            resolvedIDs = append(resolvedIDs, resolvedID)
+        }
+
+        members := append(resolvedIDs, userID)
         seen := map[string]bool{}
         for _, id := range members {
-            if seen[id] { continue }
+            if seen[id] {
+                continue
+            }
             seen[id] = true
             _, err := db.Exec(`INSERT INTO conversation_members (conversation_id, user_id, joined_at) VALUES (?, ?, ?)`, convID, id, now)
             if err != nil {
