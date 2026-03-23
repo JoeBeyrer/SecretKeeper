@@ -1,8 +1,8 @@
 :root {
   --font-family-roboto: 'Roboto', sans-serif;
-  --text-rgb-124-124-124: rgba(124, 124, 124, 1);
-  --text-rgb-48-48-48: rgba(48, 48, 48, 1);
-  --text-rgb-112-112-112: rgba(112, 112, 112, 1);
+  --text-rgb-124-124-124: #999;
+  --text-rgb-48-48-48: #fff;
+  --text-rgb-112-112-112: #999;
   --text-white: rgba(255, 255, 255, 1);
 }
 
@@ -49,7 +49,7 @@ img {
   flex-grow: 0;
   flex-shrink: 1;
   flex-basis: auto;
-  background-color: rgba(255, 255, 255, 1);
+  background-color: #1a1e24;
   width: 100%;
   height: 100vh;
   display: flex;
@@ -62,7 +62,7 @@ img {
   flex-grow: 0;
   flex-shrink: 1;
   flex-basis: auto;
-  background-color: rgba(239, 246, 252, 1);
+  background-color: #1a1e24;
   flex: 1;
   display: flex;
   gap: 24px;
@@ -73,7 +73,7 @@ img {
   flex-grow: 0;
   flex-shrink: 1;
   flex-basis: auto;
-  background-color: rgba(110, 0, 255, 1);
+  background-color: #1a702b;
   border-radius: 25px;
   border: none;
   color: rgba(255, 255, 255, 1);
@@ -87,7 +87,7 @@ img {
 }
 
 .rectangle-1-3:hover {
-  background-color: rgba(90, 0, 214, 1);
+  background-color: #1a702b;
 }
 
 .rectangle-2-4 {
@@ -95,7 +95,7 @@ img {
   flex-shrink: 1;
   flex-basis: auto;
   box-shadow: 0px 4px 5px 2px rgba(0,0,0,0.5);
-  background-color: rgba(255, 255, 255, 1);
+  background-color: #303742;
   border-radius: 25px;
   width: 360px;
   min-width: 300px;
@@ -109,7 +109,7 @@ img {
   flex-shrink: 1;
   flex-basis: auto;
   box-shadow: 0px 4px 5px 2px rgba(0,0,0,0.5);
-  background-color: rgba(255, 255, 255, 1);
+  background-color: #303742;
   border-radius: 25px;
   flex: 1;
   display: flex;
@@ -130,7 +130,7 @@ img {
   flex-grow: 0;
   flex-shrink: 1;
   flex-basis: auto;
-  background-color: rgba(239, 246, 252, 0.87);
+  background-color: #3b4450;
   border-radius: 25px;
   border: none;
   padding: 10px 14px;
@@ -292,8 +292,8 @@ img {
   height: 40px;
   border-radius: 50%;
   border: none;
-  background: rgba(239, 246, 252, 1);
-  color: rgba(110, 0, 255, 1);
+  background: #3b4450;
+  color: #34c9eb;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -302,7 +302,7 @@ img {
 }
 
 .profile-btn:hover {
-  background: rgba(220, 230, 242, 1);
+  background: #444;
 }
 
 .conversation-list {
@@ -385,6 +385,7 @@ img {
   gap: 16px;
 }
 
+
 .message-row {
   display: flex;
   align-items: flex-end;
@@ -406,21 +407,21 @@ img {
 }
 
 .message-bubble.received {
-  background-color: rgba(231, 231, 231, 1);
+  background-color: #3b4450;
   border-bottom-left-radius: 6px;
 }
 
 .message-bubble.sent {
-  background-color: rgba(110, 0, 255, 1);
+  background-color: #34c9eb;
   border-bottom-right-radius: 6px;
 }
 
 .message-bubble.sent .text-38 {
-  color: var(--text-white);
+  color: #1a1e24;
 }
 
 .message-bubble.sent .text-35 {
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(26, 30, 36, 0.7);
 }
 
 .no-messages {
