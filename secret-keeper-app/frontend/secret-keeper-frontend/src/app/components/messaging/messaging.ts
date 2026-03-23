@@ -1,4 +1,4 @@
-import { Component, NgZone, OnInit, OnDestroy } from '@angular/core';
+import { Component, NgZone, OnInit, OnDestroy, ViewChild, ElementRef, AfterViewChecked } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
@@ -11,7 +11,14 @@ interface Message {
   username: string;
   time: string;
   content: string;
-  isMine: boolean; 
+  isMine: boolean;
+}
+
+interface Conversation {
+  id: string;
+  name: string;
+  lastMessage: string;
+  lastMessageTime: string;
 }
 
 @Component({
@@ -20,19 +27,22 @@ interface Message {
   templateUrl: './messaging.html',
   styleUrl: './messaging.css',
 })
-export class Messaging implements OnInit, OnDestroy {
+export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
   messages: Message[] = [];
   newMessage: string = '';
   errorMessage: string = '';
 
-  // Conversation state
   conversationId: string = '';
-  newConversationMemberId: string = ''; 
+  newConversationMemberId: string = '';
   isConnected: boolean = false;
 
   currentUsername: string = '';
+  conversations: Conversation[] = [];
 
   private messageSub: Subscription | null = null;
+  private shouldScrollToBottom = false;
+
+  @ViewChild('messagesArea') private messagesArea?: ElementRef;
 
   constructor(
     private ngZone: NgZone,
@@ -43,7 +53,6 @@ export class Messaging implements OnInit, OnDestroy {
   ) {}
 
   async ngOnInit(): Promise<void> {
-    // Load the current user to label messages
     const user = await this.authService.loadCurrentUser();
     if (!user) {
       this.router.navigate(['/login']);
@@ -51,11 +60,13 @@ export class Messaging implements OnInit, OnDestroy {
     }
     this.currentUsername = user.display_name || user.username;
 
-    // Subscribe to incoming messages from the service
     this.messageSub = this.messagingService.messages$.subscribe((incoming) => {
-      if (incoming.conversation_id !== this.conversationId) return;
+      if (incoming.conversation_id !== this.conversationId) {
+        // Update sidebar preview for other conversations
+        this.updateConversationPreview(incoming.conversation_id, incoming.ciphertext);
+        return;
+      }
 
-      // Skip our own messages
       if (incoming.sender_id === this.currentUsername) return;
 
       const msg: Message = {
@@ -67,37 +78,63 @@ export class Messaging implements OnInit, OnDestroy {
 
       this.ngZone.run(() => {
         this.messages.push(msg);
+        this.updateConversationPreview(incoming.conversation_id, incoming.ciphertext);
+        this.shouldScrollToBottom = true;
       });
     });
   }
 
-  // Connect to a specific conversation - currently using conv ID, will change to panel view
+  ngAfterViewChecked(): void {
+    if (this.shouldScrollToBottom) {
+      this.scrollToBottom();
+      this.shouldScrollToBottom = false;
+    }
+  }
+
+  selectConversation(convId: string): void {
+    if (this.conversationId === convId) return;
+    this.conversationId = convId;
+    this.messages = [];
+    this.errorMessage = '';
+
+    if (!this.messagingService.isConnected()) {
+      this.messagingService.connect();
+    }
+    this.isConnected = true;
+  }
+
   connectToConversation(): void {
     if (!this.conversationId.trim()) {
       this.errorMessage = 'Please enter a conversation ID.';
       return;
     }
     this.errorMessage = '';
-    this.messages = []; // clear old messages when switching conversations
+    this.messages = [];
 
     this.messagingService.connect();
-    this.isConnected = this.messagingService.isConnected();
+    this.isConnected = true;
+
+    this.addConversationToList(this.conversationId.trim(), this.conversationId.trim().substring(0, 8));
   }
 
-  // Create a new conversation with specified user
   async startNewConversation(): Promise<void> {
     if (!this.newConversationMemberId.trim()) {
-      this.errorMessage = 'Please enter a user ID to start a conversation with.';
+      this.errorMessage = 'Please enter a username to start a conversation with.';
       return;
     }
 
     try {
-      const convId = await this.conversationService.createConversation([
-        this.newConversationMemberId.trim(),
-      ]);
+      const username = this.newConversationMemberId.trim();
+      const convId = await this.conversationService.createConversation([username]);
       this.conversationId = convId;
       this.newConversationMemberId = '';
-      this.connectToConversation();
+      this.errorMessage = '';
+      this.messages = [];
+
+      this.addConversationToList(convId, username);
+
+      this.messagingService.connect();
+      this.isConnected = true;
     } catch (e: any) {
       this.ngZone.run(() => {
         this.errorMessage = e.message || 'Failed to create conversation.';
@@ -118,34 +155,71 @@ export class Messaging implements OnInit, OnDestroy {
       return;
     }
 
-    // MVP: sends plaintext in the ciphertext field.
     this.messagingService.sendMessage(this.conversationId, this.newMessage.trim());
 
-    this.messages.push({
+    const msg: Message = {
       username: this.currentUsername,
       time: this.formatTime(new Date()),
       content: this.newMessage.trim(),
       isMine: true,
-    });
-
+    };
+    this.messages.push(msg);
+    this.updateConversationPreview(this.conversationId, this.newMessage.trim());
     this.newMessage = '';
+    this.shouldScrollToBottom = true;
   }
 
   goToProfile(): void {
     this.router.navigate(['/profile']);
   }
 
+  getActiveConversationName(): string {
+    const conv = this.conversations.find(c => c.id === this.conversationId);
+    return conv ? conv.name : this.conversationId.substring(0, 8);
+  }
+
   ngOnDestroy(): void {
     this.messageSub?.unsubscribe();
   }
 
+  private addConversationToList(id: string, name: string): void {
+    if (this.conversations.find(c => c.id === id)) return;
+    this.conversations.unshift({
+      id,
+      name,
+      lastMessage: '',
+      lastMessageTime: '',
+    });
+  }
+
+  private updateConversationPreview(convId: string, text: string): void {
+    const conv = this.conversations.find(c => c.id === convId);
+    if (conv) {
+      conv.lastMessage = text.length > 40 ? text.substring(0, 40) + '...' : text;
+      conv.lastMessageTime = this.formatTimeShort(new Date());
+    }
+  }
+
+  private scrollToBottom(): void {
+    if (this.messagesArea) {
+      const el = this.messagesArea.nativeElement;
+      el.scrollTop = el.scrollHeight;
+    }
+  }
+
   private formatTime(d: Date): string {
-    const hh = String(d.getUTCHours()).padStart(2, '0');
-    const mm = String(d.getUTCMinutes()).padStart(2, '0');
-    const ss = String(d.getUTCSeconds()).padStart(2, '0');
-    const month = d.getUTCMonth() + 1;
-    const day = d.getUTCDate();
-    const year = d.getUTCFullYear();
-    return `${hh}:${mm}:${ss} ${month}-${day}-${year}`;
+    const hours = d.getHours();
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    const ampm = hours >= 12 ? 'pm' : 'am';
+    const h = hours % 12 || 12;
+    return `Today, ${h}.${minutes}${ampm}`;
+  }
+
+  private formatTimeShort(d: Date): string {
+    const hours = d.getHours();
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    const ampm = hours >= 12 ? 'pm' : 'am';
+    const h = hours % 12 || 12;
+    return `${h}:${minutes}${ampm}`;
   }
 }

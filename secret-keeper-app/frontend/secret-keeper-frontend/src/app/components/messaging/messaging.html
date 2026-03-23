@@ -1,71 +1,146 @@
-<div class="messaging-container">
-  <div class="messaging-card">
-    <div class="messaging-header">
-      <h1>Messages</h1>
-      <button class="profile-button" (click)="goToProfile()">My Profile</button>
-    </div>
-
-    @if (errorMessage) {
-      <div class="error-message">{{ errorMessage }}</div>
-    }
-
-    @if (!isConnected) {
-      <div class="conv-setup">
-        <div class="conv-setup-section">
-          <p class="conv-label">Join an existing conversation</p>
-          <div class="conv-input-row">
-            <input
-              type="text"
-              [(ngModel)]="conversationId"
-              placeholder="Paste conversation ID"
-              class="form-control"
-            />
-            <button class="send-button" (click)="connectToConversation()">Join</button>
-          </div>
-        </div>
-
-        <div class="conv-divider">or</div>
-
-        <div class="conv-setup-section">
-          <p class="conv-label">Start a new conversation</p>
-          <div class="conv-input-row">
-            <input
-              type="text"
-              [(ngModel)]="newConversationMemberId"
-              placeholder="Enter the other user's ID"
-              class="form-control"
-            />
-            <button class="send-button" (click)="startNewConversation()">Start</button>
-          </div>
-        </div>
+<div class="macbook-pro-16-1-1">
+  <div class="rectangle-3-2">
+    <div class="rectangle-2-4">
+      <div class="sidebar-header">
+        <p class="text-25"><span class="text-rgb-48-48-48">Chats</span></p>
+        <button class="profile-btn" (click)="goToProfile()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+            <circle cx="12" cy="7" r="4"/>
+          </svg>
+        </button>
       </div>
-    }
 
-    @if (isConnected) {
-      <div class="message-list">
-        @for (msg of messages; track msg.time + msg.username) {
-          <div class="message-item">
-            <div class="message-header">
-              <span class="message-username">{{ msg.username }}</span>
-              <span class="message-time">{{ msg.time }}</span>
+      <div class="conversation-list">
+        @for (conv of conversations; track conv.id) {
+          <div
+            class="conversation-item"
+            [class.active]="conv.id === conversationId"
+            (click)="selectConversation(conv.id)"
+          >
+            <svg class="ellipse-1-7" viewBox="0 0 48 48">
+              <circle cx="24" cy="24" r="24" fill="rgba(231, 231, 231, 1)"/>
+              <text x="24" y="32" text-anchor="middle" font-size="20" font-weight="700" fill="rgba(48, 48, 48, 1)">{{ conv.name.charAt(0).toUpperCase() }}</text>
+            </svg>
+            <div class="conv-info">
+              <div class="conv-top-row">
+                <p class="text-26"><span class="text-rgb-48-48-48">{{ conv.name }}</span></p>
+                @if (conv.lastMessageTime) {
+                  <p class="text-35"><span class="text-rgb-124-124-124">{{ conv.lastMessageTime }}</span></p>
+                }
+              </div>
+              @if (conv.lastMessage) {
+                <p class="text-27"><span class="text-rgb-48-48-48">{{ conv.lastMessage }}</span></p>
+              }
             </div>
-            <div class="message-content">{{ msg.content }}</div>
+          </div>
+        }
+
+        @if (conversations.length === 0) {
+          <div class="no-conversations">
+            <p class="text-24"><span class="text-rgb-124-124-124">No conversations yet</span></p>
           </div>
         }
       </div>
 
-      <div class="message-input-area">
-        <div class="form-group">
+      <div class="sidebar-footer">
+        <div class="sidebar-action">
+          <input
+            type="text"
+            [(ngModel)]="conversationId"
+            placeholder="Paste conversation ID"
+            class="rectangle-9-13"
+            (keydown.enter)="connectToConversation()"
+          />
+          <button class="rectangle-1-3" (click)="connectToConversation()">Join</button>
+        </div>
+        <div class="sidebar-action">
+          <input
+            type="text"
+            [(ngModel)]="newConversationMemberId"
+            placeholder="Username to chat with"
+            class="rectangle-9-13"
+            (keydown.enter)="startNewConversation()"
+          />
+          <button class="rectangle-1-3" (click)="startNewConversation()">New</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="rectangle-4-5">
+      @if (isConnected && conversationId) {
+        <div class="chat-header">
+          <svg class="ellipse-2-12" viewBox="0 0 52 52">
+            <circle cx="26" cy="26" r="24" fill="rgba(231, 231, 231, 1)"/>
+            <circle cx="26" cy="26" r="24" stroke="rgba(83, 34, 188, 1)" stroke-width="4" fill="none"/>
+            <text x="26" y="34" text-anchor="middle" font-size="22" font-weight="700" fill="rgba(48, 48, 48, 1)">{{ getActiveConversationName().charAt(0).toUpperCase() }}</text>
+          </svg>
+          <div>
+            <p class="text-26"><span class="text-rgb-48-48-48">{{ getActiveConversationName() }}</span></p>
+          </div>
+        </div>
+
+        <div class="messages-area" #messagesArea>
+          @for (msg of messages; track $index) {
+            <div class="message-row" [class.mine]="msg.isMine" [class.theirs]="!msg.isMine">
+              @if (!msg.isMine) {
+                <svg class="ellipse-12-51" viewBox="0 0 36 36">
+                  <circle cx="18" cy="18" r="18" fill="rgba(231, 231, 231, 1)"/>
+                  <text x="18" y="26" text-anchor="middle" font-size="14" font-weight="700" fill="rgba(48, 48, 48, 1)">{{ msg.username.charAt(0).toUpperCase() }}</text>
+                </svg>
+              }
+              <div class="message-bubble" [class.sent]="msg.isMine" [class.received]="!msg.isMine">
+                @if (!msg.isMine) {
+                  <p class="text-25"><span class="text-rgb-48-48-48">{{ msg.username }}</span></p>
+                }
+                <p class="text-38" [class.text-white]="msg.isMine"><span [class.text-white]="msg.isMine" [class.text-rgb-48-48-48]="!msg.isMine">{{ msg.content }}</span></p>
+                <p class="text-35" [class.text-white]="msg.isMine"><span [class.text-white]="msg.isMine" [class.text-rgb-124-124-124]="!msg.isMine">{{ msg.time }}</span></p>
+              </div>
+              @if (msg.isMine) {
+                <svg class="ellipse-15-54" viewBox="0 0 36 36">
+                  <circle cx="18" cy="18" r="18" fill="rgba(110, 0, 255, 1)"/>
+                  <text x="18" y="26" text-anchor="middle" font-size="14" font-weight="700" fill="rgba(255, 255, 255, 1)">{{ currentUsername.charAt(0).toUpperCase() }}</text>
+                </svg>
+              }
+            </div>
+          }
+
+          @if (messages.length === 0) {
+            <div class="no-messages">
+              <p class="text-27"><span class="text-rgb-48-48-48">No messages yet. Say hello!</span></p>
+            </div>
+          }
+        </div>
+
+        <div class="message-input-bar">
           <input
             type="text"
             [(ngModel)]="newMessage"
-            placeholder="Send a message"
-            class="form-control"
+            placeholder="Type your message here..."
+            class="rectangle-9-13"
             (keydown.enter)="sendMessage()"
           />
+          <button class="rectangle-1-3" (click)="sendMessage()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"/>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+            </svg>
+          </button>
         </div>
-        <button class="send-button" (click)="sendMessage()">Send</button>
-      </div>
-    }
+      } @else {
+        <div class="empty-state">
+          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+          <p class="text-26"><span class="text-rgb-48-48-48">Select a conversation</span></p>
+          <p class="text-27"><span class="text-rgb-48-48-48">Join or create a conversation to start messaging</span></p>
+          @if (errorMessage) {
+            <div class="error-toast">
+              <p class="text-27"><span class="text-rgb-48-48-48">{{ errorMessage }}</span></p>
+            </div>
+          }
+        </div>
+      }
+    </div>
   </div>
 </div>
