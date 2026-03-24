@@ -293,6 +293,15 @@
   cursor: not-allowed;
 }
 
+.action-btn.message {
+  background: #34c9eb;
+  color: #1a1e24;
+}
+
+.action-btn.message:hover:not(:disabled) {
+  background: #2ab8d9;
+}
+
 .action-btn.accept {
   background: #1a702b;
   color: white;

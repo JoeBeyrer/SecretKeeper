@@ -1,6 +1,6 @@
 import { Component, NgZone, OnInit, OnDestroy, ViewChild, ElementRef, AfterViewChecked } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, ActivatedRoute } from '@angular/router';
 import { Subscription } from 'rxjs';
 
 import { MessagingService } from '../../services/messaging.service';
@@ -49,6 +49,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
   constructor(
     private ngZone: NgZone,
     private router: Router,
+    private route: ActivatedRoute,
     private messagingService: MessagingService,
     private conversationService: ConversationService,
     private authService: AuthService,
@@ -90,6 +91,25 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
         this.shouldScrollToBottom = true;
       });
     });
+
+    const chatWith = this.route.snapshot.queryParamMap.get('chatWith');
+    if (chatWith) {
+      try {
+        const convId = await this.conversationService.createConversation([chatWith]);
+        this.ngZone.run(() => {
+          this.conversationId = convId;
+          this.messages = [];
+          this.errorMessage = '';
+          this.addConversationToList(convId, chatWith);
+          this.messagingService.connect();
+          this.isConnected = true;
+        });
+      } catch (e: any) {
+        this.ngZone.run(() => {
+          this.errorMessage = e.message || 'Failed to start conversation.';
+        });
+      }
+    }
   }
 
   ngAfterViewChecked(): void {

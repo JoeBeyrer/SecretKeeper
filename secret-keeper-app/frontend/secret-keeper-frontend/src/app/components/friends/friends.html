@@ -84,6 +84,13 @@
               </div>
               <div class="row-actions">
                 <button
+                  class="action-btn message"
+                  (click)="startChat(f)"
+                  [disabled]="isActing(f.username)"
+                >
+                  {{ isActing(f.username) ? '...' : 'Message' }}
+                </button>
+                <button
                   class="action-btn danger"
                   (click)="remove(f)"
                   [disabled]="isActing(f.username)"
