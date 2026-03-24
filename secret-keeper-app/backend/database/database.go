@@ -118,6 +118,20 @@ func InitDB(path string) *sql.DB {
         )
     `)
 
+    execOrFatal(db, `
+        CREATE TABLE IF NOT EXISTS friendships (
+            id TEXT PRIMARY KEY,
+            requester_id TEXT NOT NULL,
+            addressee_id TEXT NOT NULL,
+            accepted INTEGER NOT NULL DEFAULT 0,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            FOREIGN KEY (requester_id) REFERENCES users(id),
+            FOREIGN KEY (addressee_id) REFERENCES users(id),
+            UNIQUE (requester_id, addressee_id)
+        )
+    `)
+
 	log.Println("Database initialized")
 	return db
 }

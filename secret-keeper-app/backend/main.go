@@ -54,6 +54,14 @@ func main() {
     mux.Handle("/api/profile/picture", auth(http.HandlerFunc(handlers.UploadProfilePictureHandler(db))))
     mux.Handle("/api/account", auth(http.HandlerFunc(handlers.UpdateAccountHandler(db))))
 
+    // FRIENDS ROUTES
+	mux.Handle("/api/friends", auth(http.HandlerFunc(handlers.GetFriendsHandler(db))))
+	mux.Handle("/api/friends/requests", auth(http.HandlerFunc(handlers.GetPendingRequestsHandler(db))))
+	mux.Handle("/api/friends/request", auth(http.HandlerFunc(handlers.SendFriendRequestHandler(db))))
+	mux.Handle("/api/friends/accept", auth(http.HandlerFunc(handlers.AcceptFriendRequestHandler(db))))
+	mux.Handle("/api/friends/decline", auth(http.HandlerFunc(handlers.DeclineFriendRequestHandler(db))))
+	mux.Handle("/api/friends/remove", auth(http.HandlerFunc(handlers.RemoveFriendHandler(db))))
+    
     // TEMPORARY FOR TESTING _ REMOVE OR COMMENT
     mux.Handle("/api/test-auth", auth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
         userID, ok := handlers.GetUserIDFromContext(r)
@@ -68,18 +76,18 @@ func main() {
 
     // CORS
     handler := cors.New(cors.Options{
-        AllowedOrigins:   []string{"http://localhost:4200"},
-        AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-        AllowedHeaders:   []string{"Content-Type"},
+        AllowedOrigins: []string{"http://localhost:4200"},
+        AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+        AllowedHeaders: []string{"Content-Type"},
         AllowCredentials: true,
     }).Handler(mux)
 
     server := &http.Server{
-        Addr:         ":8080",
-        Handler:      handler,
-        ReadTimeout:  10 * time.Second,
+        Addr: ":8080",
+        Handler: handler,
+        ReadTimeout: 10 * time.Second,
         WriteTimeout: 10 * time.Second,
-        IdleTimeout:  60 * time.Second,
+        IdleTimeout: 60 * time.Second,
     }
 
     log.Println("Server running on http://localhost:8080")

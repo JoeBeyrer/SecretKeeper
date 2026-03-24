@@ -1,39 +1,161 @@
-<div class="macbook-pro-16-1-1">
-  <div class="rectangle-6-6">
-    <div class="nav-icons">
-      <button class="nav-icon-btn" (click)="goTo('messaging')">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-        </svg>
-      </button>
-      <button class="nav-icon-btn" (click)="goTo('profile')">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="3"/>
-          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-        </svg>
-      </button>
-      <button class="nav-icon-btn active" (click)="goTo('friends')">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-          <circle cx="9" cy="7" r="4"/>
-          <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-          <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-        </svg>
-      </button>
-    </div>
-  </div>
-  <div class="friends-content-area">
-    <div class="rectangle-4-5">
-      <div class="empty-state">
-        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-          <circle cx="9" cy="7" r="4"/>
-          <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-          <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-        </svg>
-        <p class="text-26">Friends</p>
-        <p class="text-27">Coming soon</p>
+<div class="friends-container">
+  <div class="friends-card">
+
+    <!-- Header -->
+    <div class="friends-header">
+      <h1>Friends</h1>
+      <div class="header-actions">
+        <button class="nav-button" (click)="goToMessaging()">Messages</button>
+        <button class="nav-button" (click)="goToProfile()">Profile</button>
       </div>
     </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab" [class.active]="activeTab === 'friends'" (click)="setTab('friends')">
+        Friends
+        @if (friends.length > 0) {
+          <span class="tab-badge">{{ friends.length }}</span>
+        }
+      </button>
+      <button class="tab" [class.active]="activeTab === 'requests'" (click)="setTab('requests')">
+        Requests
+        @if (incomingCount > 0) {
+          <span class="tab-badge incoming">{{ incomingCount }}</span>
+        }
+      </button>
+      <button class="tab" [class.active]="activeTab === 'add'" (click)="setTab('add')">
+        Add Friend
+      </button>
+    </div>
+
+    <!-- Feedback messages -->
+    @if (errorMessage) {
+      <div class="feedback error">{{ errorMessage }}</div>
+    }
+    @if (successMessage) {
+      <div class="feedback success">{{ successMessage }}</div>
+    }
+
+    <!-- Initial load spinner — only shown before any data has ever loaded -->
+    @if (initialLoading) {
+      <div class="loading-row">
+        <span class="loading-dot"></span>
+        <span class="loading-dot"></span>
+        <span class="loading-dot"></span>
+      </div>
+    }
+
+    <!-- TAB: Friends List -->
+    @if (!initialLoading && activeTab === 'friends') {
+      <div class="list">
+        @if (friends.length === 0) {
+          <div class="empty-state">
+            <span class="empty-icon">👥</span>
+            <p>No friends yet. Add someone to get started.</p>
+          </div>
+        }
+        @for (f of friends; track f.user_id) {
+          <div class="friend-row">
+            <div class="avatar">{{ displayName(f)[0].toUpperCase() }}</div>
+            <div class="friend-info">
+              <span class="friend-name">{{ displayName(f) }}</span>
+              <span class="friend-username">&#64;{{ f.username }}</span>
+            </div>
+            <div class="row-actions">
+              <button
+                class="action-btn danger"
+                (click)="remove(f)"
+                [disabled]="isActing(f.username)"
+              >
+                {{ isActing(f.username) ? '...' : 'Remove' }}
+              </button>
+            </div>
+          </div>
+        }
+      </div>
+    }
+
+    <!-- TAB: Requests -->
+    @if (!initialLoading && activeTab === 'requests') {
+      <div class="list">
+
+        @if (incomingRequests.length > 0) {
+          <p class="section-label">Incoming</p>
+          @for (f of incomingRequests; track f.user_id) {
+            <div class="friend-row">
+              <div class="avatar incoming">{{ displayName(f)[0].toUpperCase() }}</div>
+              <div class="friend-info">
+                <span class="friend-name">{{ displayName(f) }}</span>
+                <span class="friend-username">&#64;{{ f.username }}</span>
+              </div>
+              <div class="row-actions">
+                <button
+                  class="action-btn accept"
+                  (click)="accept(f)"
+                  [disabled]="isActing(f.username)"
+                >
+                  {{ isActing(f.username) ? '...' : 'Accept' }}
+                </button>
+                <button
+                  class="action-btn danger"
+                  (click)="decline(f)"
+                  [disabled]="isActing(f.username)"
+                >
+                  {{ isActing(f.username) ? '...' : 'Decline' }}
+                </button>
+              </div>
+            </div>
+          }
+        }
+
+        @if (outgoingRequests.length > 0) {
+          <p class="section-label">Sent</p>
+          @for (f of outgoingRequests; track f.user_id) {
+            <div class="friend-row">
+              <div class="avatar outgoing">{{ displayName(f)[0].toUpperCase() }}</div>
+              <div class="friend-info">
+                <span class="friend-name">{{ displayName(f) }}</span>
+                <span class="friend-username">&#64;{{ f.username }}</span>
+              </div>
+              <div class="row-actions">
+                <span class="status-chip pending">Pending</span>
+              </div>
+            </div>
+          }
+        }
+
+        @if (incomingRequests.length === 0 && outgoingRequests.length === 0) {
+          <div class="empty-state">
+            <span class="empty-icon">📭</span>
+            <p>No pending requests.</p>
+          </div>
+        }
+      </div>
+    }
+
+    <!-- TAB: Add Friend -->
+    @if (!initialLoading && activeTab === 'add') {
+      <div class="add-section">
+        <p class="add-hint">Enter a username to send them a friend request.</p>
+        <div class="add-row">
+          <input
+            type="text"
+            class="form-control"
+            [(ngModel)]="addUsername"
+            placeholder="Username"
+            (keydown.enter)="sendRequest()"
+          />
+          <button
+            class="send-button"
+            (click)="sendRequest()"
+            [disabled]="!addUsername.trim()"
+          >
+            Send Request
+          </button>
+        </div>
+      </div>
+    }
+
   </div>
 </div>
