@@ -156,6 +156,7 @@ export class Friends implements OnInit {
     return !!this.actionInProgress[username];
   }
 
+  goTo(page: string): void { this.router.navigate(['/' + page]); }
   goToMessaging(): void { this.router.navigate(['/messaging']); }
   goToProfile(): void { this.router.navigate(['/profile']); }
 
