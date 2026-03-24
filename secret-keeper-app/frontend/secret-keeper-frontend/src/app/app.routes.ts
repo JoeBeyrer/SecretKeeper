@@ -13,5 +13,5 @@ export const routes: Routes = [
   { path: 'signup', component: Signup },
   { path: 'reset-password', component: PasswordReset },
   { path: 'profile', component: Profile },
-  { path: 'friends', component: Friends },
+  { path: 'friends', component: Friends }
 ];

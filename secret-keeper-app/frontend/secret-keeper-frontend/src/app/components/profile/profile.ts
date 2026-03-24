@@ -231,4 +231,8 @@ export class Profile implements OnInit {
   goToMessaging(): void {
     this.router.navigate(['/messaging']);
   }
+
+  goTo(page: string): void {
+    this.router.navigate(['/' + page]);
+  }
 }

@@ -5,6 +5,7 @@ import (
     "net/http"
     "time"
 
+    "github.com/joho/godotenv" //adding this for .env file loading for linux
     "github.com/rs/cors"
     "secret-keeper-app/backend/database"
     "secret-keeper-app/backend/handlers"
@@ -12,6 +13,10 @@ import (
 )
 
 func main() {
+    if err := godotenv.Load(); err != nil {
+        log.Println("There isn't a .env variable (you can probably ignore this if not running linux terminal):", err)
+    } // .env loading
+
     db := database.InitDB("./database/secretkeeper.db")
     defer db.Close()
 

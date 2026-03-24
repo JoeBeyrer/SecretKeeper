@@ -113,11 +113,14 @@ func readPump(c *messaging.Client, hub *messaging.Hub, db *sql.DB) {
 				continue
 			}
 
+			senderDisplayName, _ := database.GetDisplayNameByID(db, senderID)
+
 			outgoing := models.WSMessage{
 				Type:           "new_message",
 				ConversationID: convID,
 				Ciphertext:     ciphertext,
 				SenderID:       senderUsername,
+				DisplayName:    senderDisplayName,
 			}
 
 			jsonData, err := json.Marshal(outgoing)
