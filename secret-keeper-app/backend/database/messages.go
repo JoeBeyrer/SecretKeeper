@@ -31,6 +31,15 @@ func GetUsernameByID(db *sql.DB, userID string) (string, error) {
 	return username, err
 }
 
+func GetDisplayNameByID(db *sql.DB, userID string) (string, error) {
+	var displayName sql.NullString
+	err := db.QueryRow(`SELECT display_name FROM user_profiles WHERE user_id = ?`, userID).Scan(&displayName)
+	if err != nil {
+		return "", err
+	}
+	return displayName.String, nil
+}
+
 func GetConversationMembers(db *sql.DB, conversationID string) ([]string, error) {
 	rows, err := db.Query(`
 		SELECT user_id FROM conversation_members

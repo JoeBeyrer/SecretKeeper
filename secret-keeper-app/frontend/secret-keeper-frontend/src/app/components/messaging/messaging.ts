@@ -34,9 +34,11 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
 
   conversationId: string = '';
   newConversationMemberId: string = '';
+  newConversationName: string = '';
   isConnected: boolean = false;
 
   currentUsername: string = '';
+  currentDisplayName: string = '';
   conversations: Conversation[] = [];
 
   private messageSub: Subscription | null = null;
@@ -58,11 +60,17 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
       this.router.navigate(['/login']);
       return;
     }
-    this.currentUsername = user.display_name || user.username;
+    this.currentUsername = user.username;
+    this.currentDisplayName = user.display_name || user.username;
+
+    this.messagingService.connect();
 
     this.messageSub = this.messagingService.messages$.subscribe((incoming) => {
+      if (incoming.sender_id !== this.currentUsername) {
+        this.updateConversationName(incoming.conversation_id, incoming.display_name || incoming.sender_id);
+      }
+
       if (incoming.conversation_id !== this.conversationId) {
-        // Update sidebar preview for other conversations
         this.updateConversationPreview(incoming.conversation_id, incoming.ciphertext);
         return;
       }
@@ -70,7 +78,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
       if (incoming.sender_id === this.currentUsername) return;
 
       const msg: Message = {
-        username: incoming.sender_id,
+        username: incoming.display_name || incoming.sender_id,
         time: this.formatTime(new Date()),
         content: incoming.ciphertext,
         isMine: false,
@@ -114,7 +122,9 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     this.messagingService.connect();
     this.isConnected = true;
 
-    this.addConversationToList(this.conversationId.trim(), this.conversationId.trim().substring(0, 8));
+    const convName = this.newConversationName.trim() || this.conversationId.trim().substring(0, 8);
+    this.addConversationToList(this.conversationId.trim(), convName);
+    this.newConversationName = '';
   }
 
   async startNewConversation(): Promise<void> {
@@ -158,7 +168,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     this.messagingService.sendMessage(this.conversationId, this.newMessage.trim());
 
     const msg: Message = {
-      username: this.currentUsername,
+      username: this.currentDisplayName,
       time: this.formatTime(new Date()),
       content: this.newMessage.trim(),
       isMine: true,
@@ -190,6 +200,13 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
       lastMessage: '',
       lastMessageTime: '',
     });
+  }
+
+  private updateConversationName(convId: string, displayName: string): void {
+    const conv = this.conversations.find(c => c.id === convId);
+    if (conv && conv.name === convId.substring(0, 8)) {
+      conv.name = displayName;
+    }
   }
 
   private updateConversationPreview(convId: string, text: string): void {
