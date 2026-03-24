@@ -1,0 +1,161 @@
+<div class="friends-container">
+  <div class="friends-card">
+
+    <!-- Header -->
+    <div class="friends-header">
+      <h1>Friends</h1>
+      <div class="header-actions">
+        <button class="nav-button" (click)="goToMessaging()">Messages</button>
+        <button class="nav-button" (click)="goToProfile()">Profile</button>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab" [class.active]="activeTab === 'friends'" (click)="setTab('friends')">
+        Friends
+        @if (friends.length > 0) {
+          <span class="tab-badge">{{ friends.length }}</span>
+        }
+      </button>
+      <button class="tab" [class.active]="activeTab === 'requests'" (click)="setTab('requests')">
+        Requests
+        @if (incomingCount > 0) {
+          <span class="tab-badge incoming">{{ incomingCount }}</span>
+        }
+      </button>
+      <button class="tab" [class.active]="activeTab === 'add'" (click)="setTab('add')">
+        Add Friend
+      </button>
+    </div>
+
+    <!-- Feedback messages -->
+    @if (errorMessage) {
+      <div class="feedback error">{{ errorMessage }}</div>
+    }
+    @if (successMessage) {
+      <div class="feedback success">{{ successMessage }}</div>
+    }
+
+    <!-- Initial load spinner — only shown before any data has ever loaded -->
+    @if (initialLoading) {
+      <div class="loading-row">
+        <span class="loading-dot"></span>
+        <span class="loading-dot"></span>
+        <span class="loading-dot"></span>
+      </div>
+    }
+
+    <!-- TAB: Friends List -->
+    @if (!initialLoading && activeTab === 'friends') {
+      <div class="list">
+        @if (friends.length === 0) {
+          <div class="empty-state">
+            <span class="empty-icon">👥</span>
+            <p>No friends yet. Add someone to get started.</p>
+          </div>
+        }
+        @for (f of friends; track f.user_id) {
+          <div class="friend-row">
+            <div class="avatar">{{ displayName(f)[0].toUpperCase() }}</div>
+            <div class="friend-info">
+              <span class="friend-name">{{ displayName(f) }}</span>
+              <span class="friend-username">&#64;{{ f.username }}</span>
+            </div>
+            <div class="row-actions">
+              <button
+                class="action-btn danger"
+                (click)="remove(f)"
+                [disabled]="isActing(f.username)"
+              >
+                {{ isActing(f.username) ? '...' : 'Remove' }}
+              </button>
+            </div>
+          </div>
+        }
+      </div>
+    }
+
+    <!-- TAB: Requests -->
+    @if (!initialLoading && activeTab === 'requests') {
+      <div class="list">
+
+        @if (incomingRequests.length > 0) {
+          <p class="section-label">Incoming</p>
+          @for (f of incomingRequests; track f.user_id) {
+            <div class="friend-row">
+              <div class="avatar incoming">{{ displayName(f)[0].toUpperCase() }}</div>
+              <div class="friend-info">
+                <span class="friend-name">{{ displayName(f) }}</span>
+                <span class="friend-username">&#64;{{ f.username }}</span>
+              </div>
+              <div class="row-actions">
+                <button
+                  class="action-btn accept"
+                  (click)="accept(f)"
+                  [disabled]="isActing(f.username)"
+                >
+                  {{ isActing(f.username) ? '...' : 'Accept' }}
+                </button>
+                <button
+                  class="action-btn danger"
+                  (click)="decline(f)"
+                  [disabled]="isActing(f.username)"
+                >
+                  {{ isActing(f.username) ? '...' : 'Decline' }}
+                </button>
+              </div>
+            </div>
+          }
+        }
+
+        @if (outgoingRequests.length > 0) {
+          <p class="section-label">Sent</p>
+          @for (f of outgoingRequests; track f.user_id) {
+            <div class="friend-row">
+              <div class="avatar outgoing">{{ displayName(f)[0].toUpperCase() }}</div>
+              <div class="friend-info">
+                <span class="friend-name">{{ displayName(f) }}</span>
+                <span class="friend-username">&#64;{{ f.username }}</span>
+              </div>
+              <div class="row-actions">
+                <span class="status-chip pending">Pending</span>
+              </div>
+            </div>
+          }
+        }
+
+        @if (incomingRequests.length === 0 && outgoingRequests.length === 0) {
+          <div class="empty-state">
+            <span class="empty-icon">📭</span>
+            <p>No pending requests.</p>
+          </div>
+        }
+      </div>
+    }
+
+    <!-- TAB: Add Friend -->
+    @if (!initialLoading && activeTab === 'add') {
+      <div class="add-section">
+        <p class="add-hint">Enter a username to send them a friend request.</p>
+        <div class="add-row">
+          <input
+            type="text"
+            class="form-control"
+            [(ngModel)]="addUsername"
+            placeholder="Username"
+            (keydown.enter)="sendRequest()"
+          />
+          <button
+            class="send-button"
+            (click)="sendRequest()"
+            [disabled]="!addUsername.trim()"
+          >
+            Send Request
+          </button>
+        </div>
+      </div>
+    }
+
+  </div>
+</div>
