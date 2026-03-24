@@ -1,0 +1,121 @@
+:root {
+  --font-family-roboto: 'Roboto', sans-serif;
+  --text-rgb-124-124-124: #999;
+  --text-rgb-48-48-48: #fff;
+  --text-rgb-112-112-112: #999;
+  --text-white: rgba(255, 255, 255, 1);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:host {
+  display: block;
+  width: 100%;
+  height: 100vh;
+}
+
+.macbook-pro-16-1-1 {
+  background-color: #1a1e24;
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  overflow: hidden;
+  padding: 24px;
+  gap: 24px;
+  box-sizing: border-box;
+}
+
+.rectangle-6-6 {
+  flex-grow: 0;
+  flex-shrink: 0;
+  flex-basis: auto;
+  box-shadow: 0px 4px 5px 2px rgba(0,0,0,0.5);
+  background-color: #303742;
+  border-radius: 25px;
+  width: 70px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 0;
+}
+
+.nav-icons {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.nav-icon-btn {
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  border: none;
+  background: transparent;
+  color: #999;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, color 0.2s;
+}
+
+.nav-icon-btn:hover {
+  background: #3b4450;
+  color: #fff;
+}
+
+.nav-icon-btn.active {
+  background: rgba(110, 0, 255, 0.15);
+  color: #34c9eb;
+}
+
+.friends-content-area {
+  flex: 1;
+  display: flex;
+  height: 100%;
+}
+
+.rectangle-4-5 {
+  flex-grow: 0;
+  flex-shrink: 1;
+  flex-basis: auto;
+  box-shadow: 0px 4px 5px 2px rgba(0,0,0,0.5);
+  background-color: #303742;
+  border-radius: 25px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #999;
+}
+
+.text-26 {
+  font-family: var(--font-family-roboto);
+  font-weight: 700;
+  font-size: 20px;
+  letter-spacing: 5%;
+  color: var(--text-rgb-48-48-48);
+}
+
+.text-27 {
+  font-family: var(--font-family-roboto);
+  font-weight: 300;
+  font-size: 16px;
+  letter-spacing: 5%;
+  color: var(--text-rgb-124-124-124);
+}

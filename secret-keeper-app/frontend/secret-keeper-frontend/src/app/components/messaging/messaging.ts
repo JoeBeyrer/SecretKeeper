@@ -183,6 +183,10 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     this.router.navigate(['/profile']);
   }
 
+  goTo(page: string): void {
+    this.router.navigate(['/' + page]);
+  }
+
   getActiveConversationName(): string {
     const conv = this.conversations.find(c => c.id === this.conversationId);
     return conv ? conv.name : this.conversationId.substring(0, 8);
