@@ -197,3 +197,10 @@ func GetUserIDFromContext(r *http.Request) (string, bool) {
     userID, ok := r.Context().Value(userIDKey).(string)
     return userID, ok
 }
+
+// SetTestUserID is a test helper injecting a userID into a request context -
+// simulating what AuthMiddleware does.
+func SetTestUserID(r *http.Request, userID string) *http.Request {
+    ctx := context.WithValue(r.Context(), userIDKey, userID)
+    return r.WithContext(ctx)
+}
