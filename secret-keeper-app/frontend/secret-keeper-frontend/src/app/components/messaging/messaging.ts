@@ -142,31 +142,24 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
 
   // Called when clicking a conversation in the sidebar
   async selectConversation(convId: string): Promise<void> {
-    this.conversationId = convId;
-    this.messages = [];
-    this.errorMessage = '';
-    this.isConnected = true;
+  this.messages = [];
+  this.errorMessage = '';
 
-    if (!this.messagingService.isConnected()) {
-      this.messagingService.connect();
-    }
-
-    // If we already have the key cached, load messages immediately
-    if (this.conversationKeys.has(convId)) {
-      await this.loadMessages(convId);
-      return;
-    }
-
-    const claimed = await this.tryClaimRoomKey(convId);
-    if (claimed) {
-      return;
-    }
-
-    // Otherwise prompt for the room key
-    this.modal = { type: 'enter-room-key', convId };
-    this.roomKeyInput = '';
-    this.roomKeyError = '';
+  if (!this.messagingService.isConnected()) {
+    this.messagingService.connect();
   }
+
+  if (this.conversationKeys.has(convId)) {
+    this.conversationId = convId;
+    this.isConnected = true;
+    await this.loadMessages(convId);
+    return;
+  }
+
+  this.modal = { type: 'enter-room-key', convId };
+  this.roomKeyInput = '';
+  this.roomKeyError = '';
+}
 
   // Submit room key from the enter-key modal
   async submitRoomKey(): Promise<void> {
