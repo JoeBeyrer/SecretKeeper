@@ -16,7 +16,6 @@ export interface ConversationSummary {
 })
 export class ConversationService {
 
-  // Creates a new conversation
   async createConversation(memberIds: string[]): Promise<string> {
     const response = await fetch('http://localhost:8080/api/conversations/create', {
       method: 'POST',
@@ -51,10 +50,12 @@ export class ConversationService {
     const response = await fetch(`http://localhost:8080/api/conversations/${conversationId}/messages`, {
       credentials: 'include',
     });
+
     if (!response.ok) {
       const text = await response.text();
       throw new Error(`Failed to load messages: ${text}`);
     }
+
     return response.json();
   }
 }
