@@ -48,12 +48,16 @@ func main() {
     // PROTECTED ROUTES
     auth := handlers.AuthMiddleware(db)
     mux.Handle("/ws", auth(http.HandlerFunc(handlers.WebSocketHandler(hub, db))))
-    mux.Handle("/api/conversations", auth(http.HandlerFunc(handlers.CreateConversationHandler(db))))
     mux.Handle("/api/profile", auth(http.HandlerFunc(handlers.GetProfileHandler(db))))
     mux.Handle("/api/profile/update", auth(http.HandlerFunc(handlers.UpdateProfileHandler(db))))
     mux.Handle("/api/profile/picture", auth(http.HandlerFunc(handlers.UploadProfilePictureHandler(db))))
     mux.Handle("/api/account", auth(http.HandlerFunc(handlers.UpdateAccountHandler(db))))
 
+    // CONVERSATION ROUTES
+    mux.Handle("/api/conversations/create", auth(http.HandlerFunc(handlers.CreateConversationHandler(db))))
+    mux.Handle("/api/conversations/get", auth(http.HandlerFunc(handlers.GetConversationsHandler(db))))
+    mux.Handle("/api/conversations/{id}/messages", auth(http.HandlerFunc(handlers.GetConversationMessagesHandler(db))))
+    
     // FRIENDS ROUTES
 	mux.Handle("/api/friends", auth(http.HandlerFunc(handlers.GetFriendsHandler(db))))
 	mux.Handle("/api/friends/requests", auth(http.HandlerFunc(handlers.GetPendingRequestsHandler(db))))
@@ -61,7 +65,7 @@ func main() {
 	mux.Handle("/api/friends/accept", auth(http.HandlerFunc(handlers.AcceptFriendRequestHandler(db))))
 	mux.Handle("/api/friends/decline", auth(http.HandlerFunc(handlers.DeclineFriendRequestHandler(db))))
 	mux.Handle("/api/friends/remove", auth(http.HandlerFunc(handlers.RemoveFriendHandler(db))))
-    
+
     // TEMPORARY FOR TESTING _ REMOVE OR COMMENT
     mux.Handle("/api/test-auth", auth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
         userID, ok := handlers.GetUserIDFromContext(r)

@@ -4,6 +4,15 @@ import (
     "database/sql"
 )
 
+type MessageRow struct {
+    ID string
+    SenderID string
+    Username string
+    DisplayName string
+    Ciphertext string
+    CreatedAt int64
+}
+
 func SaveMessage(db *sql.DB, id, convID, senderID, ciphertext string, createdAt int64) error {
 	_, err := db.Exec(`
 		INSERT INTO messages (id, conversation_id, sender_id, ciphertext, created_at)
@@ -60,4 +69,36 @@ func GetConversationMembers(db *sql.DB, conversationID string) ([]string, error)
 	}
 
 	return members, nil
+}
+
+func GetMessagesByConversation(db *sql.DB, conversationID string, limit int) ([]MessageRow, error) {
+    rows, err := db.Query(`
+        SELECT
+            m.id,
+            m.sender_id,
+            u.username,
+            COALESCE(p.display_name, u.username) AS display_name,
+            m.ciphertext,
+            m.created_at
+        FROM messages m
+        JOIN users u ON u.id = m.sender_id
+        LEFT JOIN user_profiles p ON p.user_id = m.sender_id
+        WHERE m.conversation_id = ?
+        ORDER BY m.created_at ASC
+        LIMIT ?
+    `, conversationID, limit)
+    if err != nil {
+        return nil, err
+    }
+    defer rows.Close()
+
+    var result []MessageRow
+    for rows.Next() {
+        var msg MessageRow
+        if err := rows.Scan(&msg.ID, &msg.SenderID, &msg.Username, &msg.DisplayName, &msg.Ciphertext, &msg.CreatedAt); err != nil {
+            return nil, err
+        }
+        result = append(result, msg)
+    }
+    return result, nil
 }
