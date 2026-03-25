@@ -156,6 +156,11 @@ export class Friends implements OnInit {
     return !!this.actionInProgress[username];
   }
 
+  startChat(f: FriendEntry): void {
+    this.router.navigate(['/messaging'], { queryParams: { chatWith: f.username } });
+  }
+
+  goTo(page: string): void { this.router.navigate(['/' + page]); }
   goToMessaging(): void { this.router.navigate(['/messaging']); }
   goToProfile(): void { this.router.navigate(['/profile']); }
 
