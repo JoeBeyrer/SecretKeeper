@@ -132,6 +132,26 @@ func InitDB(path string) *sql.DB {
         )
     `)
 
+    execOrFatal(db, `
+        CREATE TABLE IF NOT EXISTS user_keys (
+            user_id TEXT PRIMARY KEY,
+            public_key TEXT NOT NULL,
+            encrypted_private_key TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    `)
+
+    execOrFatal(db, `
+        CREATE TABLE IF NOT EXISTS conversation_keys (
+            conversation_id TEXT NOT NULL,
+            user_id TEXT NOT NULL,
+            encrypted_key TEXT NOT NULL,
+            PRIMARY KEY (conversation_id, user_id),
+            FOREIGN KEY (conversation_id) REFERENCES conversations(id),
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    `)
+
 	log.Println("Database initialized")
 	return db
 }

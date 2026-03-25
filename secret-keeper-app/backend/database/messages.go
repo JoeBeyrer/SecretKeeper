@@ -102,3 +102,47 @@ func GetMessagesByConversation(db *sql.DB, conversationID string, limit int) ([]
     }
     return result, nil
 }
+
+
+func SaveUserKeys(db *sql.DB, userID, publicKey, encryptedPrivateKey string) error {
+    _, err := db.Exec(`
+        INSERT INTO user_keys (user_id, public_key, encrypted_private_key)
+        VALUES (?, ?, ?)
+        ON CONFLICT(user_id) DO UPDATE SET
+            public_key = excluded.public_key,
+            encrypted_private_key = excluded.encrypted_private_key
+    `, userID, publicKey, encryptedPrivateKey)
+    return err
+}
+
+func GetUserPublicKey(db *sql.DB, userID string) (string, error) {
+    var key string
+    err := db.QueryRow(`SELECT public_key FROM user_keys WHERE user_id = ?`, userID).Scan(&key)
+    return key, err
+}
+
+func GetUserKeys(db *sql.DB, userID string) (publicKey, encryptedPrivateKey string, err error) {
+    err = db.QueryRow(`
+        SELECT public_key, encrypted_private_key FROM user_keys WHERE user_id = ?
+    `, userID).Scan(&publicKey, &encryptedPrivateKey)
+    return
+}
+
+func SaveConversationKey(db *sql.DB, conversationID, userID, encryptedKey string) error {
+    _, err := db.Exec(`
+        INSERT INTO conversation_keys (conversation_id, user_id, encrypted_key)
+        VALUES (?, ?, ?)
+        ON CONFLICT(conversation_id, user_id) DO UPDATE SET
+            encrypted_key = excluded.encrypted_key
+    `, conversationID, userID, encryptedKey)
+    return err
+}
+
+func GetConversationKey(db *sql.DB, conversationID, userID string) (string, error) {
+    var key string
+    err := db.QueryRow(`
+        SELECT encrypted_key FROM conversation_keys
+        WHERE conversation_id = ? AND user_id = ?
+    `, conversationID, userID).Scan(&key)
+    return key, err
+}
