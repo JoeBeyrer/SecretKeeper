@@ -10,8 +10,6 @@ import (
 	"time"
 )
 
-
-
 func Test_register_handler_func(t *testing.T) {
 	db := database.InitDB(":memory:")
 	defer db.Close()
@@ -139,11 +137,11 @@ func Test_register_handler_func(t *testing.T) {
 	}
 
 	if w.Code != http.StatusCreated {
-    	t.Fatalf("expected 201 got %d", w.Code)
+		t.Fatalf("expected 201 got %d", w.Code)
 	} else {
 		t.Log("got 201 code for correct response")
 	}
-	//duplicate username 
+	//duplicate username
 	body = `{"username":"testuser","email":"test@gmail.com","password":"password"}`
 	req = httptest.NewRequest("POST", "/register", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -155,4 +153,45 @@ func Test_register_handler_func(t *testing.T) {
 	} else {
 		t.Log("duplicate username was rejected")
 	}
+}
+
+func Test_verify_email_handler_func(t *testing.T) {
+	var token string
+	db := database.InitDB(":memory:")
+	defer db.Close()
+	//invalid token
+	token = ""
+	req := httptest.NewRequest("GET", "/api/verify-email?token="+token, nil)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	handlers.VerifyEmailHandler(db)(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatal("empty token did not return correct code")
+	} else {
+		t.Log("empty token returned valid code")
+	}
+	//expired link
+	token = "03feb4393fa18cbf70c49732c1419d3fc8e6842c072d6937edc96ba6aef27338"
+
+	if _, err := db.Exec(`
+		INSERT INTO email_verifications (id, user_id, token, created_at, expires_at)
+		VALUES ("9e99af6b-48e4-4eeb-951f-0cb27e03e32c", "testuser", "03feb4393fa18cbf70c49732c1419d3fc8e6842c072d6937edc96ba6aef27338", 1740067200, 1740467200)
+	`); err != nil {
+		t.Fatal("error inserting test value into email_verifications table")
+	} else {
+		t.Log("successfully inserted test values into email_verifications table")
+	}
+
+	req = httptest.NewRequest("GET", "/api/verify-email?token="+token, nil)
+	req.Header.Set("Content-Type", "application/json")
+	w = httptest.NewRecorder()
+	handlers.VerifyEmailHandler(db)(w, req)
+
+	if w.Code != http.StatusUnprocessableEntity {
+		t.Fatal("invalid or expired verification link does not return correct code")
+	} else {
+		t.Log("invalid or expired link returned correct code")
+	}
+
 }
