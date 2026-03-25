@@ -5,4 +5,5 @@ type WSMessage struct {
 	ConversationID string `json:"conversation_id"`
 	Ciphertext     string `json:"ciphertext"`
 	SenderID       string `json:"sender_id"`
+	DisplayName    string `json:"display_name"`
 }
