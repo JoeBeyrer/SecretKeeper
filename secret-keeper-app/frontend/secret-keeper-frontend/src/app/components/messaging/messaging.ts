@@ -64,6 +64,25 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     this.currentUsername = user.username;
     this.currentDisplayName = user.display_name || user.username;
 
+    try {
+      const convs = await this.conversationService.getConversations();
+      this.ngZone.run(() => {
+        this.conversations = convs.map(c => ({
+          id: c.id,
+          name: c.name,
+          lastMessage: c.last_message,
+          lastMessageTime: c.last_message_time
+            ? this.formatTimeShort(new Date(c.last_message_time * 1000))
+            : '',
+        }));
+        if (this.conversations.length > 0) {
+          this.isConnected = true;
+        }
+      });
+    } catch (e: any) {
+      console.error('[Messaging] Failed to load conversations:', e);
+    }
+
     this.messagingService.connect();
 
     this.messageSub = this.messagingService.messages$.subscribe((incoming) => {
@@ -119,16 +138,32 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     }
   }
 
-  selectConversation(convId: string): void {
+  async selectConversation(convId: string): Promise<void> {
     if (this.conversationId === convId) return;
+    
     this.conversationId = convId;
     this.messages = [];
     this.errorMessage = '';
+    this.isConnected = true;
 
     if (!this.messagingService.isConnected()) {
       this.messagingService.connect();
     }
-    this.isConnected = true;
+
+    try {
+      const history = await this.conversationService.getMessages(convId);
+      this.ngZone.run(() => {
+        this.messages = history.map((m: any) => ({
+          username: m.DisplayName || m.Username,
+          time: this.formatTime(new Date(m.CreatedAt * 1000)),
+          content: m.Ciphertext,
+          isMine: m.Username === this.currentUsername,
+        }));
+        this.shouldScrollToBottom = true;
+      });
+    } catch (e: any) {
+      console.error('[Messaging] Failed to load message history:', e);
+    }
   }
 
   connectToConversation(): void {
