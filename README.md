@@ -15,12 +15,12 @@ As a temporary placeholder, the role assignments will be:
 
 ## Project Setup
 - Install Go using [here](https://go.dev/dl/)
-- Run `go get github.com/joho/godotenv` for .env file loading (Linux only)
 - Run Go server using `go run main.go` from the secret-keeper-app/backend directory
 - Run `go get github.com/rs/cors` to install CORS middleware
 - Run `go get golang.org/x/crypto/bcrypt` for bcrypt password hashing
 - Run `go get github.com/google/uuid` for UUID use in database
 - Run `go get github.com/gorilla/websocket` for messaging with websockets
+- Run `go get github.com/joho/godotenv` for .env file loading (Linux only)
 
 - Run `npm install -g @angular/cli` to install Angular CLI
 - Install node.js [here](https://nodejs.org/en/download)
