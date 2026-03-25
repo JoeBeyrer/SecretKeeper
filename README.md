@@ -15,6 +15,7 @@ As a temporary placeholder, the role assignments will be:
 
 ## Project Setup
 - Install Go using [here](https://go.dev/dl/)
+- Run `go get github.com/joho/godotenv` for .env file loading (Linux only)
 - Run Go server using `go run main.go` from the secret-keeper-app/backend directory
 - Run `go get github.com/rs/cors` to install CORS middleware
 - Run `go get golang.org/x/crypto/bcrypt` for bcrypt password hashing
@@ -27,6 +28,20 @@ As a temporary placeholder, the role assignments will be:
 - Run `ng serve` from the secret-keeper-app/frontend/secret-keeper-frontend directory to run the website at http://localhost:4200
   - May need to run `npm install zone.js` if a Zone.js error is encountered
 
+## Environment Variables
+The app requires SMTP credentials to send verification and password reset emails.
+
+**Linux** — create a `.env` file in `secret-keeper-app/backend` with:
+```
+SMTP_USER=secretkeeperapp@gmail.com
+SMTP_PASS=app-password
+```
+
+**Windows** — set these in the same terminal window before running `go run .`:
+```
+set SMTP_USER=secretkeeperapp@gmail.com
+set SMTP_PASS=app-password
+```
 
 ## Notes While Writing Code
 - To create a new component, `run ng g c components/[NAME]` from the secret-keeper-frontend directory
