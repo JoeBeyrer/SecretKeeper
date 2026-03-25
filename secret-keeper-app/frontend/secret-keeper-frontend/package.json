@@ -7,7 +7,10 @@
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
-    "serve:ssr:secret-keeper-frontend": "node dist/secret-keeper-frontend/server/server.mjs"
+    "serve:ssr:secret-keeper-frontend": "node dist/secret-keeper-frontend/server/server.mjs",
+    "e2e": "ng e2e",
+    "cypress:open": "cypress open",
+    "cypress:run": "cypress run"
   },
   "prettier": {
     "printWidth": 100,
@@ -41,8 +44,10 @@
     "@angular/build": "^21.1.2",
     "@angular/cli": "^21.1.2",
     "@angular/compiler-cli": "^21.1.0",
+    "@cypress/schematic": "^5.0.0",
     "@types/express": "^5.0.1",
     "@types/node": "^20.17.19",
+    "cypress": "^15.13.0",
     "jsdom": "^27.1.0",
     "typescript": "~5.9.2",
     "vitest": "^4.0.8"

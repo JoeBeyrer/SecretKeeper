@@ -6,6 +6,7 @@ export interface IncomingMessage {
   conversation_id: string;
   ciphertext: string;
   sender_id: string;
+  display_name: string;
 }
  
 export interface OutgoingMessage {
