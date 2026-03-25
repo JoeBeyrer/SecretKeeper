@@ -1,17 +1,23 @@
 package handlers
 
 import (
-    "database/sql"
-    "encoding/json"
-    "net/http"
-    "time"
+	"database/sql"
+	"encoding/json"
+	"net/http"
+	"time"
 
-    "github.com/google/uuid"
-    "secret-keeper-app/backend/database"
+	"github.com/google/uuid"
+	"secret-keeper-app/backend/database"
 )
 
 type createConvReq struct {
-    MemberIDs []string `json:"member_ids"`
+	MemberIDs []string `json:"member_ids"`
+	RoomKey   string   `json:"room_key"`
+}
+
+type createConvResp struct {
+	ConversationID string `json:"conversation_id"`
+	Created        bool   `json:"created"`
 }
 
 func CreateConversationHandler(db *sql.DB) http.HandlerFunc {
@@ -70,28 +76,57 @@ func CreateConversationHandler(db *sql.DB) http.HandlerFunc {
             }
         }
 
-        // No existing conversation found — create a new one
-        convID := uuid.New().String()
-        now := time.Now().Unix()
+		if req.RoomKey == "" {
+			http.Error(w, "missing room key", http.StatusBadRequest)
+			return
+		}
 
-        _, err := db.Exec(`INSERT INTO conversations (id, created_at) VALUES (?, ?)`, convID, now)
-        if err != nil {
-            http.Error(w, "could not create conversation", http.StatusInternalServerError)
-            return
-        }
+		roomKeyHash, err := database.HashConversationRoomKey(req.RoomKey)
+		if err != nil {
+			http.Error(w, "could not protect room key", http.StatusInternalServerError)
+			return
+		}
 
-        for _, id := range uniqueMembers {
-            _, err := db.Exec(`INSERT INTO conversation_members (conversation_id, user_id, joined_at) VALUES (?, ?, ?)`, convID, id, now)
-            if err != nil {
-                http.Error(w, "could not add member", http.StatusInternalServerError)
-                return
-            }
-        }
+		// No existing conversation found - create a new one
+		convID := uuid.New().String()
+		now := time.Now().Unix()
 
-        w.Header().Set("Content-Type", "application/json")
-        w.WriteHeader(http.StatusCreated)
-        json.NewEncoder(w).Encode(map[string]string{"conversation_id": convID})
-    }
+		var pendingRoomKeyRecipientID any
+		if len(uniqueMembers) == 2 {
+			for _, id := range uniqueMembers {
+				if id != userID {
+					pendingRoomKeyRecipientID = id
+					break
+				}
+			}
+		}
+
+		_, err = db.Exec(`
+            INSERT INTO conversations (
+                id,
+                created_at,
+                room_key_hash,
+                pending_room_key,
+                pending_room_key_recipient_id
+            ) VALUES (?, ?, ?, ?, ?)
+        `, convID, now, roomKeyHash, req.RoomKey, pendingRoomKeyRecipientID)
+		if err != nil {
+			http.Error(w, "could not create conversation", http.StatusInternalServerError)
+			return
+		}
+
+		for _, id := range uniqueMembers {
+			_, err := db.Exec(`INSERT INTO conversation_members (conversation_id, user_id, joined_at) VALUES (?, ?, ?)`, convID, id, now)
+			if err != nil {
+				http.Error(w, "could not add member", http.StatusInternalServerError)
+				return
+			}
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(createConvResp{ConversationID: convID, Created: true})
+	}
 }
 
 type ConversationSummary struct {
@@ -171,7 +206,6 @@ func GetConversationsHandler(db *sql.DB) http.HandlerFunc {
     }
 }
 
-
 func GetConversationMessagesHandler(db *sql.DB) http.HandlerFunc {
     return func(w http.ResponseWriter, r *http.Request) {
         userID, ok := GetUserIDFromContext(r)
@@ -204,4 +238,92 @@ func GetConversationMessagesHandler(db *sql.DB) http.HandlerFunc {
         w.Header().Set("Content-Type", "application/json")
         json.NewEncoder(w).Encode(msgs)
     }
+}
+
+func VerifyConversationRoomKeyHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := GetUserIDFromContext(r)
+		if !ok {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		convID := r.PathValue("id")
+		if convID == "" {
+			http.Error(w, "missing conversation id", http.StatusBadRequest)
+			return
+		}
+
+		if !database.IsUserInConversation(db, userID, convID) {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+
+		var body struct {
+			RoomKey string `json:"room_key"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			http.Error(w, "invalid request", http.StatusBadRequest)
+			return
+		}
+		if body.RoomKey == "" {
+			http.Error(w, "missing room key", http.StatusBadRequest)
+			return
+		}
+
+		ok, err := database.VerifyConversationRoomKey(db, convID, body.RoomKey)
+		if err == sql.ErrNoRows {
+			http.Error(w, "room key verifier not set", http.StatusNotFound)
+			return
+		}
+		if err != nil {
+			http.Error(w, "could not verify room key", http.StatusInternalServerError)
+			return
+		}
+		if !ok {
+			http.Error(w, "incorrect room key", http.StatusUnauthorized)
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+
+type claimRoomKeyResp struct {
+	RoomKey string `json:"room_key"`
+}
+
+func ClaimConversationRoomKeyHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := GetUserIDFromContext(r)
+		if !ok {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		convID := r.PathValue("id")
+		if convID == "" {
+			http.Error(w, "missing conversation id", http.StatusBadRequest)
+			return
+		}
+
+		if !database.IsUserInConversation(db, userID, convID) {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+
+		roomKey, err := database.ClaimConversationRoomKey(db, convID, userID)
+		if err == sql.ErrNoRows {
+			http.Error(w, "no pending room key", http.StatusNotFound)
+			return
+		}
+		if err != nil {
+			http.Error(w, "could not claim room key", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(claimRoomKeyResp{RoomKey: roomKey})
+	}
 }

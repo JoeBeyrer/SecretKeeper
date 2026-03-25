@@ -79,30 +79,20 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     this.currentUsername = user.username;
     this.currentDisplayName = user.display_name || user.username;
 
-    try {
-      const convs = await this.conversationService.getConversations();
-      this.ngZone.run(() => {
-        this.conversations = convs.map(c => ({
-          id: c.id,
-          name: c.name,
-          lastMessage: c.last_message ? '🔒 Encrypted message' : '',
-          lastMessageTime: c.last_message_time
-            ? this.formatTimeShort(new Date(c.last_message_time * 1000))
-            : '',
-        }));
-      });
-    } catch (e: any) {
-      console.error('[Messaging] Failed to load conversations:', e);
-    }
+    await this.refreshConversationList();
 
     this.messagingService.connect();
 
     this.messageSub = this.messagingService.messages$.subscribe((incoming) => {
+      const knownConversation = !!this.conversations.find(c => c.id === incoming.conversation_id);
+      if (!knownConversation) {
+        void this.refreshConversationList();
+      }
+
       if (incoming.sender_id !== this.currentUsername) {
         this.updateConversationName(incoming.conversation_id, incoming.display_name || incoming.sender_id);
       }
 
-      // Always update preview with encrypted indicator
       this.ngZone.run(() => {
         this.updateConversationPreview(incoming.conversation_id, incoming.ciphertext);
       });
@@ -110,7 +100,6 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
       if (incoming.conversation_id !== this.conversationId) return;
       if (incoming.sender_id === this.currentUsername) return;
 
-      // Decrypt if we have the key
       const convKey = this.conversationKeys.get(incoming.conversation_id);
       if (!convKey) return;
 
@@ -126,7 +115,6 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
           this.shouldScrollToBottom = true;
         });
       }).catch(() => {
-        // Wrong key or corrupted — show locked indicator
         this.ngZone.run(() => {
           this.messages.push({
             username: incoming.display_name || incoming.sender_id,
@@ -154,8 +142,6 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
 
   // Called when clicking a conversation in the sidebar
   async selectConversation(convId: string): Promise<void> {
-    if (this.conversationId === convId) return;
-
     this.conversationId = convId;
     this.messages = [];
     this.errorMessage = '';
@@ -168,6 +154,11 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     // If we already have the key cached, load messages immediately
     if (this.conversationKeys.has(convId)) {
       await this.loadMessages(convId);
+      return;
+    }
+
+    const claimed = await this.tryClaimRoomKey(convId);
+    if (claimed) {
       return;
     }
 
@@ -190,16 +181,9 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
 
     try {
       const key = await this.cryptoService.deriveConversationKey(passphrase, convId);
-
-      // Verify the key works by trying to decrypt the latest message
-      const history = await this.conversationService.getMessages(convId);
-      if (history.length > 0) {
-        try {
-          await this.cryptoService.decryptMessage(history[history.length - 1].Ciphertext, key);
-        } catch {
-          this.roomKeyError = 'Incorrect room key. Please try again.';
-          return;
-        }
+      const verified = await this.verifyRoomKeyForConversation(convId, passphrase, key);
+      if (!verified) {
+        return;
       }
 
       this.conversationKeys.set(convId, key);
@@ -287,29 +271,117 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
 
   // Private helpers
 
-  private async startNewConversationWith(username: string): Promise<void> {
+  private async refreshConversationList(): Promise<void> {
     try {
-      const convId = await this.conversationService.createConversation([username]);
+      const convs = await this.conversationService.getConversations();
+      this.ngZone.run(() => {
+        this.conversations = convs.map(c => ({
+          id: c.id,
+          name: c.name,
+          lastMessage: c.last_message ? '🔒 Encrypted message' : '',
+          lastMessageTime: c.last_message_time
+            ? this.formatTimeShort(new Date(c.last_message_time * 1000))
+            : '',
+        }));
+      });
+    } catch (e: any) {
+      console.error('[Messaging] Failed to load conversations:', e);
+    }
+  }
 
-      // Generate room key for new conversation
-      const passphrase = this.cryptoService.generateRoomKey();
-      const key = await this.cryptoService.deriveConversationKey(passphrase, convId);
+  private async tryClaimRoomKey(convId: string): Promise<boolean> {
+    try {
+      const roomKey = await this.conversationService.claimRoomKey(convId);
+      const key = await this.cryptoService.deriveConversationKey(roomKey, convId);
       this.conversationKeys.set(convId, key);
 
       this.ngZone.run(() => {
-        this.conversationId = convId;
+        this.modal = { type: 'show-room-key', convId, key: roomKey };
+        this.roomKeyCopied = false;
+        this.roomKeyInput = '';
+        this.roomKeyError = '';
+      });
+
+      await this.loadMessages(convId);
+      return true;
+    } catch (e: any) {
+      if (e?.message === 'ROOM_KEY_NOT_AVAILABLE') {
+        return false;
+      }
+
+      console.error('[Messaging] Failed to claim room key:', e);
+      this.ngZone.run(() => {
+        this.errorMessage = 'Failed to retrieve the one-time room key.';
+      });
+      return false;
+    }
+  }
+
+  private async startNewConversationWith(username: string): Promise<void> {
+    try {
+      const passphrase = this.cryptoService.generateRoomKey();
+      const result = await this.conversationService.createConversation([username], passphrase);
+
+      this.ngZone.run(() => {
+        this.conversationId = result.conversation_id;
         this.messages = [];
         this.errorMessage = '';
         this.isConnected = true;
-        this.addConversationToList(convId, username);
-        // Show the room key modal
-        this.modal = { type: 'show-room-key', convId, key: passphrase };
-        this.roomKeyCopied = false;
+        this.addConversationToList(result.conversation_id, username);
+      });
+
+      if (result.created) {
+        const key = await this.cryptoService.deriveConversationKey(passphrase, result.conversation_id);
+        this.conversationKeys.set(result.conversation_id, key);
+
+        this.ngZone.run(() => {
+          this.modal = { type: 'show-room-key', convId: result.conversation_id, key: passphrase };
+          this.roomKeyCopied = false;
+        });
+        return;
+      }
+
+      if (this.conversationKeys.has(result.conversation_id)) {
+        await this.loadMessages(result.conversation_id);
+        return;
+      }
+
+      this.ngZone.run(() => {
+        this.modal = { type: 'enter-room-key', convId: result.conversation_id };
+        this.roomKeyInput = '';
+        this.roomKeyError = '';
       });
     } catch (e: any) {
       this.ngZone.run(() => {
         this.errorMessage = e.message || 'Failed to create conversation.';
       });
+    }
+  }
+
+  private async verifyRoomKeyForConversation(convId: string, passphrase: string, key: CryptoKey): Promise<boolean> {
+    try {
+      await this.conversationService.verifyRoomKey(convId, passphrase);
+      return true;
+    } catch (e: any) {
+      if (e?.message !== 'ROOM_KEY_VERIFIER_NOT_SET') {
+        this.roomKeyError = 'Incorrect room key. Please try again.';
+        return false;
+      }
+    }
+
+    // Backward compatibility for older conversations created before verifier support.
+    const history = await this.conversationService.getMessages(convId);
+    if (history.length === 0) {
+      this.roomKeyError = 'This older conversation has no saved room-key verifier yet. Please create a new conversation.';
+      return false;
+    }
+
+    try {
+      await this.cryptoService.decryptMessage(history[history.length - 1].Ciphertext, key);
+      return true;
+    } catch {
+      this.roomKeyError = 'Incorrect room key. Please try again.';
+      return false;
     }
   }
 

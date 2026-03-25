@@ -57,6 +57,8 @@ func main() {
     mux.Handle("/api/conversations/create", auth(http.HandlerFunc(handlers.CreateConversationHandler(db))))
     mux.Handle("/api/conversations/get", auth(http.HandlerFunc(handlers.GetConversationsHandler(db))))
     mux.Handle("/api/conversations/{id}/messages", auth(http.HandlerFunc(handlers.GetConversationMessagesHandler(db))))
+    mux.Handle("/api/conversations/{id}/verify-room-key", auth(http.HandlerFunc(handlers.VerifyConversationRoomKeyHandler(db))))
+    mux.Handle("/api/conversations/{id}/claim-room-key", auth(http.HandlerFunc(handlers.ClaimConversationRoomKeyHandler(db))))
     
     // FRIENDS ROUTES
 	mux.Handle("/api/friends", auth(http.HandlerFunc(handlers.GetFriendsHandler(db))))

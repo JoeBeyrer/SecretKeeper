@@ -17,7 +17,7 @@ func InitDB(path string) *sql.DB {
 	}
 
 	execOrFatal(db, `PRAGMA journal_mode=WAL;`)  // WAL makes fewer db locked issues
-	execOrFatal(db, `PRAGMA foreign_keys = ON;`) // explicitly allow foreing keys
+	execOrFatal(db, `PRAGMA foreign_keys = ON;`) // explicitly allow foreign keys
 
 	execOrFatal(db, `
         CREATE TABLE IF NOT EXISTS users (
@@ -62,7 +62,6 @@ func InitDB(path string) *sql.DB {
         )
     `)
 
-
 	execOrFatal(db, `
         CREATE TABLE IF NOT EXISTS password_resets (
             id TEXT PRIMARY KEY,
@@ -90,7 +89,10 @@ func InitDB(path string) *sql.DB {
 	execOrFatal(db, `
         CREATE TABLE IF NOT EXISTS conversations (
             id TEXT PRIMARY KEY,
-            created_at INTEGER
+            created_at INTEGER,
+            room_key_hash TEXT,
+            pending_room_key TEXT,
+            pending_room_key_recipient_id TEXT
         )
     `)
 
@@ -100,7 +102,7 @@ func InitDB(path string) *sql.DB {
             user_id TEXT,
             joined_at INTEGER,
             PRIMARY KEY (conversation_id, user_id),
-            FOREIGN KEY (conversation_id) REFERENCES conversations(id)
+            FOREIGN KEY (conversation_id) REFERENCES conversations(id),
             FOREIGN KEY (user_id) REFERENCES users(id)
         )
     `)

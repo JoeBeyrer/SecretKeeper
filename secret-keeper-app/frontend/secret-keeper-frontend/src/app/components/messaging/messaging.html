@@ -93,9 +93,6 @@
               <div class="conv-top-row">
                 <p class="text-26"><span class="text-rgb-48-48-48">{{ conv.name }}</span></p>
                 <div class="conv-top-right">
-                  @if (!conversationKeys.has(conv.id)) {
-                    <span class="lock-icon">🔒</span>
-                  }
                   @if (conv.lastMessageTime) {
                     <p class="text-35"><span class="text-rgb-124-124-124">{{ conv.lastMessageTime }}</span></p>
                   }

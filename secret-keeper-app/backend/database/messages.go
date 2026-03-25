@@ -1,7 +1,9 @@
 package database
 
 import (
-    "database/sql"
+	"database/sql"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 type MessageRow struct {
@@ -103,7 +105,6 @@ func GetMessagesByConversation(db *sql.DB, conversationID string, limit int) ([]
     return result, nil
 }
 
-
 func SaveUserKeys(db *sql.DB, userID, publicKey, encryptedPrivateKey string) error {
     _, err := db.Exec(`
         INSERT INTO user_keys (user_id, public_key, encrypted_private_key)
@@ -145,4 +146,82 @@ func GetConversationKey(db *sql.DB, conversationID, userID string) (string, erro
         WHERE conversation_id = ? AND user_id = ?
     `, conversationID, userID).Scan(&key)
     return key, err
+}
+
+func ClaimConversationRoomKey(db *sql.DB, conversationID, userID string) (string, error) {
+	tx, err := db.Begin()
+	if err != nil {
+		return "", err
+	}
+	defer tx.Rollback()
+
+	var roomKey sql.NullString
+	var recipientID sql.NullString
+	err = tx.QueryRow(`
+        SELECT pending_room_key, pending_room_key_recipient_id
+        FROM conversations
+        WHERE id = ?
+    `, conversationID).Scan(&roomKey, &recipientID)
+	if err != nil {
+		return "", err
+	}
+
+	if !roomKey.Valid || roomKey.String == "" || !recipientID.Valid || recipientID.String != userID {
+		return "", sql.ErrNoRows
+	}
+
+	result, err := tx.Exec(`
+        UPDATE conversations
+        SET pending_room_key = NULL,
+            pending_room_key_recipient_id = NULL
+        WHERE id = ? AND pending_room_key_recipient_id = ?
+    `, conversationID, userID)
+	if err != nil {
+		return "", err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return "", err
+	}
+	if rowsAffected == 0 {
+		return "", sql.ErrNoRows
+	}
+
+	if err := tx.Commit(); err != nil {
+		return "", err
+	}
+
+	return roomKey.String, nil
+}
+
+func HashConversationRoomKey(roomKey string) (string, error) {
+	hash, err := bcrypt.GenerateFromPassword([]byte(roomKey), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+	return string(hash), nil
+}
+
+func VerifyConversationRoomKey(db *sql.DB, conversationID, roomKey string) (bool, error) {
+	var roomKeyHash sql.NullString
+	err := db.QueryRow(`
+        SELECT room_key_hash FROM conversations WHERE id = ?
+    `, conversationID).Scan(&roomKeyHash)
+	if err != nil {
+		return false, err
+	}
+	if !roomKeyHash.Valid || roomKeyHash.String == "" {
+		return false, sql.ErrNoRows
+	}
+
+	err = bcrypt.CompareHashAndPassword([]byte(roomKeyHash.String), []byte(roomKey))
+	if err == bcrypt.ErrMismatchedHashAndPassword {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
 }
