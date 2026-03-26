@@ -312,7 +312,7 @@ func Test_remove_friend_func(t *testing.T) {
 	} else {
 		t.Log("successfully removed friendship from friendships table")
 	}
-	
+
 	var exists int
 	err = db.QueryRow(`
 		SELECT 1
@@ -325,5 +325,196 @@ func Test_remove_friend_func(t *testing.T) {
 		t.Fatal("friendship row still exists after removal")
 	} else {
 		t.Log("successfully removed friendship from friendships table")
+	}
+}
+
+func Test_get_friends_func(t *testing.T) {
+	db := database.InitDB(":memory:")
+	defer db.Close()
+
+	_, err := db.Exec(`
+		INSERT INTO users (id, username, email, password_hash, created_at)
+		VALUES ("user1", "requester", "requester@gmail.com", "password", 1740067200)
+	`)
+	if err != nil {
+		t.Fatalf("failed to insert requester user: %v", err)
+	}
+
+	_, err = db.Exec(`
+		INSERT INTO users (id, username, email, password_hash, created_at)
+		VALUES ("user2", "addressee", "addressee@gmail.com", "password", 1740067200)
+	`)
+	if err != nil {
+		t.Fatalf("failed to insert addressee user: %v", err)
+	}
+
+	err = database.SendFriendRequest(db, "user1", "user2")
+	if err != nil {
+		t.Fatalf("failed to send friend request: %v", err)
+	} else {
+		t.Log("successfully sent friend request")
+	}
+
+	err = database.AcceptFriendRequest(db, "user2", "user1")
+	if err != nil {
+		t.Fatalf("failed to accept friend request: %v", err)
+	} else {
+		t.Log("successfully accepted friend request")
+	}
+
+	friends, err := database.GetFriends(db, "user1")
+	if err != nil {
+		t.Fatalf("failed to get friends: %v", err)
+	} else {
+		t.Log("successfully got friends")
+	}
+
+	if len(friends) != 1 {
+		t.Fatalf("expected 1 friend, got %d", len(friends))
+	}
+
+	if friends[0].UserID != "user2" || friends[0].Username != "addressee" || friends[0].Accepted != true {
+		t.Fatal("friend entry does not match expected values")
+	} else {
+		t.Log("friend entry matches expected values")
+	}
+}
+
+func Test_get_pending_requests_func(t *testing.T) {
+	db := database.InitDB(":memory:")
+	defer db.Close()
+
+	_, err := db.Exec(`
+		INSERT INTO users (id, username, email, password_hash, created_at)
+		VALUES ("user1", "requester", "requester@gmail.com", "password", 1740067200)
+	`)
+	if err != nil {
+		t.Fatalf("failed to insert requester user: %v", err)
+	}
+
+	_, err = db.Exec(`
+		INSERT INTO users (id, username, email, password_hash, created_at)
+		VALUES ("user2", "addressee", "addressee@gmail.com", "password", 1740067200)
+	`)
+	if err != nil {
+		t.Fatalf("failed to insert addressee user: %v", err)
+	}
+
+	err = database.SendFriendRequest(db, "user1", "user2")
+	if err != nil {
+		t.Fatalf("failed to send friend request: %v", err)
+	} else {
+		t.Log("successfully sent friend request")
+	}
+
+	friends, err := database.GetPendingRequests(db, "user1")
+	if err != nil {
+		t.Fatalf("failed to get friends: %v", err)
+	} else {
+		t.Log("successfully got friends")
+	}
+
+	if len(friends) != 1 {
+		t.Fatalf("expected 1 friend, got %d", len(friends))
+	}
+
+	if friends[0].UserID != "user2" || friends[0].Username != "addressee" || friends[0].Accepted == true || friends[0].Direction != "outgoing" {
+		t.Fatal("friend entry does not match expected values")
+	} else {
+		t.Log("friend entry matches expected values")
+	}
+}
+
+func Test_friendship_exists_func(t *testing.T) {
+	db := database.InitDB(":memory:")
+	defer db.Close()
+
+	_, err := db.Exec(`
+		INSERT INTO users (id, username, email, password_hash, created_at)
+		VALUES ("user1", "requester", "requester@gmail.com", "password", 1740067200)
+	`)
+	if err != nil {
+		t.Fatalf("failed to insert requester user: %v", err)
+	}
+
+	_, err = db.Exec(`
+		INSERT INTO users (id, username, email, password_hash, created_at)
+		VALUES ("user2", "addressee", "addressee@gmail.com", "password", 1740067200)
+	`)
+	if err != nil {
+		t.Fatalf("failed to insert addressee user: %v", err)
+	}
+
+	err = database.SendFriendRequest(db, "user1", "user2")
+	if err != nil {
+		t.Fatalf("failed to send friend request: %v", err)
+	} else {
+		t.Log("successfully sent friend request")
+	}
+
+	err = database.AcceptFriendRequest(db, "user2", "user1")
+	if err != nil {
+		t.Fatalf("failed to accept friend request: %v", err)
+	} else {
+		t.Log("successfully accepted friend request")
+	}
+
+	exists, accepted, direction, err := database.FriendshipExists(db, "user1", "user2")
+	if err != nil {
+		t.Fatalf("failed to get friendship status because of: %v", err)
+	} else {
+		t.Log("successfully got friendships status")
+	}
+
+	if exists != true || accepted != true || direction != "outgoing" {
+		t.Fatal("friendship status does not match expected values")
+	} else {
+		t.Log("friendship status matches expected values")
+	}
+	//incoming direction
+	exists, accepted, direction, err = database.FriendshipExists(db, "user2", "user1")
+	if err != nil {
+		t.Fatalf("failed to get friendship status because of: %v", err)
+	} else {
+		t.Log("successfully got friendships status")
+	}
+
+	if exists != true || accepted != true || direction != "incoming" {
+		t.Fatal("friendship status does not match expected values")
+	} else {
+		t.Log("friendship status matches expected values")
+	}
+}
+
+func Test_get_user_id_by_username_func(t *testing.T) {
+	db := database.InitDB(":memory:")
+	defer db.Close()
+
+	_, err := db.Exec(`
+		INSERT INTO users (id, username, email, password_hash, created_at)
+		VALUES ("user1", "requester", "requester@gmail.com", "password", 1740067200)
+	`)
+	if err != nil {
+		t.Fatalf("failed to insert requester user: %v", err)
+	}
+
+	id, err := database.GetUserIDByUsername(db, "requester")
+	if err != nil{
+		t.Fatal("failed to get user id by username")
+	} else {
+		t.Log("got user id by username")
+	}
+
+	if id != "user1"{
+		t.Fatal("returned the incorrect id by username")
+	} else {
+		t.Log("returned the correct id by username")
+	}
+	//nonexistent username
+	_, err = database.GetUserIDByUsername(db, "nonexistent")
+	if err != sql.ErrNoRows {
+		t.Fatal("expected sql.ErrNoRows for nonexistent user")
+	} else {
+		t.Log("correctly returned sql.ErrNoRows for nonexistent user")
 	}
 }

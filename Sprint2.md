@@ -341,3 +341,20 @@ All issues that were incomplete are due to time constraints. The team decided to
 - `type: string`
 - `conversation_id: string`
 - `ciphertext: string`
+
+---
+
+## Running Frontend Tests
+
+Frontend end-to-end tests are written with Cypress and live in `secret-keeper-app/frontend/secret-keeper-frontend/cypress/e2e/`.
+
+Before running the tests, make sure the Angular dev server and Go backend are both running.
+
+To open the Cypress test runner:
+
+```
+cd secret-keeper-app/frontend/secret-keeper-frontend
+npx cypress open --e2e --config baseUrl=http://localhost:4200
+```
+
+Select **E2E Testing**, choose a browser, then click any spec file to run it.
