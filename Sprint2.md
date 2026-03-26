@@ -54,38 +54,7 @@ We plan to implement functionality to support user stories 2, 4, 8, and 14. In a
 - Add backend unit tests for database and handler logic
 - Add frontend tests for authentication, profile, friend, and messaging flows
 - Expand frontend unit testing beyond the existing service and component scaffolds
-### List of Tests
-- Test_init_db_func
-- Test_create_session_func
-- Test_delete_session_func
-- Test_send_friend_request_func
-- Test_accept_friend_request_func
-- Test_decline_friend_request_func
-- Test_remove_friend_func
-- Test_get_friends_func
-- Test_get_pending_requests_func
-- Test_friendship_exists_func
-- Test_get_user_id_by_username_func
-- Test_send_friend_request_handler
-- Test_accept_friend_request_handler
-- Test_decline_friend_request_handler
-- Test_remove_friend_handler
-- Test_get_friends_handler
-- Test_get_pending_requests_handler
-- Test_create_conversation_handler
-- Test_get_conversations_handler
-- Test_forgot_password_handler
-- Test_validate_reset_token_handler
-- Test_reset_password_handler
-- Test_get_profile_handler
-- Test_update_profile_handler
-- Test_update_account_handler
-- Test_verify_email_change_handler
-- Test_logout_handler
-- Test_upload_profile_picture_handler
-- Test_register_handler_func
-- Test_verify_email_handler_func
-- Test_login_handler_func
+
 ## Successfully Completed
 - Authentication backend routes are implemented for register, login, logout, email verification, email-change verification, and password reset flow
 - Conversation backend routes are implemented for creating conversations, loading conversation lists, loading message history, verifying room keys, and one-time room key claiming
@@ -118,6 +87,76 @@ All issues that were incomplete are due to time constraints. The team decided to
 
 
 
+---
+# Testing
+## Running Frontend Tests
+
+Frontend end-to-end tests are written with Cypress and live in `secret-keeper-app/frontend/secret-keeper-frontend/cypress/e2e/`.
+
+Before running the tests, make sure the Angular dev server and Go backend are both running.
+
+To open the Cypress test runner:
+
+```
+cd secret-keeper-app/frontend/secret-keeper-frontend
+npx cypress open --e2e --config baseUrl=http://localhost:4200
+```
+
+Select **E2E Testing**, choose a browser, then click any spec file to run it. Here is the list of tests:
+
+- go_to_signup.cy.ts — User navigates from login page to signup page.
+- signup_username_too_short.cy.ts — Signup rejects username shorter than required minimum.
+- signup_password_too_short.cy.ts — Signup rejects password shorter than required minimum.
+- signup_accepts_valid_credentials.cy.ts — Signup accepts valid username and password combination.
+- go_to_password_reset.cy.ts — User navigates from login page to password reset page.
+- use_password_reset.cy.ts — User submits email for password reset and invalid email is rejected.
+- messaging_load_page.cy.ts — Messaging page loads with sidebar and empty conversation state.
+- messaging_create_conversation.cy.ts — User creates a new conversation and room key modal appears.
+- messaging_send_message.cy.ts — User sends a message in a conversation and it appears in the chat.
+- messaging_conversation_list.cy.ts — Conversation list renders with conversation items.
+- messaging_nav_to_profile.cy.ts — User navigates to profile page from messaging sidebar.
+- messaging_nav_to_friends.cy.ts — User navigates to friends page from messaging sidebar.
+- profile_load_page.cy.ts — Profile page loads and displays user's username and email.
+- profile_update_display_name.cy.ts — User updates their display name and change is saved.
+- profile_logout.cy.ts — User logs out and is redirected to login page.
+- friends_load_page.cy.ts — Friends page loads with Friends, Requests, and Add Friend tabs.
+- friends_send_request.cy.ts — User sends a friend request to another user.
+- friends_view_requests.cy.ts — User views incoming friend requests on the Requests tab.
+- friends_message_button.cy.ts — User adds a friend, friend accepts, then user opens chat from friends list.
+
+
+## List of Backend Tests
+- Test_init_db_func
+- Test_create_session_func
+- Test_delete_session_func
+- Test_send_friend_request_func
+- Test_accept_friend_request_func
+- Test_decline_friend_request_func
+- Test_remove_friend_func
+- Test_get_friends_func
+- Test_get_pending_requests_func
+- Test_friendship_exists_func
+- Test_get_user_id_by_username_func
+- Test_send_friend_request_handler
+- Test_accept_friend_request_handler
+- Test_decline_friend_request_handler
+- Test_remove_friend_handler
+- Test_get_friends_handler
+- Test_get_pending_requests_handler
+- Test_create_conversation_handler
+- Test_get_conversations_handler
+- Test_forgot_password_handler
+- Test_validate_reset_token_handler
+- Test_reset_password_handler
+- Test_get_profile_handler
+- Test_update_profile_handler
+- Test_update_account_handler
+- Test_verify_email_change_handler
+- Test_logout_handler
+- Test_upload_profile_picture_handler
+- Test_register_handler_func
+- Test_verify_email_handler_func
+- Test_login_handler_func
 ---
 
 # SecretKeeper API Documentation
@@ -373,39 +412,4 @@ All issues that were incomplete are due to time constraints. The team decided to
 - `conversation_id: string`
 - `ciphertext: string`
 
----
 
-## Running Frontend Tests
-
-Frontend end-to-end tests are written with Cypress and live in `secret-keeper-app/frontend/secret-keeper-frontend/cypress/e2e/`.
-
-Before running the tests, make sure the Angular dev server and Go backend are both running.
-
-To open the Cypress test runner:
-
-```
-cd secret-keeper-app/frontend/secret-keeper-frontend
-npx cypress open --e2e --config baseUrl=http://localhost:4200
-```
-
-Select **E2E Testing**, choose a browser, then click any spec file to run it. Here is the list of tests:
-
-- go_to_signup.cy.ts — User navigates from login page to signup page.
-- signup_username_too_short.cy.ts — Signup rejects username shorter than required minimum.
-- signup_password_too_short.cy.ts — Signup rejects password shorter than required minimum.
-- signup_accepts_valid_credentials.cy.ts — Signup accepts valid username and password combination.
-- go_to_password_reset.cy.ts — User navigates from login page to password reset page.
-- use_password_reset.cy.ts — User submits email for password reset and invalid email is rejected.
-- messaging_load_page.cy.ts — Messaging page loads with sidebar and empty conversation state.
-- messaging_create_conversation.cy.ts — User creates a new conversation and room key modal appears.
-- messaging_send_message.cy.ts — User sends a message in a conversation and it appears in the chat.
-- messaging_conversation_list.cy.ts — Conversation list renders with conversation items.
-- messaging_nav_to_profile.cy.ts — User navigates to profile page from messaging sidebar.
-- messaging_nav_to_friends.cy.ts — User navigates to friends page from messaging sidebar.
-- profile_load_page.cy.ts — Profile page loads and displays user's username and email.
-- profile_update_display_name.cy.ts — User updates their display name and change is saved.
-- profile_logout.cy.ts — User logs out and is redirected to login page.
-- friends_load_page.cy.ts — Friends page loads with Friends, Requests, and Add Friend tabs.
-- friends_send_request.cy.ts — User sends a friend request to another user.
-- friends_view_requests.cy.ts — User views incoming friend requests on the Requests tab.
-- friends_message_button.cy.ts — User adds a friend, friend accepts, then user opens chat from friends list.
