@@ -1,10 +1,95 @@
+# Sprint 2 Report
+
+## User Stories
+1. As a user, I want to be able to login, so that my messages and data are associated with my personal account
+2. As a user, I want my conversations to be private, so that only intended recipients can read them
+3. As a user, I want to be able to search for other users, so that I may message certain people
+4. As a user, I want to be able to add friends, so that I can maintain and start conversations with my known associates
+5. As a user, I want to be able to start a conversation, so that I can message a specific friend
+6. As a user, I want to be able to send images, so that I am not limited to text data
+7. As a user, I want to be able to send videos, so that I am not limited to text data
+8. As a user, I want to be able to modify my account information, so that I can ensure updated and accurate information
+9. As a user, I want my account credentials to be stored securely, so that my account cannot be compromised
+10. As a user, I want to have a profile picture, so that I can distinguish my account
+11. As a user, I want my messages to disappear after a certain amount of time, so that my chat history remains secure and private
+12. As a user, I want to delete a message I sent, so that I can remove incorrect or sensitive information
+13. As a user, I want to log out of my account, so that others cannot access my messages on my device
+14. As a user, I want to see a list of my conversations, so that I can quickly navigate between chats
+15. As a user, I want to block another user, so that they cannot contact me
+16. As a user, I want to be able to edit my messages, so that I can rectify incorrect or sensitive information
+17. As a user, I want to implement password reset option
+18. As a user, I want to implement group message chats
+19. As a user, I want to be able to create an account, so that I can login and use SecretKeeper
+20. As a user, I want to be able to send PDF files, so that I can transmit documents with important data
+21. As a user, I want to be able to “mute” a chat so that I can more easily ignore messages from it
+22. As a user, I want to access the app through the web, so that I can conveniently interface from any device
+
+## Planned Issues
+We plan to implement functionality to support user stories 2, 4, 8, and 14. In addition, we plan to complete frontend-backend integration for user stories 1, 5, 9, 17, 18, 19, and 22, and create both backend and frontend testing frameworks.
+### Private Conversations and Encryption
+- Complete frontend-backend integration for creating conversations, loading conversation lists, and loading message history
+- Add room key based conversation access flow for creating and opening chats
+- Verify room keys for existing conversations and support one-time room key retrieval for recipients
+- Encrypt and decrypt chat messages on the client before sending and after receiving them
+### Friends
+- Implement backend and frontend support for loading friends and pending requests
+- Support sending, accepting, declining, and removing friend requests
+- Use friend relationships to support easier conversation creation
+### Profile and Account Information
+- Integrate frontend profile views with backend profile endpoints
+- Support account information such as display name, bio, email, and profile picture
+- Add support for modifying profile and account information
+### Conversation List and Navigation
+- Render a live conversation list from backend data
+- Show conversation names, previews, and timestamps in the messaging sidebar
+- Improve the overall messaging page layout and navigation flow for easier chat access
+### Authentication and Web Integration
+- Complete frontend-backend integration for login, signup, password reset, logout, and authenticated sessions
+- Ensure authenticated requests consistently use session cookies across the web app
+- Continue supporting browser-based access to SecretKeeper through the Angular frontend
+### Group Conversations
+- Extend conversation creation flow to support multiple members
+- Ensure grouped conversations can be stored, loaded, and displayed through the same messaging infrastructure
+### Testing
+- Add backend unit tests for database and handler logic
+- Add frontend tests for authentication, profile, friend, and messaging flows
+- Expand frontend unit testing beyond the existing service and component scaffolds
+
+## Successfully Completed
+- Authentication backend routes are implemented for register, login, logout, email verification, email-change verification, and password reset flow
+- Conversation backend routes are implemented for creating conversations, loading conversation lists, loading message history, verifying room keys, and one-time room key claiming
+- Friends backend routes are implemented for loading friends, loading pending requests, sending requests, accepting requests, declining requests, and removing friends
+- Profile backend routes are implemented for loading profile data, updating profile data, uploading profile pictures, and updating account information
+- WebSocket messaging backend is implemented for real-time chat delivery
+- Database support is implemented for users, sessions, conversations, friendship data, encrypted message storage, and room-key verification state
+- Frontend-backend integration now exists for login, signup, password reset, profile loading, friends management, conversation loading, and messaging
+- Real-time messaging is working through the WebSocket connection between the Angular frontend and Go backend
+- Room and chat encryption is implemented on the client using a conversation key derived from the room key, and messages are encrypted before send and decrypted after receipt
+- Conversation access flow now supports room key verification for existing chats and one-time room key retrieval for recipients
+- Conversation list UI is implemented with names, encrypted-message previews, and timestamps in the messaging sidebar
+- Key-management is implemented in the backend and frontend for storing user keys, retrieving public keys, saving encrypted conversation keys, and loading stored conversation keys
+- Backend unit tests exist for database and handler coverage
+- Frontend test scaffolds exist for the app, services, and several components
+
+## Incomplete / Carried Over
+All issues that were incomplete are due to time constraints. The team decided to continue prioritizing core messaging, privacy, authentication, and account functionality first for the MVP, while carrying lower-priority or unfinished features into the next sprint.
+- User search functionality has not been completed yet
+- Sending images has not been implemented yet
+- Sending videos has not been implemented yet
+- Disappearing messages have not been implemented yet
+- Message deletion has not been implemented yet
+- Blocking users has not been implemented yet
+- Message editing has not been implemented yet
+- Sending PDF files has not been implemented yet
+- Chat muting has not been implemented yet
+- Additional frontend and backend test coverage
+
+
+
+
+---
+
 # SecretKeeper API Documentation
-
-
-## Notes
-- Most requests use `credentials: 'include'` as the app expects a session cookie for authenticated endpoints
-- `CryptoService` is client-side only and does not call the backend
-- `MessagingService` uses WebSocket
 
 ## ApiService
 
