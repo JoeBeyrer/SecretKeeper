@@ -142,31 +142,40 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
 
   // Called when clicking a conversation in the sidebar
   async selectConversation(convId: string): Promise<void> {
-  this.messages = [];
-  this.errorMessage = '';
+    if (
+      this.conversationId === convId &&
+      this.conversationKeys.has(convId) &&
+      this.modal.type === 'none'
+    ) {
+      return;
+    }
 
-  if (!this.messagingService.isConnected()) {
-    this.messagingService.connect();
+    this.messages = [];
+    this.errorMessage = '';
+
+    if (!this.messagingService.isConnected()) {
+      this.messagingService.connect();
+    }
+
+    // If we already have the key cached, open immediately
+    if (this.conversationKeys.has(convId)) {
+      this.conversationId = convId;
+      this.isConnected = true;
+      await this.loadMessages(convId);
+      return;
+    }
+
+    // Try one-time server claim for the recipient
+    const claimed = await this.tryClaimRoomKey(convId);
+    if (claimed) {
+      return;
+    }
+
+    // Otherwise prompt for the room key
+    this.modal = { type: 'enter-room-key', convId };
+    this.roomKeyInput = '';
+    this.roomKeyError = '';
   }
-
-  if (this.conversationKeys.has(convId)) {
-    this.conversationId = convId;
-    this.isConnected = true;
-    await this.loadMessages(convId);
-    return;
-  }
-
-  const claimed = await this.tryClaimRoomKey(convId);
-  if (claimed) {
-  this.conversationId = convId;
-  this.isConnected = true;
-  return;
-  }
-
-  this.modal = { type: 'enter-room-key', convId };
-  this.roomKeyInput = '';
-  this.roomKeyError = '';
-}
 
   // Submit room key from the enter-key modal
   async submitRoomKey(): Promise<void> {
@@ -187,6 +196,8 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
       }
 
       this.conversationKeys.set(convId, key);
+      this.conversationId = convId;
+      this.isConnected = true;
       this.modal = { type: 'none' };
       this.roomKeyInput = '';
       this.roomKeyError = '';
@@ -197,11 +208,6 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
   }
 
   closeModal(): void {
-    if (this.modal.type === 'enter-room-key') {
-      // If they close without entering a key, deselect the conversation
-      this.conversationId = '';
-      this.isConnected = false;
-    }
     this.modal = { type: 'none' };
     this.roomKeyInput = '';
     this.roomKeyError = '';
@@ -296,6 +302,8 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
       this.conversationKeys.set(convId, key);
 
       this.ngZone.run(() => {
+        this.conversationId = convId;
+        this.isConnected = true;
         this.modal = { type: 'show-room-key', convId, key: roomKey };
         this.roomKeyCopied = false;
         this.roomKeyInput = '';
