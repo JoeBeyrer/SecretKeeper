@@ -357,4 +357,24 @@ cd secret-keeper-app/frontend/secret-keeper-frontend
 npx cypress open --e2e --config baseUrl=http://localhost:4200
 ```
 
-Select **E2E Testing**, choose a browser, then click any spec file to run it.
+Select **E2E Testing**, choose a browser, then click any spec file to run it. Here is the list of tests:
+
+- go_to_signup.cy.ts — User navigates from login page to signup page.
+- signup_username_too_short.cy.ts — Signup rejects username shorter than required minimum.
+- signup_password_too_short.cy.ts — Signup rejects password shorter than required minimum.
+- signup_accepts_valid_credentials.cy.ts — Signup accepts valid username and password combination.
+- go_to_password_reset.cy.ts — User navigates from login page to password reset page.
+- use_password_reset.cy.ts — User submits email for password reset and invalid email is rejected.
+- messaging_load_page.cy.ts — Messaging page loads with sidebar and empty conversation state.
+- messaging_create_conversation.cy.ts — User creates a new conversation and room key modal appears.
+- messaging_send_message.cy.ts — User sends a message in a conversation and it appears in the chat.
+- messaging_conversation_list.cy.ts — Conversation list renders with conversation items.
+- messaging_nav_to_profile.cy.ts — User navigates to profile page from messaging sidebar.
+- messaging_nav_to_friends.cy.ts — User navigates to friends page from messaging sidebar.
+- profile_load_page.cy.ts — Profile page loads and displays user's username and email.
+- profile_update_display_name.cy.ts — User updates their display name and change is saved.
+- profile_logout.cy.ts — User logs out and is redirected to login page.
+- friends_load_page.cy.ts — Friends page loads with Friends, Requests, and Add Friend tabs.
+- friends_send_request.cy.ts — User sends a friend request to another user.
+- friends_view_requests.cy.ts — User views incoming friend requests on the Requests tab.
+- friends_message_button.cy.ts — User adds a friend, friend accepts, then user opens chat from friends list.
