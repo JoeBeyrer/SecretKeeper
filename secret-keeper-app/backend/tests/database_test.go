@@ -14,19 +14,6 @@ func Test_init_db_func(t *testing.T) {
 	defer db.Close()
 
 	if _, err := db.Exec(`
-	 	CREATE TABLE IF NOT EXISTS users (
-            id TEXT PRIMARY KEY,
-            username TEXT UNIQUE NOT NULL,
-            email TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            created_at INTEGER NOT NULL
-        )`); err != nil {
-		t.Fatalf("create table failed because of %v", err)
-	} else {
-		t.Log("successfully created table")
-	}
-
-	if _, err := db.Exec(`
 		INSERT INTO users (id, username, email, password_hash, created_at)
 		VALUES ("9e99af6b-48e4-4eeb-951f-0cb27e03e32c", "testuser", "testuser@gmail.com", "$2y$12$XElWz9WPwSLK3y0jUP6KhOHepv.KF4zj6z4J3XXyYRye.VXnPsMA2", 1742467200)
 	`); err != nil {
@@ -111,19 +98,232 @@ func Test_delete_session_func(t *testing.T) {
 
 	_, err = db.Exec(`
 		DELETE FROM sessions
-		WHERE session_id = ?`,
-		sessionID,
-	)
-
-	err = db.QueryRow(`
-		DELETE FROM sessions
 		WHERE id = ?`,
 		sessionID,
-	).Scan(err)
+	)
+	if err != nil {
+		t.Fatalf("error deleting because of: %v", err)
+	} else {
+		t.Log("successfully deleted session")
+	}
+
+	var id string
+	err = db.QueryRow(`
+		SELECT id FROM sessions WHERE id = ?`, sessionID,
+	).Scan(&id)
 
 	if err != sql.ErrNoRows {
 		t.Fatalf("row still exists after deletion %v", err)
 	} else {
 		t.Log("successfully deleted session")
+	}
+}
+
+func Test_send_friend_request_func(t *testing.T) {
+	db := database.InitDB(":memory:")
+	defer db.Close()
+
+	_, err := db.Exec(`
+		INSERT INTO users (id, username, email, password_hash, created_at)
+		VALUES ("user1", "requester", "requester@gmail.com", "password", 1740067200)
+	`)
+	if err != nil {
+		t.Fatalf("failed to insert requester user: %v", err)
+	}
+
+	_, err = db.Exec(`
+		INSERT INTO users (id, username, email, password_hash, created_at)
+		VALUES ("user2", "addressee", "addressee@gmail.com", "password", 1740067200)
+	`)
+	if err != nil {
+		t.Fatalf("failed to insert addressee user: %v", err)
+	}
+
+	err = database.SendFriendRequest(db, "user1", "user2")
+	if err != nil {
+		t.Fatalf("failed to send friend request: %v", err)
+	} else {
+		t.Log("successfully sent friend request")
+	}
+
+	var requesterID, addresseeID string
+	var accepted int
+	err = db.QueryRow(`
+		SELECT requester_id, addressee_id, accepted
+		FROM friendships
+		WHERE requester_id = ? AND addressee_id = ?`,
+		"user1", "user2",
+	).Scan(&requesterID, &addresseeID, &accepted)
+
+	if err == sql.ErrNoRows {
+		t.Fatal("unable to get inserted row from friendships table")
+	} else {
+		t.Log("successfully got inserted rows from friendships table")
+	}
+
+	if requesterID != "user1" || addresseeID != "user2" || accepted != 0 {
+		t.Fatal("selected information does not match friendships table inputted info")
+	} else {
+		t.Log("selected information matches friendships table inputted info")
+	}
+}
+
+func Test_accept_friend_request_func(t *testing.T) {
+	db := database.InitDB(":memory:")
+	defer db.Close()
+
+	_, err := db.Exec(`
+		INSERT INTO users (id, username, email, password_hash, created_at)
+		VALUES ("user1", "requester", "requester@gmail.com", "password", 1740067200)
+	`)
+	if err != nil {
+		t.Fatalf("failed to insert requester user: %v", err)
+	}
+
+	_, err = db.Exec(`
+		INSERT INTO users (id, username, email, password_hash, created_at)
+		VALUES ("user2", "addressee", "addressee@gmail.com", "password", 1740067200)
+	`)
+	if err != nil {
+		t.Fatalf("failed to insert addressee user: %v", err)
+	}
+
+	err = database.SendFriendRequest(db, "user1", "user2")
+	if err != nil {
+		t.Fatalf("failed to send friend request: %v", err)
+	} else {
+		t.Log("successfully sent friend request")
+	}
+
+	err = database.AcceptFriendRequest(db, "user2", "user1")
+	if err != nil {
+		t.Fatalf("failed to accept friend request: %v", err)
+	} else {
+		t.Log("successfully accepted friend request")
+	}
+
+	var accepted int
+	err = db.QueryRow(`
+		SELECT accepted
+		FROM friendships
+		WHERE requester_id = ? AND addressee_id = ?`,
+		"user1", "user2",
+	).Scan(&accepted)
+
+	if err == sql.ErrNoRows {
+		t.Fatal("unable to get inserted row from friendships table")
+	} else {
+		t.Log("successfully got inserted rows from friendships table")
+	}
+
+	if accepted == 0 {
+		t.Fatal("acceptfriendrequest function did not change accepted value")
+	} else {
+		t.Log("acceptfriendrequest changed accepted value")
+	}
+}
+
+func Test_decline_friend_request_func(t *testing.T) {
+	db := database.InitDB(":memory:")
+	defer db.Close()
+
+	_, err := db.Exec(`
+		INSERT INTO users (id, username, email, password_hash, created_at)
+		VALUES ("user1", "requester", "requester@gmail.com", "password", 1740067200)
+	`)
+	if err != nil {
+		t.Fatalf("failed to insert requester user: %v", err)
+	}
+
+	_, err = db.Exec(`
+		INSERT INTO users (id, username, email, password_hash, created_at)
+		VALUES ("user2", "addressee", "addressee@gmail.com", "password", 1740067200)
+	`)
+	if err != nil {
+		t.Fatalf("failed to insert addressee user: %v", err)
+	}
+
+	err = database.SendFriendRequest(db, "user1", "user2")
+	if err != nil {
+		t.Fatalf("failed to send friend request: %v", err)
+	} else {
+		t.Log("successfully sent friend request")
+	}
+
+	err = database.DeclineFriendRequest(db, "user2", "user1")
+	if err != nil {
+		t.Fatalf("failed to decline friend request: %v", err)
+	} else {
+		t.Log("successfully declined friend request")
+	}
+
+	var accepted int
+	err = db.QueryRow(`
+		SELECT accepted
+		FROM friendships
+		WHERE requester_id = ? AND addressee_id = ?`,
+		"user1", "user2",
+	).Scan(&accepted)
+
+	if err != sql.ErrNoRows {
+		t.Fatal("friendship row still exists after deletion")
+	} else {
+		t.Log("successfully deleted friendship from friendships table")
+	}
+}
+
+func Test_remove_friend_func(t *testing.T) {
+	db := database.InitDB(":memory:")
+	defer db.Close()
+
+	_, err := db.Exec(`
+		INSERT INTO users (id, username, email, password_hash, created_at)
+		VALUES ("user1", "requester", "requester@gmail.com", "password", 1740067200)
+	`)
+	if err != nil {
+		t.Fatalf("failed to insert requester user: %v", err)
+	}
+
+	_, err = db.Exec(`
+		INSERT INTO users (id, username, email, password_hash, created_at)
+		VALUES ("user2", "addressee", "addressee@gmail.com", "password", 1740067200)
+	`)
+	if err != nil {
+		t.Fatalf("failed to insert addressee user: %v", err)
+	}
+
+	err = database.SendFriendRequest(db, "user1", "user2")
+	if err != nil {
+		t.Fatalf("failed to send friend request: %v", err)
+	} else {
+		t.Log("successfully sent friend request")
+	}
+
+	err = database.AcceptFriendRequest(db, "user2", "user1")
+	if err != nil {
+		t.Fatalf("failed to accept friend request: %v", err)
+	} else {
+		t.Log("successfully accepted friend request")
+	}
+
+	err = database.RemoveFriend(db, "user2", "user1")
+	if err != nil {
+		t.Fatalf("remove friend function failed because of: %v", err)
+	} else {
+		t.Log("successfully removed friendship from friendships table")
+	}
+	
+	var exists int
+	err = db.QueryRow(`
+		SELECT 1
+		FROM friendships
+		WHERE requester_id = ? AND addressee_id = ?`,
+		"user1", "user2",
+	).Scan(&exists)
+
+	if err != sql.ErrNoRows {
+		t.Fatal("friendship row still exists after removal")
+	} else {
+		t.Log("successfully removed friendship from friendships table")
 	}
 }
