@@ -124,6 +124,9 @@ Select **E2E Testing**, choose a browser, then click any spec file to run it. He
 - friends_view_requests.cy.ts — User views incoming friend requests on the Requests tab.
 - friends_message_button.cy.ts — User adds a friend, friend accepts, then user opens chat from friends list.
 
+## Frontend Unit Tests
+# Planning to improve spec stubs. Will update later
+
 
 ## List of Backend Tests
 - Test_init_db_func
