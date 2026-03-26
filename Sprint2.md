@@ -125,7 +125,7 @@ Select **E2E Testing**, choose a browser, then click any spec file to run it. He
 - friends_message_button.cy.ts — User adds a friend, friend accepts, then user opens chat from friends list.
 
 ## Frontend Unit Tests
-# Planning to improve spec stubs. Will update later
+Planning to improve spec stubs. Will update later
 
 
 ## List of Backend Tests
