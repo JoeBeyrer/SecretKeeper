@@ -156,6 +156,13 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     return;
   }
 
+  const claimed = await this.tryClaimRoomKey(convId);
+  if (claimed) {
+  this.conversationId = convId;
+  this.isConnected = true;
+  return;
+  }
+
   this.modal = { type: 'enter-room-key', convId };
   this.roomKeyInput = '';
   this.roomKeyError = '';
