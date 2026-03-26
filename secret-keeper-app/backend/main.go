@@ -57,6 +57,8 @@ func main() {
     mux.Handle("/api/conversations/create", auth(http.HandlerFunc(handlers.CreateConversationHandler(db))))
     mux.Handle("/api/conversations/get", auth(http.HandlerFunc(handlers.GetConversationsHandler(db))))
     mux.Handle("/api/conversations/{id}/messages", auth(http.HandlerFunc(handlers.GetConversationMessagesHandler(db))))
+    mux.Handle("/api/conversations/{id}/verify-room-key", auth(http.HandlerFunc(handlers.VerifyConversationRoomKeyHandler(db))))
+    mux.Handle("/api/conversations/{id}/claim-room-key", auth(http.HandlerFunc(handlers.ClaimConversationRoomKeyHandler(db))))
     
     // FRIENDS ROUTES
 	mux.Handle("/api/friends", auth(http.HandlerFunc(handlers.GetFriendsHandler(db))))
@@ -65,6 +67,13 @@ func main() {
 	mux.Handle("/api/friends/accept", auth(http.HandlerFunc(handlers.AcceptFriendRequestHandler(db))))
 	mux.Handle("/api/friends/decline", auth(http.HandlerFunc(handlers.DeclineFriendRequestHandler(db))))
 	mux.Handle("/api/friends/remove", auth(http.HandlerFunc(handlers.RemoveFriendHandler(db))))
+
+    // ENCRYPTION ROUTES
+    mux.Handle("/api/keys/save", auth(http.HandlerFunc(handlers.SaveKeysHandler(db))))
+    mux.Handle("/api/keys/get", auth(http.HandlerFunc(handlers.GetKeysHandler(db))))
+    mux.Handle("/api/users/{username}/public-key", auth(http.HandlerFunc(handlers.GetPublicKeyHandler(db))))
+    mux.Handle("/api/conversations/{id}/keys", auth(http.HandlerFunc(handlers.SaveConversationKeyHandler(db))))
+    mux.Handle("/api/conversations/{id}/key", auth(http.HandlerFunc(handlers.GetConversationKeyHandler(db))))
 
     // TEMPORARY FOR TESTING _ REMOVE OR COMMENT
     mux.Handle("/api/test-auth", auth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
