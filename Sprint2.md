@@ -84,12 +84,12 @@ All issues that were incomplete are due to time constraints. The team decided to
 - Chat muting has not been implemented yet
 - Additional frontend and backend test coverage
 
-
-
-
 ---
+
 # Testing
 ## Running Frontend Tests
+
+### Cypress End-to-End Tests
 
 Frontend end-to-end tests are written with Cypress and live in `secret-keeper-app/frontend/secret-keeper-frontend/cypress/e2e/`.
 
@@ -112,54 +112,281 @@ Select **E2E Testing**, choose a browser, then click any spec file to run it. He
 - use_password_reset.cy.ts — User submits email for password reset and invalid email is rejected.
 - messaging_load_page.cy.ts — Messaging page loads with sidebar and empty conversation state.
 - messaging_create_conversation.cy.ts — User creates a new conversation and room key modal appears.
-- messaging_send_message.cy.ts — User sends a message in a conversation and it appears in the chat.
 - messaging_conversation_list.cy.ts — Conversation list renders with conversation items.
 - messaging_nav_to_profile.cy.ts — User navigates to profile page from messaging sidebar.
 - messaging_nav_to_friends.cy.ts — User navigates to friends page from messaging sidebar.
-- profile_load_page.cy.ts — Profile page loads and displays user's username and email.
 - profile_update_display_name.cy.ts — User updates their display name and change is saved.
 - profile_logout.cy.ts — User logs out and is redirected to login page.
 - friends_load_page.cy.ts — Friends page loads with Friends, Requests, and Add Friend tabs.
 - friends_send_request.cy.ts — User sends a friend request to another user.
 - friends_view_requests.cy.ts — User views incoming friend requests on the Requests tab.
-- friends_message_button.cy.ts — User adds a friend, friend accepts, then user opens chat from friends list.
 
 ## Frontend Unit Tests
-Planning to improve spec stubs. Will update later
 
+Unit tests are written with Jasmine and run with Karma inside the Angular project.
 
-## List of Backend Tests
-- Test_init_db_func
-- Test_create_session_func
-- Test_delete_session_func
-- Test_send_friend_request_func
-- Test_accept_friend_request_func
-- Test_decline_friend_request_func
-- Test_remove_friend_func
-- Test_get_friends_func
-- Test_get_pending_requests_func
-- Test_friendship_exists_func
-- Test_get_user_id_by_username_func
-- Test_send_friend_request_handler
-- Test_accept_friend_request_handler
-- Test_decline_friend_request_handler
-- Test_remove_friend_handler
-- Test_get_friends_handler
-- Test_get_pending_requests_handler
-- Test_create_conversation_handler
-- Test_get_conversations_handler
-- Test_forgot_password_handler
-- Test_validate_reset_token_handler
-- Test_reset_password_handler
-- Test_get_profile_handler
-- Test_update_profile_handler
-- Test_update_account_handler
-- Test_verify_email_change_handler
-- Test_logout_handler
-- Test_upload_profile_picture_handler
-- Test_register_handler_func
-- Test_verify_email_handler_func
-- Test_login_handler_func
+To run all frontend unit tests:
+
+```
+cd secret-keeper-app/frontend/secret-keeper-frontend
+npx ng test --watch=false
+```
+
+**Component Tests** (`src/app/components/*/`)
+
+friends/friends.spec.ts
+- should create
+- should load friends and pending requests on init
+- should filter incomingRequests correctly
+- should filter outgoingRequests correctly
+- should return display_name if set, otherwise username
+- should set activeTab when setTab is called
+- should clear messages when setTab is called
+- should call sendFriendRequest and set successMessage on success
+- should set errorMessage when sendFriendRequest fails
+- should not call sendFriendRequest when username is empty
+- should call acceptRequest with correct username
+- should call declineRequest with correct username
+- should call removeFriend with correct username
+- should navigate to messaging with chatWith param when startChat is called
+- should redirect to login if user is not authenticated
+- should track isActing correctly during actions
+
+login/login.spec.ts
+- should create
+- should initialize form with empty username and password
+- should set errorMessage when submitting invalid form
+- should mark form invalid when username is too short
+- should mark form invalid when password is too short
+- should mark form valid with correct username and password
+- should navigate to /signup when goToSignup is called
+- should navigate to /reset-password when goToForgotPassword is called
+- should set successMessage when verified query param is true
+
+messaging/messaging.spec.ts
+- should create
+- should redirect to /login if user is not authenticated
+- should set currentUsername and currentDisplayName from the authenticated user
+- should load and map conversations on init
+- should call messagingService.connect() on init
+- startNewConversation() should set errorMessage when username is empty
+- sendMessage() should do nothing when newMessage is empty
+- sendMessage() should set errorMessage when no conversationId is set
+- sendMessage() should set errorMessage when socket is not connected
+- sendMessage() should encrypt and send the message
+- closeModal() should reset modal state
+- goTo() should navigate to the given page
+- getActiveConversationName() should return name of current conversation
+- getActiveConversationName() should return truncated id when conversation is unknown
+- selectConversation() should prompt for room key when claimRoomKey returns NOT_AVAILABLE
+- submitRoomKey() should set roomKeyError when input is empty
+- sendMessage() should set errorMessage when no room key is cached for the conversation
+
+password-reset/password-reset.spec.ts
+- should create
+- should start in request state
+- should set requestError when email is invalid
+- should POST to password-reset/request and set requestMessage on success
+- should set requestError on POST failure
+- goToLogin() should navigate to /login
+- requestNewLink() should navigate to /reset-password
+- should enter validating state and set reset state when token is valid
+- should set expired state when token is invalid
+- should set expired state when validation request errors
+- should show reset page after valid token
+- should set resetError when passwords do not match
+- should set resetError when password is too short
+- should POST confirm and set success state on success
+- should set resetError with 422 expired link message
+- should set generic resetError on other confirm errors
+
+profile/profile.spec.ts
+- should create
+- should load profile data on init
+- should populate profileForm with loaded profile data
+- should navigate to /login when loadProfile returns 401
+- should set errorMessage when loadProfile returns non-401 error
+- onSave() should set errorMessage when profileForm is invalid
+- onSave() should PUT profile and set successMessage on success
+- onSave() should set errorMessage on save failure
+- onSaveAccount() should set accountErrorMessage when all fields are empty
+- onSaveAccount() should set accountErrorMessage when passwords do not match
+- onSaveAccount() should PUT account and reset form on success
+- onSaveAccount() should set accountErrorMessage with 409 conflict
+- onLogout() should POST to /api/logout and navigate to /login
+- onLogout() should navigate to /login even on logout error
+- goToMessaging() should navigate to /messaging
+- should set accountSuccessMessage when email_updated query param is true
+- onPictureSelected() should set errorMessage for disallowed file type
+
+signup/signup.spec.ts
+- should create
+- should initialize the form with empty fields
+- should set errorMessage when username is missing
+- should set errorMessage when username is too short
+- should set errorMessage when email is missing
+- should set errorMessage when email is invalid
+- should set errorMessage when password is missing
+- should set errorMessage when password is too short
+- should set errorMessage when passwords do not match
+- should navigate to /login when goToLogin is called
+
+**Service Tests** (`src/app/services/`)
+
+api.spec.ts
+- should be created
+- get() should send a GET request to the correct URL
+- post() should send a POST request with the given body
+- put() should send a PUT request with the given body
+- delete() should send a DELETE request to the correct URL
+
+auth.service.spec.ts
+- should be created
+- getCurrentUser() should return null before any load
+- clearCurrentUser() should set currentUser back to null
+- loadCurrentUser() should return cached user on second call without re-fetching
+- loadCurrentUser() should return null when response is not ok
+- loadCurrentUser() should return null when fetch throws
+- loadCurrentUser() should return and cache the user profile on success
+
+conversation.service.spec.ts
+- should be created
+- createConversation() should POST /conversations/create with member_ids and room_key
+- createConversation() should throw on non-ok response
+- getConversations() should GET /conversations/get and return list
+- getConversations() should throw on error
+- getMessages() should GET /conversations/:id/messages
+- verifyRoomKey() should POST /conversations/:id/verify-room-key and resolve on ok
+- verifyRoomKey() should throw ROOM_KEY_VERIFIER_NOT_SET on 404
+- verifyRoomKey() should throw generic error on other failures
+- claimRoomKey() should POST /conversations/:id/claim-room-key and return the room_key
+- claimRoomKey() should throw ROOM_KEY_NOT_AVAILABLE on 404
+- claimRoomKey() should throw on other errors
+
+crypto.service.spec.ts
+- should be created
+- generateRoomKey() should return a non-empty base64 string
+- generateRoomKey() should return a different key on each call
+- generateRoomKey() should produce a valid base64-decodable string of 18 raw bytes
+- deriveConversationKey() should return a CryptoKey
+- deriveConversationKey() should produce the same key for the same passphrase and convId
+- deriveConversationKey() should produce different keys for different passphrases
+- deriveConversationKey() should produce different keys for different conversation IDs
+- encryptMessage() should encrypt a message to a non-empty base64 string
+- decryptMessage() should decrypt back to the original plaintext
+- encryptMessage() should produce different ciphertexts for the same message (random IV)
+- encryptMessage()/decryptMessage() should encrypt and decrypt an empty string
+- encryptMessage()/decryptMessage() should encrypt and decrypt a long unicode message
+- decryptMessage() should reject decryption when the ciphertext is tampered with
+- decryptMessage() should reject decryption when the wrong key is used
+
+friend.service.spec.ts
+- should be created
+- getFriends() should GET /friends and return the list
+- getFriends() should throw when response is not ok
+- getPendingRequests() should GET /friends/requests and return list
+- sendFriendRequest() should POST /friends/request with correct username
+- sendFriendRequest() should throw when response is not ok
+- acceptRequest() should POST /friends/accept with correct username
+- declineRequest() should POST /friends/decline with correct username
+- removeFriend() should DELETE /friends/remove with correct username
+- removeFriend() should throw when response is not ok
+
+key.service.spec.ts
+- should be created
+- saveKeys() should POST /keys/save with the correct payload
+- saveKeys() should throw when response is not ok
+- getKeys() should GET /keys/get and return public and private keys
+- getKeys() should throw when response is not ok
+- getPublicKey() should GET /users/:username/public-key and return public_key and user_id
+- getPublicKey() should throw when the user is not found
+- saveConversationKeys() should POST /conversations/:id/keys with the keys array
+- saveConversationKeys() should throw when response is not ok
+- getConversationKey() should GET /conversations/:id/key and return the encrypted_key string
+- getConversationKey() should throw when response is not ok
+
+messaging.service.spec.ts
+- should be created
+- connect() should create a WebSocket pointing to the correct URL
+- connect() should not create a second socket if already OPEN
+- connect() should set socket to null on close
+- isConnected() should return false before connect() is called
+- isConnected() should return true when socket is OPEN
+- isConnected() should return false after disconnect()
+- sendMessage() should send a properly structured JSON payload
+- sendMessage() should not throw when socket is not open
+- sendMessage() should not send when socket has been disconnected
+- disconnect() should close the socket
+- disconnect() should not throw when called before connect()
+- messages$ should emit an IncomingMessage when a new_message event is received
+- messages$ should not emit for messages with a type other than new_message
+- messages$ should not throw when the incoming message is malformed JSON
+- messages$ should emit multiple messages in order
+- ngOnDestroy() should disconnect and complete the subject without errors
+
+To run backend tests:
+
+```
+cd secret-keeper-app/backend
+go test ./tests/... -v
+```
+
+**database_test.go**
+- Test_init_db_func — Verifies database schema initializes correctly.
+- Test_create_session_func — Verifies session creation and retrieval.
+- Test_delete_session_func — Verifies session deletion.
+- Test_send_friend_request_func — Verifies friend request creation in DB.
+- Test_accept_friend_request_func — Verifies friend request acceptance in DB.
+- Test_decline_friend_request_func — Verifies friend request decline in DB.
+- Test_remove_friend_func — Verifies friend removal in DB.
+- Test_get_friends_func — Verifies accepted friends are returned.
+- Test_get_pending_requests_func — Verifies pending requests are returned.
+- Test_friendship_exists_func — Verifies friendship existence checks.
+- Test_get_user_id_by_username_func — Verifies user lookup by username.
+
+**handlers_test.go**
+- Test_register_handler_func — Invalid password length, empty username, duplicate username, valid registration.
+- Test_verify_email_handler_func — Missing token, expired token, valid token verification.
+- Test_login_handler_func — Invalid credentials, unverified email, valid login.
+
+**auth_friends_test.go**
+- Test_send_friend_request_handler — Unauthorized, user not found, self-add, duplicate, valid request.
+- Test_accept_friend_request_handler — Unauthorized, user not found, valid acceptance.
+- Test_decline_friend_request_handler — Unauthorized, user not found, valid decline.
+- Test_remove_friend_handler — Unauthorized, user not found, valid removal.
+- Test_get_friends_handler — Unauthorized, empty list, populated list.
+- Test_get_pending_requests_handler — Unauthorized, incoming and outgoing requests.
+
+**profile_passwordreset_test.go**
+- Test_forgot_password_handler — Empty email, unknown email, unverified email, valid request with rate limit.
+- Test_validate_reset_token_handler — Missing token, expired token, valid token.
+- Test_reset_password_handler — Missing token, expired token, password too short, valid reset.
+- Test_get_profile_handler — Unauthorized, valid profile fetch, auto-creates blank profile row.
+- Test_update_profile_handler — Unauthorized, display name too long, bio too long, valid update.
+- Test_update_account_handler — Unauthorized, duplicate username/email conflict, valid username and email update.
+- Test_verify_email_change_handler — Missing token, expired token, valid verification and redirect.
+- Test_logout_handler — Valid logout clears session cookie.
+- Test_upload_profile_picture_handler — Unauthorized, oversized file, invalid file type, valid upload.
+
+**conversations_test.go**
+- Test_create_conversation_handler — Missing room key, unknown member, valid creation, duplicate returns existing, unauthorized.
+- Test_get_conversations_handler — Empty list, list after creation, unauthorized.
+- Test_get_conversation_messages_handler — Empty message list, non-member forbidden access.
+- Test_verify_conversation_room_key_handler — Correct key returns 204, wrong key returns 401, empty key returns 400.
+- Test_claim_conversation_room_key_handler — Recipient claims key, double-claim returns 404, non-member returns 403.
+
+**keys_test.go**
+- Test_save_keys_handler — Empty keys return 400, valid save returns 204, unauthorized returns 401.
+- Test_get_keys_handler — No keys returns 404, returns key pair after save, unauthorized returns 401.
+- Test_get_public_key_handler — No keys returns 404, returns key after save, unknown username returns 404, unauthorized returns 401.
+
+**hub_test.go**
+- Test_hub_register_and_send — Registered client receives message.
+- Test_hub_send_to_unregistered_user — Sending to unknown user does not panic.
+- Test_hub_unregister — Unregistered client no longer receives messages.
+- Test_hub_register_replaces_existing_client — Re-registration replaces old client channel.
+- Test_hub_multiple_clients — Multiple clients each receive only their own messages.
+
 ---
 
 # SecretKeeper API Documentation
@@ -417,5 +644,3 @@ Planning to improve spec stubs. Will update later
 
 ## Demo Video
 [Sprint 2 Demo Video](https://www.youtube.com/watch?v=81LtIXOoIwg)
-
-
