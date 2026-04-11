@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -76,8 +77,13 @@ func CreateConversationHandler(db *sql.DB) http.HandlerFunc {
             }
         }
 
+		req.RoomKey = strings.TrimSpace(req.RoomKey)
 		if req.RoomKey == "" {
 			http.Error(w, "missing room key", http.StatusBadRequest)
+			return
+		}
+		if len(req.RoomKey) <= 6 {
+			http.Error(w, "room key must be longer than 6 characters", http.StatusBadRequest)
 			return
 		}
 
