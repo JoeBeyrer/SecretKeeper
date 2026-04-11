@@ -25,6 +25,7 @@ interface Conversation {
 
 type ModalState =
   | { type: 'none' }
+  | { type: 'create-room-key'; username: string }
   | { type: 'show-room-key'; convId: string; key: string }
   | { type: 'enter-room-key'; convId: string };
 
@@ -138,7 +139,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
 
     const chatWith = this.route.snapshot.queryParamMap.get('chatWith');
     if (chatWith) {
-      await this.startNewConversationWith(chatWith);
+      this.openCreateConversationModal(chatWith);
     }
   }
 
@@ -186,6 +187,18 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     this.roomKeyError = '';
   }
 
+  async submitCreateConversation(): Promise<void> {
+    if (this.modal.type !== 'create-room-key') return;
+
+    const passphrase = this.roomKeyInput.trim();
+    if (passphrase.length <= 6) {
+      this.roomKeyError = 'Room key must be longer than 6 characters.';
+      return;
+    }
+
+    await this.startNewConversationWith(this.modal.username, passphrase);
+  }
+
   // Submit room key from the enter-key modal
   async submitRoomKey(): Promise<void> {
     if (this.modal.type !== 'enter-room-key') return;
@@ -230,12 +243,13 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
   }
 
   async startNewConversation(): Promise<void> {
-    if (!this.newConversationMemberId.trim()) {
+    const username = this.newConversationMemberId.trim();
+    if (!username) {
       this.errorMessage = 'Please enter a username to start a conversation with.';
       return;
     }
-    await this.startNewConversationWith(this.newConversationMemberId.trim());
-    this.newConversationMemberId = '';
+
+    this.openCreateConversationModal(username);
   }
 
   async sendMessage(): Promise<void> {
@@ -299,6 +313,14 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
 
   // Private helpers
 
+  private openCreateConversationModal(username: string): void {
+    this.modal = { type: 'create-room-key', username };
+    this.roomKeyInput = this.cryptoService.generateRoomKey();
+    this.roomKeyError = '';
+    this.roomKeyCopied = false;
+    this.errorMessage = '';
+  }
+
   private async refreshConversationList(): Promise<void> {
     try {
       const convs = await this.conversationService.getConversations();
@@ -348,9 +370,8 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     }
   }
 
-  private async startNewConversationWith(username: string): Promise<void> {
+  private async startNewConversationWith(username: string, passphrase: string): Promise<void> {
     try {
-      const passphrase = this.cryptoService.generateRoomKey();
       const result = await this.conversationService.createConversation([username], passphrase);
 
       this.ngZone.run(() => {
@@ -358,6 +379,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
         this.messages = [];
         this.errorMessage = '';
         this.isConnected = true;
+        this.newConversationMemberId = '';
         this.addConversationToList(result.conversation_id, username);
       });
 

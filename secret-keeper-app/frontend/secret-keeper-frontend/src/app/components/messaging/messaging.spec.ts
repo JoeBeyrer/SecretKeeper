@@ -118,6 +118,27 @@ describe('Messaging', () => {
     expect(conversationServiceSpy.createConversation).not.toHaveBeenCalled();
   });
 
+  it('startNewConversation() should open a room-key modal with a generated key', async () => {
+    cryptoServiceSpy.generateRoomKey.mockReturnValue('generated-room-key');
+    component.newConversationMemberId = 'bob';
+
+    await component.startNewConversation();
+
+    expect(component.modal).toEqual({ type: 'create-room-key', username: 'bob' });
+    expect(component.roomKeyInput).toBe('generated-room-key');
+    expect(conversationServiceSpy.createConversation).not.toHaveBeenCalled();
+  });
+
+  it('submitCreateConversation() should set roomKeyError when the key is too short', async () => {
+    component.modal = { type: 'create-room-key', username: 'bob' };
+    component.roomKeyInput = 'short';
+
+    await component.submitCreateConversation();
+
+    expect(component.roomKeyError).toContain('longer than 6');
+    expect(conversationServiceSpy.createConversation).not.toHaveBeenCalled();
+  });
+
   it('sendMessage() should do nothing when newMessage is empty', async () => {
     component.newMessage = '   ';
     await component.sendMessage();
