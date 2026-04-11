@@ -5,7 +5,15 @@ import (
 	"secret-keeper-app/backend/database"
 	"testing"
 	"time"
+	"log"
+	"os"
+	"io"
 )
+
+func TestMain(m *testing.M) {
+    log.SetOutput(io.Discard)
+    os.Exit(m.Run())
+}
 
 func Test_init_db_func(t *testing.T) {
 	var id, username, email, password_hash string

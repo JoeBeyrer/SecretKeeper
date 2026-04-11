@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"time"
-
+    "log"
 	"github.com/google/uuid"
 	"secret-keeper-app/backend/database"
 )
@@ -134,6 +134,7 @@ type ConversationSummary struct {
     Name            string `json:"name"`
     LastMessage     string `json:"last_message"`
     LastMessageTime int64  `json:"last_message_time"`
+    MessageLifetime int `json:"message_lifetime"`
 }
 
 func GetConversationsHandler(db *sql.DB) http.HandlerFunc {
@@ -326,4 +327,67 @@ func ClaimConversationRoomKeyHandler(db *sql.DB) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(claimRoomKeyResp{RoomKey: roomKey})
 	}
+}
+
+func SetMessageLifetimeHandler(db *sql.DB) http.HandlerFunc {
+    return func(w http.ResponseWriter, r *http.Request) {
+        userID, ok := GetUserIDFromContext(r)
+        if !ok {
+            log.Println("[Lifetime] unauthorized")
+            http.Error(w, "unauthorized", http.StatusUnauthorized)
+            return
+        }
+
+        convID := r.PathValue("id")
+        if convID == "" {
+            log.Println("[Lifetime] missing conversation id")
+            http.Error(w, "missing conversation id", http.StatusBadRequest)
+            return
+        }
+
+        if !database.IsUserInConversation(db, userID, convID) {
+            log.Println("[Lifetime] forbidden - user not in conversation")
+            http.Error(w, "forbidden", http.StatusForbidden)
+            return
+        }
+
+        var body struct {
+            MessageLifetime int `json:"message_lifetime"`
+        }
+        if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+            log.Println("[Lifetime] invalid request body:", err)
+            http.Error(w, "invalid request", http.StatusBadRequest)
+            return
+        }
+
+        log.Printf("[Lifetime] setting lifetime for conversation %s to %d\n", convID, body.MessageLifetime)
+
+        _, err := db.Exec(`UPDATE conversations SET message_lifetime = ? WHERE id = ?`, body.MessageLifetime, convID)
+        if err != nil {
+            log.Println("[Lifetime] db error:", err)
+            http.Error(w, "could not update message lifetime", http.StatusInternalServerError)
+            return
+        }
+        // Update expires_at for all existing messages in the conversation
+        if body.MessageLifetime > 0 {
+            _, err = db.Exec(`
+                UPDATE messages 
+                SET expires_at = created_at + ?
+                WHERE conversation_id = ?
+            `, body.MessageLifetime * 60, convID)
+        } else {
+            _, err = db.Exec(`
+                UPDATE messages 
+                SET expires_at = NULL
+                WHERE conversation_id = ?
+            `, convID)
+        }
+        if err != nil {
+            log.Println("[Lifetime] failed to update message expiries:", err)
+            http.Error(w, "could not update message expiries", http.StatusInternalServerError)
+            return
+        }
+        log.Println("[Lifetime] success")
+        w.WriteHeader(http.StatusNoContent)
+    }
 }

@@ -459,7 +459,7 @@ img {
 }
 
 .message-bubble.sent .text-35 {
-  color: rgba(26, 30, 36, 0.7);
+  color: rgba(26, 30, 36, 1);
 }
 
 .no-messages {
@@ -530,7 +530,7 @@ img {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 1);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -689,4 +689,50 @@ img {
   font-size: 11px;
   color: #34c9eb;
   font-weight: 400;
+}
+
+.message-lifetime-input {
+  text-align: center;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(52, 201, 235, 1);
+  font-size: 14px;
+  color: rgba(52, 201, 235, 1);
+  padding: 4px 0;
+  width: 48px;
+  outline: none;
+  cursor: text;
+}
+
+.message-lifetime-input::-webkit-inner-spin-button,
+.message-lifetime-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.message-lifetime-input[type=number] {
+  -moz-appearance: textfield;
+}
+
+.message-lifetime-input::placeholder {
+  color: rgba(52, 201, 235, 1);
+  font-style: italic;
+}
+
+.chat-message_delete_timer {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lifetime-label {
+  color: rgba(52, 201, 235, 1);
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.lifetime-unit {
+  color: rgba(52, 201, 235, 1);
+  font-size: 14px;
 }

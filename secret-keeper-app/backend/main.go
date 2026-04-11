@@ -27,6 +27,9 @@ func main() {
 
     hub := messaging.NewHub() // messaging
 
+    // Background goroutine that sweeps expired messages
+    database.CleanupMessages(db, hub)
+
     // Health check
     mux.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
         w.Header().Set("Content-Type", "application/json")
@@ -59,6 +62,7 @@ func main() {
     mux.Handle("/api/conversations/{id}/messages", auth(http.HandlerFunc(handlers.GetConversationMessagesHandler(db))))
     mux.Handle("/api/conversations/{id}/verify-room-key", auth(http.HandlerFunc(handlers.VerifyConversationRoomKeyHandler(db))))
     mux.Handle("/api/conversations/{id}/claim-room-key", auth(http.HandlerFunc(handlers.ClaimConversationRoomKeyHandler(db))))
+    mux.Handle("/api/conversations/{id}/lifetime", auth(http.HandlerFunc(handlers.SetMessageLifetimeHandler(db))))
     
     // FRIENDS ROUTES
 	mux.Handle("/api/friends", auth(http.HandlerFunc(handlers.GetFriendsHandler(db))))
@@ -90,7 +94,7 @@ func main() {
     // CORS
     handler := cors.New(cors.Options{
         AllowedOrigins: []string{"http://localhost:4200"},
-        AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+        AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
         AllowedHeaders: []string{"Content-Type"},
         AllowCredentials: true,
     }).Handler(mux)

@@ -21,7 +21,6 @@ export interface OutgoingMessage {
 export class MessagingService implements OnDestroy {
   private socket: WebSocket | null = null;
   private messageSubject = new Subject<IncomingMessage>();
- 
   // Users subscribe to this to receive incoming messages
   messages$: Observable<IncomingMessage> = this.messageSubject.asObservable();
  
@@ -39,7 +38,7 @@ export class MessagingService implements OnDestroy {
     this.socket.onmessage = (event: MessageEvent) => {
       try {
         const msg: IncomingMessage = JSON.parse(event.data);
-        if (msg.type === 'new_message') {
+        if (msg.type === 'new_message' || msg.type === 'messages_updated') {
           this.messageSubject.next(msg);
         }
       } catch (e) {

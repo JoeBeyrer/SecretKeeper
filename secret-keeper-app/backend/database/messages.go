@@ -16,12 +16,18 @@ type MessageRow struct {
 }
 
 func SaveMessage(db *sql.DB, id, convID, senderID, ciphertext string, createdAt int64) error {
-	_, err := db.Exec(`
-		INSERT INTO messages (id, conversation_id, sender_id, ciphertext, created_at)
-		VALUES (?, ?, ?, ?, ?)
-	`, id, convID, senderID, ciphertext, createdAt)
-
-	return err
+    var messageLifetime int64
+    db.QueryRow(`SELECT message_lifetime FROM conversations WHERE id = ?`, convID).Scan(&messageLifetime)
+    var expiresAt *int64
+    if messageLifetime > 0 {
+        t := createdAt + (messageLifetime * 60)
+        expiresAt = &t
+    }
+    _, err := db.Exec(`
+        INSERT INTO messages (id, conversation_id, sender_id, ciphertext, created_at, expires_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+    `, id, convID, senderID, ciphertext, createdAt, expiresAt)
+    return err
 }
 
 func IsUserInConversation(db *sql.DB, userID, conversationID string) bool {

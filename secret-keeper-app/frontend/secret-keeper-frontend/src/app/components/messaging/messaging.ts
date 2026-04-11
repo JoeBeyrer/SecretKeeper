@@ -20,6 +20,7 @@ interface Conversation {
   name: string;
   lastMessage: string;
   lastMessageTime: string;
+  messageLifetime?:number;
 }
 
 type ModalState =
@@ -45,6 +46,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
   currentUsername: string = '';
   currentDisplayName: string = '';
   conversations: Conversation[] = [];
+  messageLifetime: number = 0;
 
   // modal state
   modal: ModalState = { type: 'none' };
@@ -83,7 +85,14 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
 
     this.messagingService.connect();
 
-    this.messageSub = this.messagingService.messages$.subscribe((incoming) => {
+    this.messageSub = this.messagingService.messages$.subscribe({next: async (incoming) => {
+      if (incoming.type === 'messages_updated') {
+        console.log('[Frontend] messages_updated received for', incoming.conversation_id);
+        if (incoming.conversation_id === this.conversationId) {
+          await this.loadMessages(this.conversationId);
+        }
+        return;
+      }
       const knownConversation = !!this.conversations.find(c => c.id === incoming.conversation_id);
       if (!knownConversation) {
         void this.refreshConversationList();
@@ -125,7 +134,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
           this.shouldScrollToBottom = true;
         });
       });
-    });
+    }});
 
     const chatWith = this.route.snapshot.queryParamMap.get('chatWith');
     if (chatWith) {
@@ -262,6 +271,19 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     this.shouldScrollToBottom = true;
   }
 
+  async onMessageLifetimeChange(event: Event): Promise<void> {
+    console.log('[Lifetime] change event fired');
+    const value = Number((event.target as HTMLInputElement).value);
+    console.log('[Lifetime] value:', value, 'conversationId:', this.conversationId);
+    if (!this.conversationId) return;
+    try {
+      await this.conversationService.setMessageLifetime(this.conversationId, value);
+      this.messageLifetime = value;
+    } catch (e: any) {
+      console.error('[Messaging] Failed to set message lifetime:', e);
+    }
+  }
+
   goTo(page: string): void {
     this.router.navigate(['/' + page]);
   }
@@ -288,6 +310,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
           lastMessageTime: c.last_message_time
             ? this.formatTimeShort(new Date(c.last_message_time * 1000))
             : '',
+          message_lifetime: c.message_lifetime ?? 0,
         }));
       });
     } catch (e: any) {

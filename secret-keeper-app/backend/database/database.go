@@ -17,6 +17,7 @@ func InitDB(path string) *sql.DB {
 	}
 
 	execOrFatal(db, `PRAGMA journal_mode=WAL;`)  // WAL makes fewer db locked issues
+    execOrFatal(db, `PRAGMA busy_timeout = 5000;`) //timeout to wait before returning
 	execOrFatal(db, `PRAGMA foreign_keys = ON;`) // explicitly allow foreign keys
 
 	execOrFatal(db, `
@@ -92,7 +93,8 @@ func InitDB(path string) *sql.DB {
             created_at INTEGER,
             room_key_hash TEXT,
             pending_room_key TEXT,
-            pending_room_key_recipient_id TEXT
+            pending_room_key_recipient_id TEXT,
+            message_lifetime INTEGER DEFAULT 0
         )
     `)
 

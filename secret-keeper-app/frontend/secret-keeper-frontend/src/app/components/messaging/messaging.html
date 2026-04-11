@@ -139,6 +139,19 @@
             <p class="text-26"><span class="text-rgb-48-48-48">{{ getActiveConversationName() }}</span></p>
             <p class="encrypted-badge">🔐 End-to-end encrypted</p>
           </div>
+          <div class="chat-message_delete_timer">
+            <label class="lifetime-label">Message lifetime:</label>
+            <input 
+              type="number" 
+              class="message-lifetime-input"
+              placeholder=""
+              [(ngModel)]="messageLifetime"
+              (change)="onMessageLifetimeChange($event)"
+              (keydown.enter)="onMessageLifetimeChange($event); $event.target.blur()"
+              min="0"
+            />
+            <span class="lifetime-unit">min</span>
+          </div>
         </div>
 
         <div class="messages-area" #messagesArea>

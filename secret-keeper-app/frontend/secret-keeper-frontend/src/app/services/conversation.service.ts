@@ -10,13 +10,13 @@ export interface ConversationSummary {
   name: string;
   last_message: string;
   last_message_time: number;
+  message_lifetime?: number;
 }
 
 @Injectable({
   providedIn: 'root',
 })
 export class ConversationService {
-
   async createConversation(memberIds: string[], roomKey: string): Promise<CreateConversationResponse> {
     const response = await fetch('http://localhost:8080/api/conversations/create', {
       method: 'POST',
@@ -98,4 +98,18 @@ export class ConversationService {
     throw new Error(text || 'Failed to retrieve room key.');
   }
 
+  async setMessageLifetime(conversationId: string, lifetime: number): Promise<void> {
+    console.log('[Lifetime] calling API for', conversationId, 'with', lifetime);
+    const response = await fetch(`http://localhost:8080/api/conversations/${conversationId}/lifetime`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ message_lifetime: lifetime }),
+    });
+    console.log('[Lifetime] response status:', response.status);
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Failed to set message lifetime: ${text}`);
+    }
+  }
 }
