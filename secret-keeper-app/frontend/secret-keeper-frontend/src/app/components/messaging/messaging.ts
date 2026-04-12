@@ -162,7 +162,8 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
 
     this.messages = [];
     this.errorMessage = '';
-
+    const conv = this.conversations.find(c => c.id === convId);
+    this.messageLifetime = conv?.messageLifetime ?? 0;
     if (!this.messagingService.isConnected()) {
       this.messagingService.connect();
     }

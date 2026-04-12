@@ -4,11 +4,12 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
-	"strings"
 	"time"
     "log"
 	"github.com/google/uuid"
 	"secret-keeper-app/backend/database"
+    "secret-keeper-app/backend/messaging"
+    "secret-keeper-app/backend/models"
 )
 
 type createConvReq struct {
@@ -77,13 +78,8 @@ func CreateConversationHandler(db *sql.DB) http.HandlerFunc {
             }
         }
 
-		req.RoomKey = strings.TrimSpace(req.RoomKey)
 		if req.RoomKey == "" {
 			http.Error(w, "missing room key", http.StatusBadRequest)
-			return
-		}
-		if len(req.RoomKey) <= 6 {
-			http.Error(w, "room key must be longer than 6 characters", http.StatusBadRequest)
 			return
 		}
 
@@ -150,10 +146,10 @@ func GetConversationsHandler(db *sql.DB) http.HandlerFunc {
             http.Error(w, "unauthorized", http.StatusUnauthorized)
             return
         }
-
         rows, err := db.Query(`
             SELECT
                 c.id,
+                c.message_lifetime,
                 (
                     SELECT GROUP_CONCAT(COALESCE(NULLIF(p.display_name, ''), u.username), ', ')
                     FROM conversation_members cm2
@@ -192,7 +188,7 @@ func GetConversationsHandler(db *sql.DB) http.HandlerFunc {
             var name sql.NullString
             var lastMsg sql.NullString
             var lastTime sql.NullInt64
-            if err := rows.Scan(&s.ID, &name, &lastMsg, &lastTime); err != nil {
+            if err := rows.Scan(&s.ID, &s.MessageLifetime, &name, &lastMsg, &lastTime); err != nil {
                 continue
             }
             s.Name = name.String
@@ -394,6 +390,53 @@ func SetMessageLifetimeHandler(db *sql.DB) http.HandlerFunc {
             return
         }
         log.Println("[Lifetime] success")
+        w.WriteHeader(http.StatusNoContent)
+    }
+}
+
+func DeleteMessageHandler(db *sql.DB, hub *messaging.Hub) http.HandlerFunc {
+    return func(w http.ResponseWriter, r *http.Request) {
+        userID, ok := GetUserIDFromContext(r)
+        if !ok {
+            http.Error(w, "unauthorized", http.StatusUnauthorized)
+            return
+        }
+        messageID := r.PathValue("id")
+        if messageID == "" {
+            http.Error(w, "missing message id", http.StatusBadRequest)
+            return
+        }
+        result, err := db.Exec(`
+            DELETE FROM messages
+            WHERE sender_id = ? AND id = ?
+        `, userID, messageID)
+        if err != nil {
+            http.Error(w, "could not delete message", http.StatusInternalServerError)
+            return
+        }
+
+        rows, _ := result.RowsAffected()
+        if rows == 0 {
+            http.Error(w, "message not found or not yours", http.StatusNotFound)
+            return
+        }
+
+        var convID string
+        db.QueryRow(`SELECT conversation_id FROM messages WHERE id = ?`, messageID).Scan(&convID)
+
+        members, err := database.GetConversationMembers(db, convID)
+        if err != nil {
+            http.Error(w, "failed to get members", http.StatusNotFound)
+        }
+
+        notification, _ := json.Marshal(models.WSMessage{
+            Type: "messages_updated",
+            ConversationID: convID,
+        })
+
+        for _, userID := range members {
+            hub.SendToUser(userID, notification)
+        }
         w.WriteHeader(http.StatusNoContent)
     }
 }

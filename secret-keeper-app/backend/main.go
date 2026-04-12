@@ -63,6 +63,7 @@ func main() {
     mux.Handle("/api/conversations/{id}/verify-room-key", auth(http.HandlerFunc(handlers.VerifyConversationRoomKeyHandler(db))))
     mux.Handle("/api/conversations/{id}/claim-room-key", auth(http.HandlerFunc(handlers.ClaimConversationRoomKeyHandler(db))))
     mux.Handle("/api/conversations/{id}/lifetime", auth(http.HandlerFunc(handlers.SetMessageLifetimeHandler(db))))
+    mux.Handle("/api/messages/{id}", auth(http.HandlerFunc(handlers.DeleteMessageHandler(db, hub))))
     
     // FRIENDS ROUTES
 	mux.Handle("/api/friends", auth(http.HandlerFunc(handlers.GetFriendsHandler(db))))

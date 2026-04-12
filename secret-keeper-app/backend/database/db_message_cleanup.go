@@ -56,7 +56,7 @@ func CleanExpiredMessages(db *sql.DB, hub *messaging.Hub) {
 		}
 		log.Println("[Cleanup] members to notify:", members)
 		notification, _ := json.Marshal(models.WSMessage{
-			Type:           "messages_updated",
+			Type: "messages_updated",
 			ConversationID: convID,
 		})
 		for _, userID := range members {

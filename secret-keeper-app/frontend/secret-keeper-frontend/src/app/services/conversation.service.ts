@@ -112,4 +112,17 @@ export class ConversationService {
       throw new Error(`Failed to set message lifetime: ${text}`);
     }
   }
+  async DeleteMessage(message_id: string): Promise<void> {
+    const response = await fetch(`http://localhost:8080/api/messages/${message_id}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({message_id}),
+    });
+    console.log('[message deletion] response status:', response.status);
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Failed to set message lifetime: ${text}`);
+    }
+  }
 }
