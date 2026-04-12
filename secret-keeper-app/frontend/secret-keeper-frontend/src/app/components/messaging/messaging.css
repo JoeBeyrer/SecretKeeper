@@ -745,3 +745,150 @@ img {
   background: rgba(52, 201, 235, 0.14);
   border-color: rgba(52, 201, 235, 0.55);
 }
+
+
+.hidden-attachment-input {
+  display: none;
+}
+
+.composer-error {
+  margin: 0 24px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: rgba(255, 99, 132, 0.12);
+  color: #ffb4c2;
+  font-family: var(--font-family-roboto);
+  font-size: 13px;
+}
+
+.pending-attachments-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 0 24px 12px;
+}
+
+.pending-attachment-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 260px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: #3b4450;
+  color: #fff;
+  font-family: var(--font-family-roboto);
+  font-size: 13px;
+}
+
+.pending-attachment-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pending-attachment-remove {
+  border: none;
+  background: transparent;
+  color: #cbd5e1;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.pending-attachment-remove:hover {
+  color: #fff;
+}
+
+.attachment-trigger {
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  border: none;
+  border-radius: 50%;
+  background: #3b4450;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.attachment-trigger:hover {
+  background: #4a5563;
+  transform: translateY(-1px);
+}
+
+.attachment-trigger:disabled,
+.rectangle-1-3:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.message-attachments {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 8px 0 4px;
+}
+
+.message-attachment-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.message-bubble.sent .message-attachment-card {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.message-attachment-preview {
+  width: min(320px, 100%);
+  max-height: 240px;
+  border-radius: 12px;
+  object-fit: cover;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.message-attachment-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.message-attachment-name {
+  font-family: var(--font-family-roboto);
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.message-bubble.received .message-attachment-name {
+  color: #f8fafc;
+}
+
+.message-attachment-meta {
+  font-family: var(--font-family-roboto);
+  font-size: 12px;
+  color: #cbd5e1;
+}
+
+.message-attachment-download {
+  align-self: flex-start;
+  text-decoration: none;
+  font-family: var(--font-family-roboto);
+  font-size: 13px;
+  font-weight: 600;
+  color: #34c9eb;
+}
+
+.message-bubble.sent .message-attachment-download {
+  color: #dbeafe;
+}

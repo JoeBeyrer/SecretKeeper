@@ -218,7 +218,35 @@
                 @if (!msg.isMine) {
                   <p class="text-25"><span class="text-rgb-48-48-48">{{ msg.username }}</span></p>
                 }
-                <p class="text-38" [class.text-white]="msg.isMine"><span [class.text-white]="msg.isMine" [class.text-rgb-48-48-48]="!msg.isMine">{{ msg.content }}</span></p>
+                @if (msg.content) {
+                  <p class="text-38" [class.text-white]="msg.isMine"><span [class.text-white]="msg.isMine" [class.text-rgb-48-48-48]="!msg.isMine">{{ msg.content }}</span></p>
+                }
+                @if (msg.attachments.length > 0) {
+                  <div class="message-attachments">
+                    @for (attachment of msg.attachments; track attachment.id) {
+                      <div class="message-attachment-card">
+                        @if (attachment.isImage) {
+                          <img class="message-attachment-preview" [src]="attachment.downloadUrl" [alt]="attachment.fileName" />
+                        } @else if (attachment.isVideo) {
+                          <video class="message-attachment-preview" [src]="attachment.downloadUrl" controls preload="metadata"></video>
+                        }
+
+                        <div class="message-attachment-info">
+                          <p class="message-attachment-name">{{ attachment.fileName }}</p>
+                          <p class="message-attachment-meta">{{ getAttachmentMeta(attachment) }}</p>
+                        </div>
+
+                        <a
+                          class="message-attachment-download"
+                          [href]="attachment.downloadUrl"
+                          [attr.download]="attachment.fileName"
+                        >
+                          Download
+                        </a>
+                      </div>
+                    }
+                  </div>
+                }
                 <p class="text-35" [class.text-white]="msg.isMine"><span [class.text-white]="msg.isMine" [class.text-rgb-124-124-124]="!msg.isMine">{{ msg.time }}</span></p>
               </div>
               @if (msg.isMine) {
@@ -237,7 +265,39 @@
           }
         </div>
 
+        @if (composerError) {
+          <div class="composer-error">
+            {{ composerError }}
+          </div>
+        }
+
+        @if (pendingAttachments.length > 0) {
+          <div class="pending-attachments-bar">
+            @for (attachment of pendingAttachments; track attachment.id) {
+              <div class="pending-attachment-chip">
+                <span class="pending-attachment-label">{{ getAttachmentBadgeLabel(attachment) }}</span>
+                <button class="pending-attachment-remove" (click)="removePendingAttachment(attachment.id)" aria-label="Remove attachment">
+                  ×
+                </button>
+              </div>
+            }
+          </div>
+        }
+
+        <input
+          #attachmentInput
+          type="file"
+          class="hidden-attachment-input"
+          multiple
+          (change)="onAttachmentsSelected($event)"
+        />
+
         <div class="message-input-bar">
+          <button class="attachment-trigger" type="button" (click)="triggerAttachmentPicker()" aria-label="Attach files">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.82-2.82l8.48-8.48"/>
+            </svg>
+          </button>
           <input
             type="text"
             [(ngModel)]="newMessage"
@@ -245,7 +305,7 @@
             class="rectangle-9-13"
             (keydown.enter)="sendMessage()"
           />
-          <button class="rectangle-1-3" (click)="sendMessage()">
+          <button class="rectangle-1-3" (click)="sendMessage()" [disabled]="isSendingMessage">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <line x1="22" y1="2" x2="11" y2="13"/>
               <polygon points="22 2 15 22 11 13 2 9 22 2"/>

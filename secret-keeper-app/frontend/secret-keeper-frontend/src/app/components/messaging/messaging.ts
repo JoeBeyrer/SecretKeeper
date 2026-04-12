@@ -8,11 +8,22 @@ import { ConversationService } from '../../services/conversation.service';
 import { AuthService } from '../../services/auth.service';
 import { CryptoService } from '../../services/crypto.service';
 
+interface MessageAttachment {
+  id: string;
+  fileName: string;
+  mimeType: string;
+  size: number;
+  downloadUrl: string;
+  isImage: boolean;
+  isVideo: boolean;
+}
+
 interface Message {
   username: string;
   time: string;
   content: string;
   isMine: boolean;
+  attachments: MessageAttachment[];
 }
 
 interface Conversation {
@@ -20,12 +31,36 @@ interface Conversation {
   name: string;
   lastMessage: string;
   lastMessageTime: string;
-  messageLifetime?:number;
+  messageLifetime?: number;
 }
 
 interface LifetimeOption {
   label: string;
   value: number;
+}
+
+interface PendingAttachment {
+  id: string;
+  file: File;
+  fileName: string;
+  mimeType: string;
+  size: number;
+  isImage: boolean;
+  isVideo: boolean;
+}
+
+interface RichMessageAttachmentPayload {
+  file_name: string;
+  mime_type: string;
+  size: number;
+  data_b64: string;
+}
+
+interface RichMessagePayload {
+  version: 1;
+  type: 'rich_message';
+  text: string;
+  attachments: RichMessageAttachmentPayload[];
 }
 
 type ModalState =
@@ -54,6 +89,9 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
   messages: Message[] = [];
   newMessage: string = '';
   errorMessage: string = '';
+  composerError: string = '';
+  pendingAttachments: PendingAttachment[] = [];
+  isSendingMessage: boolean = false;
 
   conversationId: string = '';
   newConversationMemberId: string = '';
@@ -78,6 +116,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
   private shouldScrollToBottom = false;
 
   @ViewChild('messagesArea') private messagesArea?: ElementRef;
+  @ViewChild('attachmentInput') private attachmentInput?: ElementRef<HTMLInputElement>;
 
   constructor(
     private ngZone: NgZone,
@@ -147,12 +186,12 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
       if (!convKey) return;
 
       this.cryptoService.decryptMessage(incoming.ciphertext, convKey).then(plaintext => {
-        const msg: Message = {
-          username: incoming.display_name || incoming.sender_id,
-          time: this.formatTime(new Date()),
-          content: plaintext,
-          isMine: false,
-        };
+        const msg = this.buildMessageFromDecryptedContent(
+          incoming.display_name || incoming.sender_id,
+          this.formatTime(new Date()),
+          false,
+          plaintext,
+        );
         this.ngZone.run(() => {
           this.messages.push(msg);
           this.shouldScrollToBottom = true;
@@ -164,12 +203,12 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
             time: this.formatTime(new Date()),
             content: '🔒 Could not decrypt message',
             isMine: false,
+            attachments: [],
           });
           this.shouldScrollToBottom = true;
         });
       });
     }});
-
   }
 
   ngAfterViewChecked(): void {
@@ -188,7 +227,11 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
       return;
     }
 
+    this.releaseMessageResources(this.messages);
     this.messages = [];
+    this.pendingAttachments = [];
+    this.newMessage = '';
+    this.composerError = '';
     this.errorMessage = '';
     this.settingsError = '';
     const conv = this.conversations.find(c => c.id === convId);
@@ -312,41 +355,93 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     this.openCreateConversationModal(username);
   }
 
+  triggerAttachmentPicker(): void {
+    this.composerError = '';
+    this.attachmentInput?.nativeElement.click();
+  }
+
+  onAttachmentsSelected(event: Event): void {
+    const input = event.target as HTMLInputElement | null;
+    const files = Array.from(input?.files ?? []);
+    if (files.length === 0) {
+      return;
+    }
+
+    this.composerError = '';
+    this.pendingAttachments = [
+      ...this.pendingAttachments,
+      ...files.map(file => this.createPendingAttachment(file)),
+    ];
+
+    if (input) {
+      input.value = '';
+    }
+  }
+
+  removePendingAttachment(attachmentId: string): void {
+    this.pendingAttachments = this.pendingAttachments.filter(attachment => attachment.id !== attachmentId);
+  }
+
   async sendMessage(): Promise<void> {
-    if (!this.newMessage.trim()) return;
-    if (!this.conversationId) {
-      this.errorMessage = 'Join or create a conversation first.';
-      return;
-    }
-    if (!this.messagingService.isConnected()) {
-      this.errorMessage = 'Not connected. Try rejoining the conversation.';
+    const text = this.newMessage.trim();
+    const hasAttachments = this.pendingAttachments.length > 0;
+    if (!text && !hasAttachments) {
       return;
     }
 
-    const convKey = this.conversationKeys.get(this.conversationId);
+    const convKey = this.ensureReadyForOutgoingContent();
     if (!convKey) {
-      this.errorMessage = 'No room key — please re-enter the room key.';
       return;
     }
 
-    const plaintext = this.newMessage.trim();
-    const ciphertext = await this.cryptoService.encryptMessage(plaintext, convKey);
+    this.composerError = '';
+    this.isSendingMessage = true;
 
-    this.messagingService.sendMessage(this.conversationId, ciphertext);
+    try {
+      let ciphertext: string;
+      let optimisticMessage: Message;
 
-    this.messages.push({
-      username: this.currentDisplayName,
-      time: this.formatTime(new Date()),
-      content: plaintext,
-      isMine: true,
-    });
-    this.updateConversationPreview(this.conversationId, ciphertext);
-    this.newMessage = '';
-    this.shouldScrollToBottom = true;
+      if (hasAttachments) {
+        const payload = await this.buildRichMessagePayload(text, this.pendingAttachments);
+        ciphertext = await this.cryptoService.encryptMessage(JSON.stringify(payload), convKey);
+        optimisticMessage = this.createRichMessageFromFiles(this.currentDisplayName, this.formatTime(new Date()), true, text, this.pendingAttachments);
+      } else {
+        ciphertext = await this.cryptoService.encryptMessage(text, convKey);
+        optimisticMessage = {
+          username: this.currentDisplayName,
+          time: this.formatTime(new Date()),
+          content: text,
+          isMine: true,
+          attachments: [],
+        };
+      }
+
+      this.messagingService.sendMessage(this.conversationId, ciphertext);
+      this.messages.push(optimisticMessage);
+      this.updateConversationPreview(this.conversationId, ciphertext);
+      this.newMessage = '';
+      this.pendingAttachments = [];
+      this.shouldScrollToBottom = true;
+    } catch (e) {
+      console.error('[Messaging] Failed to encrypt and send outgoing content:', e);
+      this.composerError = hasAttachments
+        ? 'Failed to encrypt and send file.'
+        : 'Failed to encrypt and send message.';
+    } finally {
+      this.isSendingMessage = false;
+    }
   }
 
   getMessageLifetimeLabel(value: number = this.messageLifetime): string {
     return this.lifetimeOptions.find(option => option.value === value)?.label ?? 'Never';
+  }
+
+  getAttachmentBadgeLabel(attachment: PendingAttachment): string {
+    return `${this.getAttachmentEmoji(attachment.mimeType)} ${attachment.fileName}`;
+  }
+
+  getAttachmentMeta(attachment: MessageAttachment): string {
+    return `${this.formatFileSize(attachment.size)} • ${attachment.mimeType || 'application/octet-stream'}`;
   }
 
   goTo(page: string): void {
@@ -361,8 +456,8 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
   ngOnDestroy(): void {
     this.messageSub?.unsubscribe();
     this.routeQuerySub?.unsubscribe();
+    this.releaseMessageResources(this.messages);
   }
-  
 
   private openCreateConversationModal(username: string): void {
     this.modal = { type: 'create-room-key', username };
@@ -440,7 +535,11 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
 
       this.ngZone.run(() => {
         this.conversationId = result.conversation_id;
+        this.releaseMessageResources(this.messages);
         this.messages = [];
+        this.pendingAttachments = [];
+        this.newMessage = '';
+        this.composerError = '';
         this.errorMessage = '';
         this.isConnected = true;
         this.newConversationMemberId = '';
@@ -511,29 +610,185 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
         history.map(async (m: any) => {
           try {
             const content = await this.cryptoService.decryptMessage(m.Ciphertext, convKey);
-            return {
-              username: m.DisplayName || m.Username,
-              time: this.formatTime(new Date(m.CreatedAt * 1000)),
+            return this.buildMessageFromDecryptedContent(
+              m.DisplayName || m.Username,
+              this.formatTime(new Date(m.CreatedAt * 1000)),
+              m.Username === this.currentUsername,
               content,
-              isMine: m.Username === this.currentUsername,
-            };
+            );
           } catch {
             return {
               username: m.DisplayName || m.Username,
               time: this.formatTime(new Date(m.CreatedAt * 1000)),
               content: '🔒 Could not decrypt message',
               isMine: m.Username === this.currentUsername,
+              attachments: [],
             };
           }
         })
       );
       this.ngZone.run(() => {
+        this.releaseMessageResources(this.messages);
         this.messages = decrypted;
         this.shouldScrollToBottom = true;
       });
     } catch (e) {
       console.error('[Messaging] Failed to load messages:', e);
     }
+  }
+
+  private ensureReadyForOutgoingContent(): CryptoKey | null {
+    if (!this.conversationId) {
+      this.composerError = 'Join or create a conversation first.';
+      return null;
+    }
+    if (!this.messagingService.isConnected()) {
+      this.composerError = 'Not connected. Try rejoining the conversation.';
+      return null;
+    }
+
+    const convKey = this.conversationKeys.get(this.conversationId);
+    if (!convKey) {
+      this.composerError = 'No room key — please re-enter the room key.';
+      return null;
+    }
+
+    return convKey;
+  }
+
+  private createPendingAttachment(file: File): PendingAttachment {
+    return {
+      id: this.createUniqueId(),
+      file,
+      fileName: file.name,
+      mimeType: file.type || 'application/octet-stream',
+      size: file.size,
+      isImage: file.type.startsWith('image/'),
+      isVideo: file.type.startsWith('video/'),
+    };
+  }
+
+  private async buildRichMessagePayload(text: string, attachments: PendingAttachment[]): Promise<RichMessagePayload> {
+    const serializedAttachments = await Promise.all(
+      attachments.map(async attachment => ({
+        file_name: attachment.fileName,
+        mime_type: attachment.mimeType,
+        size: attachment.size,
+        data_b64: this.cryptoService.bytesToBase64(new Uint8Array(await attachment.file.arrayBuffer())),
+      }))
+    );
+
+    return {
+      version: 1,
+      type: 'rich_message',
+      text,
+      attachments: serializedAttachments,
+    };
+  }
+
+  private buildMessageFromDecryptedContent(username: string, time: string, isMine: boolean, plaintext: string): Message {
+    const payload = this.tryParseRichMessagePayload(plaintext);
+    if (!payload) {
+      return {
+        username,
+        time,
+        content: plaintext,
+        isMine,
+        attachments: [],
+      };
+    }
+
+    return {
+      username,
+      time,
+      content: payload.text,
+      isMine,
+      attachments: payload.attachments.map(attachment => this.createMessageAttachmentFromPayload(attachment)),
+    };
+  }
+
+  private createRichMessageFromFiles(username: string, time: string, isMine: boolean, text: string, attachments: PendingAttachment[]): Message {
+    return {
+      username,
+      time,
+      content: text,
+      isMine,
+      attachments: attachments.map(attachment => this.createMessageAttachmentFromFile(attachment.file)),
+    };
+  }
+
+  private tryParseRichMessagePayload(plaintext: string): RichMessagePayload | null {
+    try {
+      const parsed = JSON.parse(plaintext) as Partial<RichMessagePayload>;
+      if (
+        parsed?.type !== 'rich_message' ||
+        parsed.version !== 1 ||
+        typeof parsed.text !== 'string' ||
+        !Array.isArray(parsed.attachments)
+      ) {
+        return null;
+      }
+
+      const validAttachments = parsed.attachments.every((attachment: any) => (
+        attachment &&
+        typeof attachment.file_name === 'string' &&
+        typeof attachment.mime_type === 'string' &&
+        typeof attachment.size === 'number' &&
+        typeof attachment.data_b64 === 'string'
+      ));
+
+      if (!validAttachments) {
+        return null;
+      }
+
+      return parsed as RichMessagePayload;
+    } catch {
+      return null;
+    }
+  }
+
+  private createMessageAttachmentFromPayload(payload: RichMessageAttachmentPayload): MessageAttachment {
+    const buffer = this.cryptoService.base64ToArrayBuffer(payload.data_b64);
+    const blob = new Blob([buffer], { type: payload.mime_type || 'application/octet-stream' });
+    const downloadUrl = URL.createObjectURL(blob);
+    const mimeType = payload.mime_type || 'application/octet-stream';
+
+    return {
+      id: this.createUniqueId(),
+      fileName: payload.file_name,
+      mimeType,
+      size: payload.size,
+      downloadUrl,
+      isImage: mimeType.startsWith('image/'),
+      isVideo: mimeType.startsWith('video/'),
+    };
+  }
+
+  private createMessageAttachmentFromFile(file: File): MessageAttachment {
+    return {
+      id: this.createUniqueId(),
+      fileName: file.name,
+      mimeType: file.type || 'application/octet-stream',
+      size: file.size,
+      downloadUrl: URL.createObjectURL(file),
+      isImage: file.type.startsWith('image/'),
+      isVideo: file.type.startsWith('video/'),
+    };
+  }
+
+  private releaseMessageResources(messages: Message[]): void {
+    for (const message of messages) {
+      for (const attachment of message.attachments) {
+        URL.revokeObjectURL(attachment.downloadUrl);
+      }
+    }
+  }
+
+  private createUniqueId(): string {
+    if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+      return crypto.randomUUID();
+    }
+    return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   }
 
   private addConversationToList(id: string, name: string): void {
@@ -577,5 +832,37 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     const ampm = hours >= 12 ? 'pm' : 'am';
     const h = hours % 12 || 12;
     return `${h}:${minutes}${ampm}`;
+  }
+
+  private formatFileSize(bytes: number): string {
+    if (bytes < 1024) {
+      return `${bytes} B`;
+    }
+    if (bytes < 1024 * 1024) {
+      return `${(bytes / 1024).toFixed(1)} KB`;
+    }
+    if (bytes < 1024 * 1024 * 1024) {
+      return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    }
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+  }
+
+  private getAttachmentEmoji(mimeType: string): string {
+    if (mimeType.startsWith('image/')) {
+      return '🖼️';
+    }
+    if (mimeType.startsWith('video/')) {
+      return '🎬';
+    }
+    if (mimeType.includes('pdf')) {
+      return '📄';
+    }
+    if (mimeType.includes('zip') || mimeType.includes('compressed')) {
+      return '🗜️';
+    }
+    if (mimeType.startsWith('audio/')) {
+      return '🎵';
+    }
+    return '📎';
   }
 }
