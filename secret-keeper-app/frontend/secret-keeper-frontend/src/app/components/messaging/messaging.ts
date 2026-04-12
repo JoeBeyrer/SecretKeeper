@@ -1,4 +1,4 @@
-import { Component, NgZone, OnInit, OnDestroy, ViewChild, ElementRef, AfterViewChecked, ChangeDetectorRef } from '@angular/core';
+import { Component, NgZone, OnInit, OnDestroy, ViewChild, ElementRef, AfterViewChecked, ChangeDetectorRef, HostListener } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
 import { Subscription } from 'rxjs';
@@ -78,6 +78,8 @@ type ModalState =
   styleUrl: './messaging.css',
 })
 export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
+  readonly QUICK_REACTIONS = ['❤️', '👍', '😂', '😮', '😢', '🙏'];
+
   readonly lifetimeOptions: LifetimeOption[] = [
     { label: '1 hour', value: 60 },
     { label: '1 day', value: 1440 },
@@ -109,6 +111,10 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
   roomKeyInput: string = '';
   roomKeyError: string = '';
   roomKeyCopied: boolean = false;
+
+  reactionPickerMessageId: string | null = null;
+  // messageId → emoji → displayName[]
+  messageReactions = new Map<string, Map<string, string[]>>();
 
   conversationKeys = new Map<string, CryptoKey>();
 
@@ -447,6 +453,60 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     } catch (e: any) {
       console.error('[Messaging] Failed to delete message:', e);
     }
+  }
+
+  @HostListener('document:click')
+  closeReactionPicker(): void {
+    this.reactionPickerMessageId = null;
+  }
+
+  openReactionPicker(messageId: string, event: MouseEvent): void {
+    event.stopPropagation();
+    this.reactionPickerMessageId = this.reactionPickerMessageId === messageId ? null : messageId;
+  }
+
+  toggleReaction(messageId: string, emoji: string, event: MouseEvent): void {
+    event.stopPropagation();
+    if (!messageId) return;
+
+    let emojiMap = this.messageReactions.get(messageId);
+    if (!emojiMap) {
+      emojiMap = new Map();
+      this.messageReactions.set(messageId, emojiMap);
+    }
+
+    const users = emojiMap.get(emoji) ?? [];
+    const idx = users.indexOf(this.currentDisplayName);
+    if (idx >= 0) {
+      const updated = [...users];
+      updated.splice(idx, 1);
+      if (updated.length === 0) {
+        emojiMap.delete(emoji);
+      } else {
+        emojiMap.set(emoji, updated);
+      }
+    } else {
+      emojiMap.set(emoji, [...users, this.currentDisplayName]);
+    }
+
+    this.reactionPickerMessageId = null;
+  }
+
+  getMessageReactions(messageId: string): { emoji: string; count: number; users: string[]; isMine: boolean }[] {
+    const emojiMap = this.messageReactions.get(messageId);
+    if (!emojiMap) return [];
+    return Array.from(emojiMap.entries())
+      .filter(([, users]) => users.length > 0)
+      .map(([emoji, users]) => ({
+        emoji,
+        count: users.length,
+        users,
+        isMine: users.includes(this.currentDisplayName),
+      }));
+  }
+
+  hasMyReaction(messageId: string, emoji: string): boolean {
+    return this.messageReactions.get(messageId)?.get(emoji)?.includes(this.currentDisplayName) ?? false;
   }
 
   getMessageLifetimeLabel(value: number = this.messageLifetime): string {
