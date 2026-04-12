@@ -187,13 +187,13 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
       if (!convKey) return;
 
       this.cryptoService.decryptMessage(incoming.ciphertext, convKey).then(plaintext => {
-        const msg = this.buildMessageFromDecryptedContent(
-          '',
-          incoming.display_name || incoming.sender_id,
-          this.formatTime(new Date()),
-          false,
-          plaintext,
-        );
+        const msg: Message = {
+          id: '',
+          username: incoming.display_name || incoming.sender_id,
+          time: this.formatTime(new Date()),
+          content: plaintext,
+          isMine: false,
+        };
         this.ngZone.run(() => {
           this.messages.push(msg);
           this.shouldScrollToBottom = true;
