@@ -70,6 +70,36 @@
     </div>
   }
 
+
+  @if (modal.type === 'conversation-settings') {
+    <div class="modal-backdrop">
+      <div class="modal">
+        <div class="modal-icon">⏳</div>
+        <h2 class="modal-title">Conversation Settings</h2>
+        <p class="modal-subtitle">Choose how long messages stay visible in this conversation. The selected policy applies to both members, updates existing messages, and future messages follow the same rule.</p>
+        <div class="settings-field">
+          <label class="settings-label" for="message-lifetime-select">Message expiry</label>
+          <select
+            id="message-lifetime-select"
+            class="modal-select"
+            [(ngModel)]="selectedMessageLifetime"
+          >
+            @for (option of lifetimeOptions; track option.value) {
+              <option [ngValue]="option.value">{{ option.label }}</option>
+            }
+          </select>
+        </div>
+        @if (settingsError) {
+          <p class="modal-error">{{ settingsError }}</p>
+        }
+        <div class="modal-actions">
+          <button class="btn-secondary" (click)="closeModal()">Cancel</button>
+          <button class="btn-primary" (click)="saveConversationSettings()">Save Settings</button>
+        </div>
+      </div>
+    </div>
+  }
+
   <!-- Nav bar -->
   <div class="rectangle-6-6">
     <div class="nav-icons">
@@ -164,18 +194,14 @@
             <p class="text-26"><span class="text-rgb-48-48-48">{{ getActiveConversationName() }}</span></p>
             <p class="encrypted-badge">🔐 End-to-end encrypted</p>
           </div>
-          <div class="chat-message_delete_timer">
-            <label class="lifetime-label">Message lifetime:</label>
-            <input 
-              type="number" 
-              class="message-lifetime-input"
-              placeholder=""
-              [(ngModel)]="messageLifetime"
-              (change)="onMessageLifetimeChange($event)"
-              (keydown.enter)="onMessageLifetimeChange($event); $event.target.blur()"
-              min="0"
-            />
-            <span class="lifetime-unit">min</span>
+          <div class="chat-message-settings">
+            <button class="settings-trigger" (click)="openConversationSettings()">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+              </svg>
+              <span>Message expiry: {{ getMessageLifetimeLabel() }}</span>
+            </button>
           </div>
         </div>
 
@@ -192,11 +218,45 @@
                 @if (!msg.isMine) {
                   <p class="text-25"><span class="text-rgb-48-48-48">{{ msg.username }}</span></p>
                 }
-                <p class="text-38" [class.text-white]="msg.isMine"><span [class.text-white]="msg.isMine" [class.text-rgb-48-48-48]="!msg.isMine">{{ msg.content }}</span></p>
+                @if (msg.content) {
+                  <p class="text-38" [class.text-white]="msg.isMine"><span [class.text-white]="msg.isMine" [class.text-rgb-48-48-48]="!msg.isMine">{{ msg.content }}</span></p>
+                }
+                @if (msg.attachments.length > 0) {
+                  <div class="message-attachments">
+                    @for (attachment of msg.attachments; track attachment.id) {
+                      <div class="message-attachment-card">
+                        @if (attachment.isImage) {
+                          <img class="message-attachment-preview" [src]="attachment.downloadUrl" [alt]="attachment.fileName" />
+                        } @else if (attachment.isVideo) {
+                          <video class="message-attachment-preview" [src]="attachment.downloadUrl" controls preload="metadata"></video>
+                        }
+
+                        <div class="message-attachment-info">
+                          <p class="message-attachment-name">{{ attachment.fileName }}</p>
+                          <p class="message-attachment-meta">{{ getAttachmentMeta(attachment) }}</p>
+                        </div>
+
+                        <a
+                          class="message-attachment-download"
+                          [href]="attachment.downloadUrl"
+                          [attr.download]="attachment.fileName"
+                        >
+                          Download
+                        </a>
+                      </div>
+                    }
+                  </div>
+                }
                 <p class="text-35" [class.text-white]="msg.isMine"><span [class.text-white]="msg.isMine" [class.text-rgb-124-124-124]="!msg.isMine">{{ msg.time }}</span></p>
               </div>
               @if (msg.isMine) {
-                <button class="delete-msg-btn" (click)="deleteMessage(msg.id, $index)" title="Delete message">
+                <button
+                  class="delete-msg-btn"
+                  (click)="deleteMessage(msg.id, $index)"
+                  [disabled]="!msg.id"
+                  title="Delete message"
+                  aria-label="Delete message"
+                >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="3 6 5 6 21 6"/>
                     <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
@@ -220,7 +280,39 @@
           }
         </div>
 
+        @if (composerError) {
+          <div class="composer-error">
+            {{ composerError }}
+          </div>
+        }
+
+        @if (pendingAttachments.length > 0) {
+          <div class="pending-attachments-bar">
+            @for (attachment of pendingAttachments; track attachment.id) {
+              <div class="pending-attachment-chip">
+                <span class="pending-attachment-label">{{ getAttachmentBadgeLabel(attachment) }}</span>
+                <button class="pending-attachment-remove" (click)="removePendingAttachment(attachment.id)" aria-label="Remove attachment">
+                  ×
+                </button>
+              </div>
+            }
+          </div>
+        }
+
+        <input
+          #attachmentInput
+          type="file"
+          class="hidden-attachment-input"
+          multiple
+          (change)="onAttachmentsSelected($event)"
+        />
+
         <div class="message-input-bar">
+          <button class="attachment-trigger" type="button" (click)="triggerAttachmentPicker()" aria-label="Attach files">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.82-2.82l8.48-8.48"/>
+            </svg>
+          </button>
           <input
             type="text"
             [(ngModel)]="newMessage"
@@ -228,7 +320,7 @@
             class="rectangle-9-13"
             (keydown.enter)="sendMessage()"
           />
-          <button class="rectangle-1-3" (click)="sendMessage()">
+          <button class="rectangle-1-3" (click)="sendMessage()" [disabled]="isSendingMessage">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <line x1="22" y1="2" x2="11" y2="13"/>
               <polygon points="22 2 15 22 11 13 2 9 22 2"/>

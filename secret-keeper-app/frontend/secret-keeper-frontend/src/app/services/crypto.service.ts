@@ -5,7 +5,7 @@ export class CryptoService {
 
   generateRoomKey(): string {
     const bytes = window.crypto.getRandomValues(new Uint8Array(18));
-    return btoa(String.fromCharCode(...bytes));
+    return this.bytesToBase64(bytes);
   }
 
   async deriveConversationKey(passphrase: string, convId: string): Promise<CryptoKey> {
@@ -31,11 +31,12 @@ export class CryptoService {
     const combined = new Uint8Array(iv.length + ciphertext.byteLength);
     combined.set(iv, 0);
     combined.set(new Uint8Array(ciphertext), iv.length);
-    return btoa(String.fromCharCode(...combined));
+    return this.bytesToBase64(combined);
   }
 
   async decryptMessage(encryptedB64: string, convKey: CryptoKey): Promise<string> {
-    const combined = Uint8Array.from(atob(encryptedB64), c => c.charCodeAt(0));
+    const combinedBuffer = this.base64ToArrayBuffer(encryptedB64);
+    const combined = new Uint8Array(combinedBuffer);
     const iv = combined.slice(0, 12);
     const ciphertext = combined.slice(12);
     const plaintext = await window.crypto.subtle.decrypt(
@@ -43,4 +44,31 @@ export class CryptoService {
     );
     return new TextDecoder().decode(plaintext);
   }
+
+  bytesToBase64(bytes: Uint8Array): string {
+    let binary = '';
+    const chunkSize = 0x8000;
+    for (let index = 0; index < bytes.length; index += chunkSize) {
+      const chunk = bytes.subarray(index, index + chunkSize);
+      for (let chunkIndex = 0; chunkIndex < chunk.length; chunkIndex += 1) {
+        binary += String.fromCharCode(chunk[chunkIndex]);
+      }
+    }
+    return btoa(binary);
+  }
+
+  base64ToBytes(base64: string): Uint8Array {
+    return new Uint8Array(this.base64ToArrayBuffer(base64));
+  }
+
+  base64ToArrayBuffer(base64: string): ArrayBuffer {
+    const binary = atob(base64);
+    const buffer = new ArrayBuffer(binary.length);
+    const bytes = new Uint8Array(buffer);
+    for (let index = 0; index < binary.length; index += 1) {
+      bytes[index] = binary.charCodeAt(index);
+    }
+    return buffer;
+  }
 }
+

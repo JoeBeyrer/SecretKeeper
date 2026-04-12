@@ -21,7 +21,7 @@ func CleanupMessages(db *sql.DB, hub *messaging.Hub) {
 func CleanExpiredMessages(db *sql.DB, hub *messaging.Hub) {
     rows, err := db.Query(`
         SELECT DISTINCT conversation_id FROM messages
-        WHERE expires_at IS NOT NULL AND expires_at < ?
+        WHERE expires_at IS NOT NULL AND expires_at <= ?
     `, time.Now().Unix())
     if err != nil {
         log.Println("Error fetching expired messages:", err)
@@ -40,7 +40,7 @@ func CleanExpiredMessages(db *sql.DB, hub *messaging.Hub) {
 
     _, err = db.Exec(`
         DELETE FROM messages
-        WHERE expires_at IS NOT NULL AND expires_at < ?
+        WHERE expires_at IS NOT NULL AND expires_at <= ?
     `, time.Now().Unix())
     if err != nil {
         log.Println("Error cleaning expired messages:", err)

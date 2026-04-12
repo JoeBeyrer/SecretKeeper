@@ -97,7 +97,6 @@ describe('CryptoService', () => {
     });
 
     it('should encrypt and decrypt a long unicode message', async () => {
-      // Covers 2-byte (Latin), 3-byte (CJK), and 4-byte (emoji/surrogate pair) UTF-8 sequences
       const long = '\u{1F512}\u3053\u3093\u306B\u3061\u306F\u{1F30D}'.repeat(100);
       const ciphertext = await service.encryptMessage(long, key);
       const decrypted = await service.decryptMessage(ciphertext, key);
@@ -106,9 +105,9 @@ describe('CryptoService', () => {
 
     it('should reject decryption when the ciphertext is tampered with', async () => {
       const ciphertext = await service.encryptMessage('hello', key);
-      const bytes = Uint8Array.from(atob(ciphertext), c => c.charCodeAt(0));
+      const bytes = service.base64ToBytes(ciphertext);
       bytes[bytes.length - 1] ^= 0xff;
-      const tampered = btoa(String.fromCharCode(...bytes));
+      const tampered = service.bytesToBase64(bytes);
       await expect(service.decryptMessage(tampered, key)).rejects.toThrow();
     });
 
@@ -116,6 +115,22 @@ describe('CryptoService', () => {
       const wrongKey = await service.deriveConversationKey('wrong-pass', 'test-conv-id');
       const ciphertext = await service.encryptMessage('hello', key);
       await expect(service.decryptMessage(ciphertext, wrongKey)).rejects.toThrow();
+    });
+  });
+
+  describe('base64 helpers', () => {
+    it('should round-trip a large byte array without overflowing the stack', () => {
+      const bytes = new Uint8Array(250000);
+      for (let index = 0; index < bytes.length; index += 1) {
+        bytes[index] = index % 251;
+      }
+
+      const base64 = service.bytesToBase64(bytes);
+      const roundTrip = service.base64ToBytes(base64);
+      const roundTripBuffer = service.base64ToArrayBuffer(base64);
+
+      expect(roundTrip).toEqual(bytes);
+      expect(new Uint8Array(roundTripBuffer)).toEqual(bytes);
     });
   });
 });
