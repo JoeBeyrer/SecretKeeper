@@ -9,6 +9,7 @@ import { AuthService } from '../../services/auth.service';
 import { CryptoService } from '../../services/crypto.service';
 
 interface Message {
+  id: string;
   username: string;
   time: string;
   content: string;
@@ -115,6 +116,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
 
       this.cryptoService.decryptMessage(incoming.ciphertext, convKey).then(plaintext => {
         const msg: Message = {
+          id: '',
           username: incoming.display_name || incoming.sender_id,
           time: this.formatTime(new Date()),
           content: plaintext,
@@ -127,6 +129,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
       }).catch(() => {
         this.ngZone.run(() => {
           this.messages.push({
+            id: '',
             username: incoming.display_name || incoming.sender_id,
             time: this.formatTime(new Date()),
             content: '🔒 Could not decrypt message',
@@ -276,6 +279,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     this.messagingService.sendMessage(this.conversationId, ciphertext);
 
     this.messages.push({
+      id: '',
       username: this.currentDisplayName,
       time: this.formatTime(new Date()),
       content: plaintext,
@@ -284,6 +288,18 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     this.updateConversationPreview(this.conversationId, ciphertext);
     this.newMessage = '';
     this.shouldScrollToBottom = true;
+  }
+
+  async deleteMessage(messageId: string, index: number): Promise<void> {
+    if (!messageId) return;
+    try {
+      await this.conversationService.DeleteMessage(messageId);
+      this.ngZone.run(() => {
+        this.messages.splice(index, 1);
+      });
+    } catch (e: any) {
+      console.error('[Messaging] Failed to delete message:', e);
+    }
   }
 
   async onMessageLifetimeChange(event: Event): Promise<void> {
@@ -450,6 +466,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
           try {
             const content = await this.cryptoService.decryptMessage(m.Ciphertext, convKey);
             return {
+              id: m.ID,
               username: m.DisplayName || m.Username,
               time: this.formatTime(new Date(m.CreatedAt * 1000)),
               content,
@@ -457,6 +474,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
             };
           } catch {
             return {
+              id: m.ID,
               username: m.DisplayName || m.Username,
               time: this.formatTime(new Date(m.CreatedAt * 1000)),
               content: '🔒 Could not decrypt message',
