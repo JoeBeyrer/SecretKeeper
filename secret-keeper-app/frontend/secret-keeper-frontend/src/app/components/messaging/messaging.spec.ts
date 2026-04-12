@@ -53,6 +53,7 @@ describe('Messaging', () => {
       verifyRoomKey: vi.fn(),
       claimRoomKey: vi.fn(),
       setMessageLifetime: vi.fn().mockResolvedValue(undefined),
+      DeleteMessage: vi.fn().mockResolvedValue(undefined),
     };
 
     authServiceSpy = {
@@ -212,6 +213,7 @@ describe('Messaging', () => {
     expect(cryptoServiceSpy.encryptMessage).toHaveBeenCalledWith('hello world', mockKey);
     expect(messagingServiceSpy.sendMessage).toHaveBeenCalledWith('conv-1', 'encrypted-blob');
     expect(component.newMessage).toBe('');
+    expect(component.messages[component.messages.length - 1].id).toBe('');
     expect(component.messages[component.messages.length - 1].content).toBe('hello world');
     expect(component.messages[component.messages.length - 1].isMine).toBe(true);
   });
@@ -255,7 +257,44 @@ describe('Messaging', () => {
     expect(serializedPayload.attachments[0].file_name).toBe('hello.txt');
     expect(messagingServiceSpy.sendMessage).toHaveBeenCalledWith('conv-1', 'encrypted-rich-message');
     expect(component.pendingAttachments.length).toBe(0);
+    expect(component.messages[component.messages.length - 1].id).toBe('');
     expect(component.messages[component.messages.length - 1].attachments[0].fileName).toBe('hello.txt');
+  });
+
+  it('deleteMessage() should call the API and remove the message from the list', async () => {
+    component.messages = [
+      {
+        id: 'msg-1',
+        username: 'Alice',
+        time: 'Today, 1.00pm',
+        content: 'hello',
+        isMine: true,
+        attachments: [],
+      },
+    ];
+
+    await component.deleteMessage('msg-1', 0);
+
+    expect(conversationServiceSpy.DeleteMessage).toHaveBeenCalledWith('msg-1');
+    expect(component.messages).toHaveLength(0);
+  });
+
+  it('deleteMessage() should ignore unsaved optimistic messages with no id', async () => {
+    component.messages = [
+      {
+        id: '',
+        username: 'Alice',
+        time: 'Today, 1.00pm',
+        content: 'hello',
+        isMine: true,
+        attachments: [],
+      },
+    ];
+
+    await component.deleteMessage('', 0);
+
+    expect(conversationServiceSpy.DeleteMessage).not.toHaveBeenCalled();
+    expect(component.messages).toHaveLength(1);
   });
 
   it('closeModal() should reset modal state', () => {

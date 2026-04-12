@@ -892,3 +892,32 @@ img {
 .message-bubble.sent .message-attachment-download {
   color: #dbeafe;
 }
+
+
+.delete-msg-btn {
+  opacity: 0;
+  background: transparent;
+  border: none;
+  color: #ff6b6b;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.15s, background 0.15s;
+  order: -1;
+}
+
+.delete-msg-btn:hover:not(:disabled) {
+  background: rgba(255, 107, 107, 0.15);
+}
+
+.delete-msg-btn:disabled {
+  opacity: 0;
+  cursor: not-allowed;
+}
+
+.message-row:hover .delete-msg-btn:not(:disabled) {
+  opacity: 1;
+}

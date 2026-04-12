@@ -19,6 +19,7 @@ interface MessageAttachment {
 }
 
 interface Message {
+  id: string;
   username: string;
   time: string;
   content: string;
@@ -187,6 +188,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
 
       this.cryptoService.decryptMessage(incoming.ciphertext, convKey).then(plaintext => {
         const msg = this.buildMessageFromDecryptedContent(
+          '',
           incoming.display_name || incoming.sender_id,
           this.formatTime(new Date()),
           false,
@@ -199,6 +201,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
       }).catch(() => {
         this.ngZone.run(() => {
           this.messages.push({
+            id: '',
             username: incoming.display_name || incoming.sender_id,
             time: this.formatTime(new Date()),
             content: '🔒 Could not decrypt message',
@@ -408,6 +411,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
       } else {
         ciphertext = await this.cryptoService.encryptMessage(text, convKey);
         optimisticMessage = {
+          id: '',
           username: this.currentDisplayName,
           time: this.formatTime(new Date()),
           content: text,
@@ -429,6 +433,19 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
         : 'Failed to encrypt and send message.';
     } finally {
       this.isSendingMessage = false;
+    }
+  }
+
+  async deleteMessage(messageId: string, index: number): Promise<void> {
+    if (!messageId) return;
+    try {
+      await this.conversationService.DeleteMessage(messageId);
+      this.ngZone.run(() => {
+        this.releaseMessageResources([this.messages[index]]);
+        this.messages.splice(index, 1);
+      });
+    } catch (e: any) {
+      console.error('[Messaging] Failed to delete message:', e);
     }
   }
 
@@ -611,6 +628,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
           try {
             const content = await this.cryptoService.decryptMessage(m.Ciphertext, convKey);
             return this.buildMessageFromDecryptedContent(
+              m.ID ?? m.id ?? '',
               m.DisplayName || m.Username,
               this.formatTime(new Date(m.CreatedAt * 1000)),
               m.Username === this.currentUsername,
@@ -618,6 +636,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
             );
           } catch {
             return {
+              id: m.ID ?? m.id ?? '',
               username: m.DisplayName || m.Username,
               time: this.formatTime(new Date(m.CreatedAt * 1000)),
               content: '🔒 Could not decrypt message',
@@ -686,10 +705,11 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     };
   }
 
-  private buildMessageFromDecryptedContent(username: string, time: string, isMine: boolean, plaintext: string): Message {
+  private buildMessageFromDecryptedContent(id: string, username: string, time: string, isMine: boolean, plaintext: string): Message {
     const payload = this.tryParseRichMessagePayload(plaintext);
     if (!payload) {
       return {
+        id,
         username,
         time,
         content: plaintext,
@@ -699,6 +719,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     }
 
     return {
+      id,
       username,
       time,
       content: payload.text,
@@ -709,6 +730,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
 
   private createRichMessageFromFiles(username: string, time: string, isMine: boolean, text: string, attachments: PendingAttachment[]): Message {
     return {
+      id: '',
       username,
       time,
       content: text,
