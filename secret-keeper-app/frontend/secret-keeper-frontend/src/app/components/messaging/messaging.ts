@@ -1,4 +1,4 @@
-import { Component, NgZone, OnInit, OnDestroy, ViewChild, ElementRef, AfterViewChecked } from '@angular/core';
+import { Component, NgZone, OnInit, OnDestroy, ViewChild, ElementRef, AfterViewChecked, ChangeDetectorRef } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
 import { Subscription } from 'rxjs';
@@ -74,12 +74,14 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
   conversationKeys = new Map<string, CryptoKey>();
 
   private messageSub: Subscription | null = null;
+  private routeQuerySub: Subscription | null = null;
   private shouldScrollToBottom = false;
 
   @ViewChild('messagesArea') private messagesArea?: ElementRef;
 
   constructor(
     private ngZone: NgZone,
+    private cdr: ChangeDetectorRef,
     private router: Router,
     private route: ActivatedRoute,
     private messagingService: MessagingService,
@@ -96,6 +98,20 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     }
     this.currentUsername = user.username;
     this.currentDisplayName = user.display_name || user.username;
+
+    this.routeQuerySub = this.route.queryParamMap.subscribe(params => {
+      const chatWith = params.get('chatWith')?.trim();
+      if (!chatWith) return;
+
+      this.openCreateConversationModalImmediately(chatWith);
+
+      void this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: { chatWith: null },
+        queryParamsHandling: 'merge',
+        replaceUrl: true,
+      });
+    });
 
     await this.refreshConversationList();
 
@@ -154,10 +170,6 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
       });
     }});
 
-    const chatWith = this.route.snapshot.queryParamMap.get('chatWith');
-    if (chatWith) {
-      this.openCreateConversationModal(chatWith);
-    }
   }
 
   ngAfterViewChecked(): void {
@@ -348,7 +360,9 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
 
   ngOnDestroy(): void {
     this.messageSub?.unsubscribe();
+    this.routeQuerySub?.unsubscribe();
   }
+  
 
   private openCreateConversationModal(username: string): void {
     this.modal = { type: 'create-room-key', username };
@@ -356,6 +370,13 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     this.roomKeyError = '';
     this.roomKeyCopied = false;
     this.errorMessage = '';
+  }
+
+  private openCreateConversationModalImmediately(username: string): void {
+    this.ngZone.run(() => {
+      this.openCreateConversationModal(username);
+      this.cdr.detectChanges();
+    });
   }
 
   private async refreshConversationList(): Promise<void> {
