@@ -2,6 +2,7 @@ package database
 
 import (
 	"database/sql"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -80,6 +81,7 @@ func GetConversationMembers(db *sql.DB, conversationID string) ([]string, error)
 }
 
 func GetMessagesByConversation(db *sql.DB, conversationID string, limit int) ([]MessageRow, error) {
+	now := time.Now().Unix()
     rows, err := db.Query(`
         SELECT
             m.id,
@@ -92,9 +94,10 @@ func GetMessagesByConversation(db *sql.DB, conversationID string, limit int) ([]
         JOIN users u ON u.id = m.sender_id
         LEFT JOIN user_profiles p ON p.user_id = m.sender_id
         WHERE m.conversation_id = ?
+          AND (m.expires_at IS NULL OR m.expires_at > ?)
         ORDER BY m.created_at ASC
         LIMIT ?
-    `, conversationID, limit)
+    `, conversationID, now, limit)
     if err != nil {
         return nil, err
     }

@@ -3,13 +3,13 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
-	"net/http"
-	"time"
-    "log"
 	"github.com/google/uuid"
+	"log"
+	"net/http"
 	"secret-keeper-app/backend/database"
     "secret-keeper-app/backend/messaging"
     "secret-keeper-app/backend/models"
+    "time"
 )
 
 type createConvReq struct {
@@ -20,6 +20,45 @@ type createConvReq struct {
 type createConvResp struct {
 	ConversationID string `json:"conversation_id"`
 	Created        bool   `json:"created"`
+}
+
+var allowedMessageLifetimes = map[int]struct{}{
+	0:      {},
+	60:     {},
+	1440:   {},
+	10080:  {},
+	43200:  {},
+	525600: {},
+}
+
+func isAllowedMessageLifetime(lifetime int) bool {
+	_, ok := allowedMessageLifetimes[lifetime]
+	return ok
+}
+
+func notifyConversationMembers(db *sql.DB, hub *messaging.Hub, convID string) {
+	if hub == nil || convID == "" {
+		return
+	}
+
+	members, err := database.GetConversationMembers(db, convID)
+	if err != nil {
+		log.Println("[Conversation Notify] failed to get members:", err)
+		return
+	}
+
+	notification, err := json.Marshal(models.WSMessage{
+		Type:           "messages_updated",
+		ConversationID: convID,
+	})
+	if err != nil {
+		log.Println("[Conversation Notify] failed to marshal notification:", err)
+		return
+	}
+
+	for _, memberID := range members {
+		hub.SendToUser(memberID, notification)
+	}
 }
 
 func CreateConversationHandler(db *sql.DB) http.HandlerFunc {
@@ -146,6 +185,7 @@ func GetConversationsHandler(db *sql.DB) http.HandlerFunc {
             http.Error(w, "unauthorized", http.StatusUnauthorized)
             return
         }
+		now := time.Now().Unix()
         rows, err := db.Query(`
             SELECT
                 c.id,
@@ -161,6 +201,7 @@ func GetConversationsHandler(db *sql.DB) http.HandlerFunc {
                     SELECT m.ciphertext
                     FROM messages m
                     WHERE m.conversation_id = c.id
+                      AND (m.expires_at IS NULL OR m.expires_at > ?)
                     ORDER BY m.created_at DESC
                     LIMIT 1
                 ) AS last_message,
@@ -168,6 +209,7 @@ func GetConversationsHandler(db *sql.DB) http.HandlerFunc {
                     SELECT m.created_at
                     FROM messages m
                     WHERE m.conversation_id = c.id
+                      AND (m.expires_at IS NULL OR m.expires_at > ?)
                     ORDER BY m.created_at DESC
                     LIMIT 1
                 ) AS last_message_time
@@ -175,7 +217,7 @@ func GetConversationsHandler(db *sql.DB) http.HandlerFunc {
             JOIN conversation_members cm ON cm.conversation_id = c.id
             WHERE cm.user_id = ?
             ORDER BY COALESCE(last_message_time, 0) DESC
-        `, userID, userID)
+        `, userID, now, now, userID)
         if err != nil {
             http.Error(w, "could not fetch conversations", http.StatusInternalServerError)
             return
@@ -292,7 +334,6 @@ func VerifyConversationRoomKeyHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-
 type claimRoomKeyResp struct {
 	RoomKey string `json:"room_key"`
 }
@@ -331,7 +372,7 @@ func ClaimConversationRoomKeyHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-func SetMessageLifetimeHandler(db *sql.DB) http.HandlerFunc {
+func SetMessageLifetimeHandler(db *sql.DB, hub *messaging.Hub) http.HandlerFunc {
     return func(w http.ResponseWriter, r *http.Request) {
         userID, ok := GetUserIDFromContext(r)
         if !ok {
@@ -362,6 +403,12 @@ func SetMessageLifetimeHandler(db *sql.DB) http.HandlerFunc {
             return
         }
 
+        if !isAllowedMessageLifetime(body.MessageLifetime) {
+			log.Println("[Lifetime] invalid lifetime value:", body.MessageLifetime)
+			http.Error(w, "invalid message lifetime", http.StatusBadRequest)
+            return
+        }
+
         log.Printf("[Lifetime] setting lifetime for conversation %s to %d\n", convID, body.MessageLifetime)
 
         _, err := db.Exec(`UPDATE conversations SET message_lifetime = ? WHERE id = ?`, body.MessageLifetime, convID)
@@ -389,6 +436,25 @@ func SetMessageLifetimeHandler(db *sql.DB) http.HandlerFunc {
             http.Error(w, "could not update message expiries", http.StatusInternalServerError)
             return
         }
+
+		now := time.Now().Unix()
+		result, err := db.Exec(`
+			DELETE FROM messages
+			WHERE conversation_id = ?
+			  AND expires_at IS NOT NULL
+			  AND expires_at <= ?
+		`, convID, now)
+		if err != nil {
+			log.Println("[Lifetime] failed to purge expired messages:", err)
+			http.Error(w, "could not purge expired messages", http.StatusInternalServerError)
+			return
+		}
+
+		if rowsDeleted, err := result.RowsAffected(); err == nil && rowsDeleted > 0 {
+			log.Printf("[Lifetime] purged %d newly expired message(s) for conversation %s\n", rowsDeleted, convID)
+		}
+
+		notifyConversationMembers(db, hub, convID)
         log.Println("[Lifetime] success")
         w.WriteHeader(http.StatusNoContent)
     }
