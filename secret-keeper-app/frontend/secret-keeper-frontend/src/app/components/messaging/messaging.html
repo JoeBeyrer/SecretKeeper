@@ -70,6 +70,36 @@
     </div>
   }
 
+
+  @if (modal.type === 'conversation-settings') {
+    <div class="modal-backdrop">
+      <div class="modal">
+        <div class="modal-icon">⏳</div>
+        <h2 class="modal-title">Conversation Settings</h2>
+        <p class="modal-subtitle">Choose how long messages stay visible in this conversation. The selected policy applies to both members, updates existing messages, and future messages follow the same rule.</p>
+        <div class="settings-field">
+          <label class="settings-label" for="message-lifetime-select">Message expiry</label>
+          <select
+            id="message-lifetime-select"
+            class="modal-select"
+            [(ngModel)]="selectedMessageLifetime"
+          >
+            @for (option of lifetimeOptions; track option.value) {
+              <option [ngValue]="option.value">{{ option.label }}</option>
+            }
+          </select>
+        </div>
+        @if (settingsError) {
+          <p class="modal-error">{{ settingsError }}</p>
+        }
+        <div class="modal-actions">
+          <button class="btn-secondary" (click)="closeModal()">Cancel</button>
+          <button class="btn-primary" (click)="saveConversationSettings()">Save Settings</button>
+        </div>
+      </div>
+    </div>
+  }
+
   <!-- Nav bar -->
   <div class="rectangle-6-6">
     <div class="nav-icons">
@@ -164,18 +194,14 @@
             <p class="text-26"><span class="text-rgb-48-48-48">{{ getActiveConversationName() }}</span></p>
             <p class="encrypted-badge">🔐 End-to-end encrypted</p>
           </div>
-          <div class="chat-message_delete_timer">
-            <label class="lifetime-label">Message lifetime:</label>
-            <input 
-              type="number" 
-              class="message-lifetime-input"
-              placeholder=""
-              [(ngModel)]="messageLifetime"
-              (change)="onMessageLifetimeChange($event)"
-              (keydown.enter)="onMessageLifetimeChange($event); $event.target.blur()"
-              min="0"
-            />
-            <span class="lifetime-unit">min</span>
+          <div class="chat-message-settings">
+            <button class="settings-trigger" (click)="openConversationSettings()">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+              </svg>
+              <span>Message expiry: {{ getMessageLifetimeLabel() }}</span>
+            </button>
           </div>
         </div>
 

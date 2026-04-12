@@ -30,7 +30,7 @@ describe('Messaging', () => {
   };
 
   const mockConversations = [
-    { id: 'conv-1', name: 'Bob', last_message: 'encrypted', last_message_time: 1700000000 },
+    { id: 'conv-1', name: 'Bob', last_message: 'encrypted', last_message_time: 1700000000, message_lifetime: 1440 },
   ];
 
   beforeEach(async () => {
@@ -47,9 +47,10 @@ describe('Messaging', () => {
     conversationServiceSpy = {
       getConversations: vi.fn().mockResolvedValue(mockConversations),
       createConversation: vi.fn(),
-      getMessages: vi.fn(),
+      getMessages: vi.fn().mockResolvedValue([]),
       verifyRoomKey: vi.fn(),
       claimRoomKey: vi.fn(),
+      setMessageLifetime: vi.fn().mockResolvedValue(undefined),
     };
 
     authServiceSpy = {
@@ -105,6 +106,7 @@ describe('Messaging', () => {
     expect(component.conversations.length).toBe(1);
     expect(component.conversations[0].name).toBe('Bob');
     expect(component.conversations[0].id).toBe('conv-1');
+    expect(component.conversations[0].messageLifetime).toBe(1440);
   });
 
   it('should call messagingService.connect() on init', () => {
@@ -180,9 +182,11 @@ describe('Messaging', () => {
   it('closeModal() should reset modal state', () => {
     component.modal = { type: 'enter-room-key', convId: 'conv-1' };
     component.roomKeyInput = 'somekey';
+    component.settingsError = 'something failed';
     component.closeModal();
     expect(component.modal.type).toBe('none');
     expect(component.roomKeyInput).toBe('');
+    expect(component.settingsError).toBe('');
   });
 
   it('goTo() should navigate to the given page', () => {
@@ -205,6 +209,7 @@ describe('Messaging', () => {
     conversationServiceSpy.claimRoomKey.mockRejectedValue(new Error('ROOM_KEY_NOT_AVAILABLE'));
     await component.selectConversation('conv-1');
     expect(component.modal.type).toBe('enter-room-key');
+    expect(component.messageLifetime).toBe(1440);
   });
 
   it('submitRoomKey() should set roomKeyError when input is empty', async () => {
@@ -219,5 +224,39 @@ describe('Messaging', () => {
     component.conversationId = 'conv-1';
     await component.sendMessage();
     expect(component.errorMessage).toContain('room key');
+  });
+
+  it('openConversationSettings() should open the settings modal with the current lifetime', () => {
+    component.conversationId = 'conv-1';
+    component.messageLifetime = 10080;
+
+    component.openConversationSettings();
+
+    expect(component.modal).toEqual({ type: 'conversation-settings', convId: 'conv-1' });
+    expect(component.selectedMessageLifetime).toBe(10080);
+  });
+
+  it('saveConversationSettings() should persist the selected lifetime and refresh messages', async () => {
+    const loadMessagesSpy = vi.spyOn(component as any, 'loadMessages').mockResolvedValue(undefined);
+    const refreshConversationListSpy = vi.spyOn(component as any, 'refreshConversationList').mockResolvedValue(undefined);
+
+    component.conversationId = 'conv-1';
+    component.conversations = [{ id: 'conv-1', name: 'Bob', lastMessage: '', lastMessageTime: '', messageLifetime: 1440 }];
+    component.modal = { type: 'conversation-settings', convId: 'conv-1' };
+    component.selectedMessageLifetime = 60;
+
+    await component.saveConversationSettings();
+
+    expect(conversationServiceSpy.setMessageLifetime).toHaveBeenCalledWith('conv-1', 60);
+    expect(component.messageLifetime).toBe(60);
+    expect(component.conversations[0].messageLifetime).toBe(60);
+    expect(component.modal.type).toBe('none');
+    expect(loadMessagesSpy).toHaveBeenCalledWith('conv-1');
+    expect(refreshConversationListSpy).toHaveBeenCalled();
+  });
+
+  it('getMessageLifetimeLabel() should map preset values to labels', () => {
+    expect(component.getMessageLifetimeLabel(60)).toBe('1 hour');
+    expect(component.getMessageLifetimeLabel(0)).toBe('Never');
   });
 });

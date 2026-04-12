@@ -23,11 +23,17 @@ interface Conversation {
   messageLifetime?:number;
 }
 
+interface LifetimeOption {
+  label: string;
+  value: number;
+}
+
 type ModalState =
   | { type: 'none' }
   | { type: 'create-room-key'; username: string }
   | { type: 'show-room-key'; convId: string; key: string }
-  | { type: 'enter-room-key'; convId: string };
+  | { type: 'enter-room-key'; convId: string }
+  | { type: 'conversation-settings'; convId: string };
 
 @Component({
   selector: 'app-messaging',
@@ -36,6 +42,15 @@ type ModalState =
   styleUrl: './messaging.css',
 })
 export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
+  readonly lifetimeOptions: LifetimeOption[] = [
+    { label: '1 hour', value: 60 },
+    { label: '1 day', value: 1440 },
+    { label: '1 week', value: 10080 },
+    { label: '1 month', value: 43200 },
+    { label: '1 year', value: 525600 },
+    { label: 'Never', value: 0 },
+  ];
+
   messages: Message[] = [];
   newMessage: string = '';
   errorMessage: string = '';
@@ -48,14 +63,14 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
   currentDisplayName: string = '';
   conversations: Conversation[] = [];
   messageLifetime: number = 0;
+  selectedMessageLifetime: number = 0;
+  settingsError: string = '';
 
-  // modal state
   modal: ModalState = { type: 'none' };
   roomKeyInput: string = '';
   roomKeyError: string = '';
   roomKeyCopied: boolean = false;
 
-  // in-memory key cache for the session
   conversationKeys = new Map<string, CryptoKey>();
 
   private messageSub: Subscription | null = null;
@@ -86,14 +101,16 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
 
     this.messagingService.connect();
 
-    this.messageSub = this.messagingService.messages$.subscribe({next: async (incoming) => {
+    this.messageSub = this.messagingService.messages$.subscribe({ next: async (incoming) => {
       if (incoming.type === 'messages_updated') {
         console.log('[Frontend] messages_updated received for', incoming.conversation_id);
+        await this.refreshConversationList();
         if (incoming.conversation_id === this.conversationId) {
           await this.loadMessages(this.conversationId);
         }
         return;
       }
+
       const knownConversation = !!this.conversations.find(c => c.id === incoming.conversation_id);
       if (!knownConversation) {
         void this.refreshConversationList();
@@ -150,7 +167,6 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     }
   }
 
-  // Called when clicking a conversation in the sidebar
   async selectConversation(convId: string): Promise<void> {
     if (
       this.conversationId === convId &&
@@ -162,13 +178,14 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
 
     this.messages = [];
     this.errorMessage = '';
+    this.settingsError = '';
     const conv = this.conversations.find(c => c.id === convId);
     this.messageLifetime = conv?.messageLifetime ?? 0;
+    this.selectedMessageLifetime = this.messageLifetime;
     if (!this.messagingService.isConnected()) {
       this.messagingService.connect();
     }
 
-    // If we already have the key cached, open immediately
     if (this.conversationKeys.has(convId)) {
       this.conversationId = convId;
       this.isConnected = true;
@@ -176,13 +193,11 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
       return;
     }
 
-    // Try one-time server claim for the recipient
     const claimed = await this.tryClaimRoomKey(convId);
     if (claimed) {
       return;
     }
 
-    // Otherwise prompt for the room key
     this.modal = { type: 'enter-room-key', convId };
     this.roomKeyInput = '';
     this.roomKeyError = '';
@@ -200,7 +215,6 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     await this.startNewConversationWith(this.modal.username, passphrase);
   }
 
-  // Submit room key from the enter-key modal
   async submitRoomKey(): Promise<void> {
     if (this.modal.type !== 'enter-room-key') return;
     const convId = this.modal.convId;
@@ -234,6 +248,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     this.modal = { type: 'none' };
     this.roomKeyInput = '';
     this.roomKeyError = '';
+    this.settingsError = '';
   }
 
   copyRoomKey(): void {
@@ -241,6 +256,38 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     navigator.clipboard.writeText(this.modal.key);
     this.roomKeyCopied = true;
     setTimeout(() => this.roomKeyCopied = false, 2000);
+  }
+
+  openConversationSettings(): void {
+    if (!this.conversationId) return;
+
+    this.selectedMessageLifetime = this.messageLifetime;
+    this.settingsError = '';
+    this.modal = { type: 'conversation-settings', convId: this.conversationId };
+  }
+
+  async saveConversationSettings(): Promise<void> {
+    if (this.modal.type !== 'conversation-settings' || !this.conversationId) {
+      return;
+    }
+
+    try {
+      await this.conversationService.setMessageLifetime(this.conversationId, this.selectedMessageLifetime);
+      this.messageLifetime = this.selectedMessageLifetime;
+      const conv = this.conversations.find(c => c.id === this.conversationId);
+      if (conv) {
+        conv.messageLifetime = this.selectedMessageLifetime;
+      }
+      this.modal = { type: 'none' };
+      this.settingsError = '';
+      await Promise.all([
+        this.refreshConversationList(),
+        this.loadMessages(this.conversationId),
+      ]);
+    } catch (e: any) {
+      console.error('[Messaging] Failed to save conversation settings:', e);
+      this.settingsError = e?.message || 'Failed to update conversation settings.';
+    }
   }
 
   async startNewConversation(): Promise<void> {
@@ -286,17 +333,8 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     this.shouldScrollToBottom = true;
   }
 
-  async onMessageLifetimeChange(event: Event): Promise<void> {
-    console.log('[Lifetime] change event fired');
-    const value = Number((event.target as HTMLInputElement).value);
-    console.log('[Lifetime] value:', value, 'conversationId:', this.conversationId);
-    if (!this.conversationId) return;
-    try {
-      await this.conversationService.setMessageLifetime(this.conversationId, value);
-      this.messageLifetime = value;
-    } catch (e: any) {
-      console.error('[Messaging] Failed to set message lifetime:', e);
-    }
+  getMessageLifetimeLabel(value: number = this.messageLifetime): string {
+    return this.lifetimeOptions.find(option => option.value === value)?.label ?? 'Never';
   }
 
   goTo(page: string): void {
@@ -311,8 +349,6 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
   ngOnDestroy(): void {
     this.messageSub?.unsubscribe();
   }
-
-  // Private helpers
 
   private openCreateConversationModal(username: string): void {
     this.modal = { type: 'create-room-key', username };
@@ -333,8 +369,14 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
           lastMessageTime: c.last_message_time
             ? this.formatTimeShort(new Date(c.last_message_time * 1000))
             : '',
-          message_lifetime: c.message_lifetime ?? 0,
+          messageLifetime: c.message_lifetime ?? 0,
         }));
+
+        const activeConversation = this.conversations.find(c => c.id === this.conversationId);
+        if (activeConversation) {
+          this.messageLifetime = activeConversation.messageLifetime ?? 0;
+          this.selectedMessageLifetime = this.messageLifetime;
+        }
       });
     } catch (e: any) {
       console.error('[Messaging] Failed to load conversations:', e);
@@ -423,7 +465,6 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
       }
     }
 
-    // Backward compatibility for older conversations created before verifier support.
     const history = await this.conversationService.getMessages(convId);
     if (history.length === 0) {
       this.roomKeyError = 'This older conversation has no saved room-key verifier yet. Please create a new conversation.';
@@ -476,7 +517,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
 
   private addConversationToList(id: string, name: string): void {
     if (this.conversations.find(c => c.id === id)) return;
-    this.conversations.unshift({ id, name, lastMessage: '', lastMessageTime: '' });
+    this.conversations.unshift({ id, name, lastMessage: '', lastMessageTime: '', messageLifetime: 0 });
   }
 
   private updateConversationName(convId: string, displayName: string): void {
