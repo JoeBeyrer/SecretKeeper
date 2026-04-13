@@ -73,6 +73,7 @@ func main() {
   	mux.Handle("/api/friends/request", auth(http.HandlerFunc(handlers.SendFriendRequestHandler(db))))
   	mux.Handle("/api/friends/accept", auth(http.HandlerFunc(handlers.AcceptFriendRequestHandler(db))))
   	mux.Handle("/api/friends/decline", auth(http.HandlerFunc(handlers.DeclineFriendRequestHandler(db))))
+  	mux.Handle("/api/friends/rescind", auth(http.HandlerFunc(handlers.RescindFriendRequestHandler(db))))
   	mux.Handle("/api/friends/remove", auth(http.HandlerFunc(handlers.RemoveFriendHandler(db))))
 
     // USER SEARCH

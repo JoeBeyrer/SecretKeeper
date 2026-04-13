@@ -100,6 +100,43 @@ func AcceptFriendRequestHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
+func RescindFriendRequestHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodDelete {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		requesterID, ok := GetUserIDFromContext(r)
+		if !ok {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		var req struct {
+			Username string `json:"username"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Username == "" {
+			http.Error(w, "username required", http.StatusBadRequest)
+			return
+		}
+
+		addresseeID, err := database.GetUserIDByUsername(db, req.Username)
+		if err != nil {
+			http.Error(w, "user not found", http.StatusNotFound)
+			return
+		}
+
+		if err := database.RescindFriendRequest(db, requesterID, addresseeID); err != nil {
+			http.Error(w, "could not rescind friend request", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"message":"Friend request rescinded."}`))
+	}
+}
+
 func DeclineFriendRequestHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {

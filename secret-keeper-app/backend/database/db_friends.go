@@ -34,6 +34,15 @@ func AcceptFriendRequest(db *sql.DB, addresseeID, requesterID string) error {
 	return err
 }
 
+// deletes the pending row the caller sent (caller is the requester)
+func RescindFriendRequest(db *sql.DB, requesterID, addresseeID string) error {
+	_, err := db.Exec(`
+		DELETE FROM friendships
+		WHERE requester_id = ? AND addressee_id = ? AND accepted = 0
+	`, requesterID, addresseeID)
+	return err
+}
+
 // deletes the pending row
 func DeclineFriendRequest(db *sql.DB, addresseeID, requesterID string) error {
 	_, err := db.Exec(`
