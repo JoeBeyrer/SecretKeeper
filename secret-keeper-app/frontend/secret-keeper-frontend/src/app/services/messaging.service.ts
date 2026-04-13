@@ -12,6 +12,9 @@ export interface IncomingMessage {
   client_message_id?: string;
   user_id?: string;
   username?: string;
+  // expires_at is the Unix timestamp (seconds) at which the message will be deleted,
+  // present only on new_message events when a lifetime is set on the conversation.
+  expires_at?: number;
 }
  
 export interface OutgoingMessage {
