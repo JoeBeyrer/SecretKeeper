@@ -1,5 +1,7 @@
-<div class="macbook-pro-16-1-1">
-  <div class="rectangle-6-6">
+<div class="page-shell">
+
+  <!-- Nav rail -->
+  <div class="nav-rail">
     <div class="nav-icons">
       <button class="nav-icon-btn" (click)="goTo('messaging')">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -22,152 +24,173 @@
       </button>
     </div>
   </div>
-  <div class="profile-content-area">
-    <div class="profile-card">
 
-    @if (isLoading) {
-      <div class="spinner"></div>
-    }
+  <!-- Settings panel -->
+  <div class="settings-panel">
 
-    @if (!isLoading) {
-      <div class="profile-header">
-        <h1>Account Settings</h1>
-        <div class="header-actions">
-          <button class="nav-button" (click)="goToMessaging()">Messages</button>
-          <button class="logout-button" (click)="onLogout()">Log Out</button>
+    <!-- Panel header -->
+    <div class="panel-header">
+      <div class="panel-title-area">
+        <div>
+          <h1 class="panel-title">Settings</h1>
+          <p class="panel-subtitle">Manage your account and preferences</p>
         </div>
       </div>
-
-      <!-- Profile Picture -->
-      <div class="picture-section">
-        <div class="avatar-wrapper">
-          @if (profile?.profile_picture_url) {
-            <img [src]="profile!.profile_picture_url" alt="Profile picture" class="avatar" />
-          }
-          @if (!profile?.profile_picture_url) {
-            <div class="avatar-placeholder">{{ profile?.username?.charAt(0)?.toUpperCase() }}</div>
-          }
+      <div class="header-actions">
+        <!-- Theme toggle -->
+        <div class="theme-row" title="{{ themeService.isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode' }}">
+          <span class="theme-icon" [class.dim]="themeService.isDark">Light</span>
+          <button class="toggle-switch" (click)="themeService.toggle()">
+            <span class="toggle-track" [class.dark]="themeService.isDark">
+              <span class="toggle-thumb" [class.dark]="themeService.isDark"></span>
+            </span>
+          </button>
+          <span class="theme-icon" [class.dim]="!themeService.isDark">Dark</span>
         </div>
-        <div class="picture-controls">
-          <label class="upload-label" for="pictureInput">
-            {{ isUploadingPicture ? 'Uploading…' : 'Change Picture' }}
-          </label>
-          <input
-            id="pictureInput"
-            type="file"
-            accept="image/jpeg,image/png,image/gif,image/webp"
-            (change)="onPictureSelected($event)"
-            class="file-input"
-          />
-          <p class="upload-hint">JPEG, PNG, GIF or WebP · max 2 MB</p>
-          @if (profile?.profile_picture_url) {
-            <button type="button" class="remove-picture-button" (click)="onRemovePicture()">Remove Picture</button>
-          }
-        </div>
+        <!-- Logout -->
+        <button class="btn-logout" (click)="onLogout()">Log Out</button>
       </div>
+    </div>
 
-      <!-- Read-only info -->
-      <div class="info-section">
-        <div class="info-row">
-          <span class="info-label">Username</span>
-          <span class="info-value">{{ profile?.username }}</span>
+    <!-- Scrollable body -->
+    <div class="panel-body">
+
+      @if (isLoading) {
+        <div class="spinner"></div>
+      }
+
+      @if (!isLoading) {
+        <div class="content-wrap">
+
+          <!-- Avatar section -->
+          <div class="avatar-section">
+            <div class="avatar-wrap">
+              @if (profile?.profile_picture_url) {
+                <img [src]="profile!.profile_picture_url" alt="Profile picture" class="avatar-img" />
+              } @else {
+                <div class="avatar-placeholder">{{ profile?.username?.charAt(0)?.toUpperCase() }}</div>
+              }
+            </div>
+            <div class="avatar-controls">
+              <label class="upload-label" for="pictureInput">
+                {{ isUploadingPicture ? 'Uploading…' : 'Change Picture' }}
+              </label>
+              <input
+                id="pictureInput"
+                type="file"
+                accept="image/jpeg,image/png,image/gif,image/webp"
+                (change)="onPictureSelected($event)"
+                class="file-input"
+              />
+              <p class="upload-hint">JPEG, PNG, GIF or WebP · max 2 MB</p>
+              @if (profile?.profile_picture_url) {
+                <button type="button" class="remove-pic-btn" (click)="onRemovePicture()">Remove Picture</button>
+              }
+            </div>
+          </div>
+
+          <!-- Read-only info -->
+          <div class="info-section">
+            <div class="info-row">
+              <span class="info-label">Username</span>
+              <span class="info-value">{{ profile?.username }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Email</span>
+              <span class="info-value">{{ profile?.email }}</span>
+            </div>
+          </div>
+
+          <!-- Profile form -->
+          <form [formGroup]="profileForm" (ngSubmit)="onSave()">
+            <div class="field-group">
+              <label class="field-label">Display Name</label>
+              <input
+                type="text"
+                formControlName="display_name"
+                placeholder="How others see your name"
+                class="field-input"
+              />
+            </div>
+            <div class="field-group">
+              <label class="field-label">Bio</label>
+              <textarea
+                formControlName="bio"
+                placeholder="Tell people a little about yourself"
+                class="field-input field-textarea"
+                rows="3"
+              ></textarea>
+            </div>
+
+            @if (errorMessage) {
+              <div class="msg-error">{{ errorMessage }}</div>
+            }
+            @if (successMessage) {
+              <div class="msg-success">{{ successMessage }}</div>
+            }
+
+            <button type="submit" class="save-btn" [disabled]="isSaving">
+              {{ isSaving ? 'Saving…' : 'Save Changes' }}
+            </button>
+          </form>
+
+          <!-- Account section -->
+          <div class="section-divider"><span>Account</span></div>
+
+          <form [formGroup]="accountForm" (ngSubmit)="onSaveAccount()">
+            <div class="field-group">
+              <label class="field-label">New Username</label>
+              <input
+                type="text"
+                formControlName="new_username"
+                placeholder="Leave blank to keep current"
+                class="field-input"
+              />
+            </div>
+            <div class="field-group">
+              <label class="field-label">New Email</label>
+              <input
+                type="email"
+                formControlName="new_email"
+                placeholder="Leave blank to keep current"
+                class="field-input"
+              />
+            </div>
+            <div class="field-group">
+              <label class="field-label">New Password</label>
+              <input
+                type="password"
+                formControlName="new_password"
+                placeholder="Leave blank to keep current"
+                class="field-input"
+              />
+            </div>
+            <div class="field-group">
+              <label class="field-label">Confirm New Password</label>
+              <input
+                type="password"
+                formControlName="confirm_new_password"
+                placeholder="Repeat new password"
+                class="field-input"
+              />
+            </div>
+
+            @if (accountErrorMessage) {
+              <div class="msg-error">{{ accountErrorMessage }}</div>
+            }
+            @if (accountSuccessMessage) {
+              <div class="msg-success">{{ accountSuccessMessage }}</div>
+            }
+
+            <button type="submit" class="save-btn" [disabled]="isSavingAccount">
+              {{ isSavingAccount ? 'Saving…' : 'Update Account' }}
+            </button>
+          </form>
+
         </div>
-        <div class="info-row">
-          <span class="info-label">Email</span>
-          <span class="info-value">{{ profile?.email }}</span>
-        </div>
-      </div>
-
-      <!-- Editable fields -->
-      <form [formGroup]="profileForm" (ngSubmit)="onSave()">
-        <div class="form-group">
-          <label class="form-label">Display Name</label>
-          <input
-            type="text"
-            formControlName="display_name"
-            placeholder="How others see your name"
-            class="form-control"
-          />
-        </div>
-        <div class="form-group">
-          <label class="form-label">Bio</label>
-          <textarea
-            formControlName="bio"
-            placeholder="Tell people a little about yourself"
-            class="form-control textarea"
-            rows="3"
-          ></textarea>
-        </div>
-
-        @if (errorMessage) {
-          <div class="error-message">{{ errorMessage }}</div>
-        }
-        @if (successMessage) {
-          <div class="success-message">{{ successMessage }}</div>
-        }
-
-        <button type="submit" class="save-button" [disabled]="isSaving">
-          {{ isSaving ? 'Saving…' : 'Save Changes' }}
-        </button>
-      </form>
-
-
-      <!-- Account Settings section -->
-      <div class="section-divider">
-        <span>Account</span>
-      </div>
-
-      <form [formGroup]="accountForm" (ngSubmit)="onSaveAccount()">
-        <div class="form-group">
-          <label class="form-label">New Username</label>
-          <input
-            type="text"
-            formControlName="new_username"
-            placeholder="Leave blank to keep current"
-            class="form-control"
-          />
-        </div>
-        <div class="form-group">
-          <label class="form-label">New Email</label>
-          <input
-            type="email"
-            formControlName="new_email"
-            placeholder="Leave blank to keep current"
-            class="form-control"
-          />
-        </div>
-        <div class="form-group">
-          <label class="form-label">New Password</label>
-          <input
-            type="password"
-            formControlName="new_password"
-            placeholder="Leave blank to keep current"
-            class="form-control"
-          />
-        </div>
-        <div class="form-group">
-          <label class="form-label">Confirm New Password</label>
-          <input
-            type="password"
-            formControlName="confirm_new_password"
-            placeholder="Repeat new password"
-            class="form-control"
-          />
-        </div>
-
-        @if (accountErrorMessage) {
-          <div class="error-message">{{ accountErrorMessage }}</div>
-        }
-        @if (accountSuccessMessage) {
-          <div class="success-message">{{ accountSuccessMessage }}</div>
-        }
-
-        <button type="submit" class="save-button" [disabled]="isSavingAccount">
-          {{ isSavingAccount ? 'Saving…' : 'Update Account' }}
-        </button>
-      </form>
-    }
+      }
 
     </div>
   </div>
+
 </div>

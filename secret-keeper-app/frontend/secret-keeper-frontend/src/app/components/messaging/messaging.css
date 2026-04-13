@@ -1049,3 +1049,6 @@ img {
 .message-row:hover .delete-msg-btn:not(:disabled) {
   opacity: 1;
 }
+
+/* Light mode overrides live in styles.css (global) so Angular's ViewEncapsulation
+   does not scope them with [_ngcontent-*] attribute selectors. */

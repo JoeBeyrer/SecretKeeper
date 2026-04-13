@@ -1,9 +1,175 @@
 /* You can add global styles to this file, and also import other style files */
 
+/* ── Theme CSS Variables ──────────────────────────────────────────────────── */
+:root {
+  /* Dark mode (default) */
+  --bg-app: #1a1e24;
+  --bg-panel: #303742;
+  --bg-input: #3b4450;
+  --bg-elevated: #222830;
+  --text-1: #ffffff;
+  --text-2: #999999;
+  --text-3: #aab0ba;
+  --border: rgba(180, 171, 171, 0.4);
+  --accent: #34c9eb;
+  --accent-hover: #2ab5d4;
+  --danger: #ff6b6b;
+  --success: #5cc878;
+  --sent-bg: #34c9eb;
+  --sent-text: #1a1e24;
+  --received-bg: #3b4450;
+  --received-text: #ffffff;
+}
+
+body.light-mode {
+  --bg-app: #eef0f5;
+  --bg-panel: #ffffff;
+  --bg-input: #f0f2f5;
+  --bg-elevated: #e4e7ec;
+  --text-1: #1a1e24;
+  --text-2: #6b7280;
+  --text-3: #4b5563;
+  --border: rgba(0, 0, 0, 0.09);
+  --accent: #34c9eb;
+  --accent-hover: #2ab5d4;
+  --danger: #ef4444;
+  --success: #22c55e;
+  --sent-bg: #34c9eb;
+  --sent-text: #1a1e24;
+  --received-bg: #f0f2f5;
+  --received-text: #1a1e24;
+}
+
+/* ── Base ─────────────────────────────────────────────────────────────────── */
 body {
   margin: 0;
   padding: 0;
-  background-color: #1a1e24;
-  color: white;
+  background-color: var(--bg-app);
+  color: var(--text-1);
   font-family: Helvetica, Arial, sans-serif;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+/* ── Messaging: Light Mode Overrides ─────────────────────────────────────────
+   These MUST live here (global stylesheet) because Angular's ViewEncapsulation
+   scopes component CSS with [_ngcontent-*] attribute selectors, which would
+   prevent `body.light-mode { }` from matching the real <body> element.
+   ────────────────────────────────────────────────────────────────────────── */
+body.light-mode {
+  /* Override the messaging-component's :root variables */
+  --text-rgb-48-48-48: #1a1e24;
+  --text-rgb-124-124-124: #6b7280;
+  --text-rgb-112-112-112: #6b7280;
+  --text-white: #1a1e24;
+}
+
+body.light-mode .macbook-pro-16-1-1,
+body.light-mode .rectangle-3-2 {
+  background-color: var(--bg-app);
+}
+
+body.light-mode .rectangle-2-4,
+body.light-mode .rectangle-4-5,
+body.light-mode .rectangle-6-6,
+body.light-mode .modal {
+  background-color: var(--bg-panel);
+  box-shadow: 0 4px 5px 2px rgba(0, 0, 0, 0.12);
+}
+
+body.light-mode .rectangle-9-13 {
+  background-color: var(--bg-input);
+  color: var(--text-1);
+}
+
+body.light-mode .reaction-chip {
+  background: var(--bg-input);
+  border-color: var(--border);
+  color: var(--text-1);
+}
+
+body.light-mode .reaction-chip.reacted {
+  background: rgba(52, 201, 235, 0.15);
+  border-color: rgba(52, 201, 235, 0.5);
+}
+
+body.light-mode .emoji-picker-popup {
+  background: var(--bg-panel);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+body.light-mode .emoji-option:hover {
+  background: rgba(0, 0, 0, 0.07);
+}
+
+body.light-mode .pending-attachment-chip {
+  background: var(--bg-input);
+  color: var(--text-1);
+}
+
+body.light-mode .btn-secondary {
+  background: var(--bg-input);
+  color: var(--text-1);
+}
+
+body.light-mode .btn-secondary:hover {
+  background: var(--bg-elevated);
+}
+
+body.light-mode .modal-input,
+body.light-mode .modal-select,
+body.light-mode .room-key-display {
+  background: var(--bg-elevated);
+  border-color: var(--border);
+  color: var(--text-1);
+}
+
+body.light-mode .modal-title  { color: var(--text-1); }
+body.light-mode .modal-subtitle { color: var(--text-2); }
+
+body.light-mode .message-bubble.received {
+  background-color: var(--received-bg);
+}
+
+/* Text inside received bubbles */
+body.light-mode .message-bubble.received .text-38 span,
+body.light-mode .message-bubble.received .text-25 span,
+body.light-mode .message-bubble.received .text-26 span,
+body.light-mode .message-bubble.received .text-35 span {
+  color: var(--received-text) !important;
+}
+
+body.light-mode .conversation-item:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+body.light-mode .conversation-item.active {
+  background: rgba(52, 201, 235, 0.08);
+}
+
+body.light-mode .attachment-trigger {
+  background: var(--bg-input);
+  color: var(--text-1);
+}
+
+body.light-mode .attachment-trigger:hover {
+  background: var(--bg-elevated);
+}
+
+body.light-mode .nav-icon-btn:hover {
+  background: var(--bg-input);
+}
+
+body.light-mode .sidebar-footer,
+body.light-mode .chat-header,
+body.light-mode .message-input-bar {
+  border-color: var(--border);
+}
+
+body.light-mode .conversation-item {
+  border-color: var(--border);
+}
+
+body.light-mode .settings-trigger {
+  border-color: rgba(52, 201, 235, 0.35);
+  background: rgba(52, 201, 235, 0.06);
 }
