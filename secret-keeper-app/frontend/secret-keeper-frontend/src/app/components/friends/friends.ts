@@ -2,10 +2,10 @@ import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 
-import { FriendService, FriendEntry } from '../../services/friend.service';
+import { FriendService, FriendEntry, UserSearchResult } from '../../services/friend.service';
 import { AuthService } from '../../services/auth.service';
 
-type Tab = 'friends' | 'requests' | 'add';
+type Tab = 'friends' | 'requests' | 'add' | 'search';
 
 @Component({
   selector: 'app-friends',
@@ -27,6 +27,13 @@ export class Friends implements OnInit {
   refreshing: boolean = false;
 
   actionInProgress: Record<string, boolean> = {};
+
+  // User search state
+  searchQuery: string = '';
+  searchResults: UserSearchResult[] = [];
+  isSearching: boolean = false;
+  searchError: string = '';
+  private searchTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     private friendService: FriendService,
@@ -70,6 +77,11 @@ export class Friends implements OnInit {
   setTab(tab: Tab): void {
     this.activeTab = tab;
     this.clearMessages();
+    if (tab !== 'search') {
+      this.searchQuery = '';
+      this.searchResults = [];
+      this.searchError = '';
+    }
     this.loadAll();
   }
 
@@ -158,6 +170,57 @@ export class Friends implements OnInit {
 
   startChat(f: FriendEntry): void {
     this.router.navigate(['/messaging'], { queryParams: { chatWith: f.username } });
+  }
+
+  onSearchInput(): void {
+    if (this.searchTimer) clearTimeout(this.searchTimer);
+    const q = this.searchQuery.trim();
+    if (!q) {
+      this.searchResults = [];
+      this.searchError = '';
+      return;
+    }
+    this.searchTimer = setTimeout(() => this.runSearch(q), 300);
+  }
+
+  private async runSearch(query: string): Promise<void> {
+    this.isSearching = true;
+    this.searchError = '';
+    try {
+      this.searchResults = await this.friendService.searchUsers(query);
+      this.cdr.detectChanges();
+    } catch (e: any) {
+      this.searchError = e.message || 'Search failed.';
+    } finally {
+      this.isSearching = false;
+      this.cdr.detectChanges();
+    }
+  }
+
+  async sendRequestFromSearch(result: UserSearchResult): Promise<void> {
+    this.actionInProgress = { ...this.actionInProgress, [result.username]: true };
+    this.searchError = '';
+    try {
+      await this.friendService.sendFriendRequest(result.username);
+      result.status = 'pending_outgoing';
+      this.cdr.detectChanges();
+    } catch (e: any) {
+      this.searchError = e.message || 'Failed to send friend request.';
+    } finally {
+      const u = { ...this.actionInProgress };
+      delete u[result.username];
+      this.actionInProgress = u;
+      this.cdr.detectChanges();
+    }
+  }
+
+  searchStatusLabel(status: string): string {
+    switch (status) {
+      case 'friend':           return 'Friends';
+      case 'pending_outgoing': return 'Pending';
+      case 'pending_incoming': return 'Respond';
+      default:                 return 'Add Friend';
+    }
   }
 
   goTo(page: string): void { this.router.navigate(['/' + page]); }

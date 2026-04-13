@@ -15,6 +15,7 @@ type MessageRow struct {
     ProfilePictureURL string
     Ciphertext string
     CreatedAt int64
+    ExpiresAt *int64
     Reactions []ReactionRow
 }
 
@@ -111,7 +112,8 @@ func GetMessagesByConversation(db *sql.DB, conversationID string, limit int) ([]
             COALESCE(p.display_name, u.username) AS display_name,
             COALESCE(p.profile_picture_url, ''),
             m.ciphertext,
-            m.created_at
+            m.created_at,
+            m.expires_at
         FROM messages m
         JOIN users u ON u.id = m.sender_id
         LEFT JOIN user_profiles p ON p.user_id = m.sender_id
@@ -128,7 +130,7 @@ func GetMessagesByConversation(db *sql.DB, conversationID string, limit int) ([]
     var result []MessageRow
     for rows.Next() {
         var msg MessageRow
-        if err := rows.Scan(&msg.ID, &msg.SenderID, &msg.Username, &msg.DisplayName, &msg.ProfilePictureURL, &msg.Ciphertext, &msg.CreatedAt); err != nil {
+        if err := rows.Scan(&msg.ID, &msg.SenderID, &msg.Username, &msg.DisplayName, &msg.ProfilePictureURL, &msg.Ciphertext, &msg.CreatedAt, &msg.ExpiresAt); err != nil {
             return nil, err
         }
         result = append(result, msg)

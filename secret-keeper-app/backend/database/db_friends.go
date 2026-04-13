@@ -155,3 +155,48 @@ func GetUserIDByUsername(db *sql.DB, username string) (string, error) {
 	err := db.QueryRow(`SELECT id FROM users WHERE username = ?`, username).Scan(&id)
 	return id, err
 }
+
+// SearchUsers returns up to 20 verified users whose username OR display name
+// contains the query string (case-insensitive partial match), excluding only
+// the caller. Each result carries the current friendship status with the caller.
+func SearchUsers(db *sql.DB, callerID, query string) ([]models.UserSearchResult, error) {
+	pattern := "%" + query + "%"
+
+	rows, err := db.Query(`
+		SELECT
+			u.id,
+			u.username,
+			COALESCE(p.display_name, '') AS display_name,
+			CASE
+				WHEN f.id IS NULL                  THEN 'none'
+				WHEN f.accepted = 1                THEN 'friend'
+				WHEN f.requester_id = ?            THEN 'pending_outgoing'
+				ELSE                                    'pending_incoming'
+			END AS status
+		FROM users u
+		LEFT JOIN user_profiles p ON p.user_id = u.id
+		LEFT JOIN friendships f ON (
+			(f.requester_id = ? AND f.addressee_id = u.id)
+			OR (f.addressee_id = ? AND f.requester_id = u.id)
+		)
+		WHERE u.email_verified = 1
+		  AND u.id != ?
+		  AND (u.username LIKE ? OR COALESCE(p.display_name, '') LIKE ?)
+		ORDER BY u.username
+		LIMIT 20
+	`, callerID, callerID, callerID, callerID, pattern, pattern)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []models.UserSearchResult
+	for rows.Next() {
+		var r models.UserSearchResult
+		if err := rows.Scan(&r.UserID, &r.Username, &r.DisplayName, &r.Status); err != nil {
+			return nil, err
+		}
+		results = append(results, r)
+	}
+	return results, nil
+}

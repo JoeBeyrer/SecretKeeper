@@ -75,6 +75,9 @@ func main() {
   	mux.Handle("/api/friends/decline", auth(http.HandlerFunc(handlers.DeclineFriendRequestHandler(db))))
   	mux.Handle("/api/friends/remove", auth(http.HandlerFunc(handlers.RemoveFriendHandler(db))))
 
+    // USER SEARCH
+    mux.Handle("/api/users/search", auth(http.HandlerFunc(handlers.SearchUsersHandler(db))))
+
     // ENCRYPTION ROUTES
     mux.Handle("/api/keys/save", auth(http.HandlerFunc(handlers.SaveKeysHandler(db))))
     mux.Handle("/api/keys/get", auth(http.HandlerFunc(handlers.GetKeysHandler(db))))
