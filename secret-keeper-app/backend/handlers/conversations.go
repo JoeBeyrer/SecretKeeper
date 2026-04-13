@@ -88,6 +88,10 @@ func CreateConversationHandler(db *sql.DB) http.HandlerFunc {
                 http.Error(w, "user not found: "+username, http.StatusBadRequest)
                 return
             }
+            if resolvedID == userID {
+                http.Error(w, "you cannot create a conversation with yourself", http.StatusBadRequest)
+                return
+            }
             resolvedIDs = append(resolvedIDs, resolvedID)
         }
 
