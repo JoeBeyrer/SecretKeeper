@@ -7,6 +7,8 @@ export interface IncomingMessage {
   ciphertext: string;
   sender_id: string;
   display_name: string;
+  profile_picture_url: string;
+  message_id: string;
 }
  
 export interface OutgoingMessage {
@@ -38,7 +40,7 @@ export class MessagingService implements OnDestroy {
     this.socket.onmessage = (event: MessageEvent) => {
       try {
         const msg: IncomingMessage = JSON.parse(event.data);
-        if (msg.type === 'new_message' || msg.type === 'messages_updated') {
+        if (msg.type === 'new_message' || msg.type === 'messages_updated' || msg.type === 'message_ack') {
           this.messageSubject.next(msg);
         }
       } catch (e) {
