@@ -9,4 +9,6 @@ type WSMessage struct {
 	ProfilePictureURL string `json:"profile_picture_url"`
 	MessageID         string `json:"message_id,omitempty"`
 	ClientMessageID   string `json:"client_message_id,omitempty"`
+	UserID            string `json:"user_id,omitempty"`
+	Username          string `json:"username,omitempty"`
 }
