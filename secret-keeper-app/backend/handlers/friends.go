@@ -9,6 +9,7 @@ import (
 	"secret-keeper-app/backend/models"
 )
 
+
 func SendFriendRequestHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -198,6 +199,41 @@ func GetFriendsHandler(db *sql.DB) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(friends)
+	}
+}
+
+func SearchUsersHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		callerID, ok := GetUserIDFromContext(r)
+		if !ok {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		query := r.URL.Query().Get("q")
+		if len(query) < 1 {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`[]`))
+			return
+		}
+
+		results, err := database.SearchUsers(db, callerID, query)
+		if err != nil {
+			http.Error(w, "server error", http.StatusInternalServerError)
+			return
+		}
+
+		if results == nil {
+			results = []models.UserSearchResult{}
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(results)
 	}
 }
 

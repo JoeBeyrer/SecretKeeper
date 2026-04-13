@@ -14,7 +14,16 @@ type FriendEntry struct {
 	UserID string `json:"user_id"`
 	Username string `json:"username"`
 	DisplayName string `json:"display_name"`
-	Accepted bool `json:"accepted"` 
+	Accepted bool `json:"accepted"`
 	Direction string `json:"direction"`
+}
+
+// UserSearchResult is returned by the user-search endpoint.
+// Status is one of: "none", "friend", "pending_outgoing", "pending_incoming".
+type UserSearchResult struct {
+	UserID      string `json:"user_id"`
+	Username    string `json:"username"`
+	DisplayName string `json:"display_name"`
+	Status      string `json:"status"`
 }
  
