@@ -28,40 +28,25 @@
 22. As a user, I want to access the app through the web, so that I can conveniently interface from any device
 
 ## Planned Issues
-We plan to implement functionality to support user stories 2, 4, 8, and 14. In addition, we plan to complete frontend-backend integration for user stories 1, 5, 9, 17, 18, 19, and 22, and create both backend and frontend testing frameworks.
-### Private Conversations and Encryption
-- Complete frontend-backend integration for creating conversations, loading conversation lists, and loading message history
-- Add room key based conversation access flow for creating and opening chats
-- Verify room keys for existing conversations and support one-time room key retrieval for recipients
-- Encrypt and decrypt chat messages on the client before sending and after receiving them
-### Friends
-- Implement backend and frontend support for loading friends and pending requests
-- Support sending, accepting, declining, and removing friend requests
-- Use friend relationships to support easier conversation creation
-### Profile and Account Information
-- Integrate frontend profile views with backend profile endpoints
-- Support account information such as display name, bio, email, and profile picture
-- Add support for modifying profile and account information
-### Conversation List and Navigation
-- Render a live conversation list from backend data
-- Show conversation names, previews, and timestamps in the messaging sidebar
-- Improve the overall messaging page layout and navigation flow for easier chat access
-### Authentication and Web Integration
-- Complete frontend-backend integration for login, signup, password reset, logout, and authenticated sessions
-- Ensure authenticated requests consistently use session cookies across the web app
-- Continue supporting browser-based access to SecretKeeper through the Angular frontend
-### Group Conversations
-- Extend conversation creation flow to support multiple members
-- Ensure grouped conversations can be stored, loaded, and displayed through the same messaging infrastructure
-### Testing
-- Add backend unit tests for database and handler logic
-- Add frontend tests for authentication, profile, friend, and messaging flows
-- Expand frontend unit testing beyond the existing service and component scaffolds
+We plan to implement functionality to support user stories 3, 7, 8, 10 (expamnded), 11, 12, 15, 16, and 20.
+### Blocking and Safety Controls
+- Implement support for blocking users so that blocked users cannot contact or interact with one another through SecretKeeper
+- Ensure blocked-user relationships are enforced consistently across friend, messaging, and conversation flows
+### Message Management
+- Add support for editing sand deleting sent messages so users can correct incorrect or sensitive content after sending
+- Add support for disappearing messages / message expiration so conversations can automatically remove older content after a configured time
+### Friendship Enhancements
+- Improve user search functionality so users can more easily find users they wish to add as friends
+- Add support for cancelling outgoing friend requests that have not yet been accepted
+### Messaging Enhancements
+- Add support for sending file-type messages, including PDFs and other attachments, through encrypted chats
+- Display profile pictures in chats so users can more easily identify conversation participants
+
 
 ## Successfully Completed
 - Authentication backend routes are implemented for register, login, logout, email verification, email-change verification, and password reset flow
 - Conversation backend routes are implemented for creating conversations, loading conversation lists, loading message history, verifying room keys, and one-time room key claiming
-- Friends backend routes are implemented for loading friends, loading pending requests, sending requests, accepting requests, declining requests, and removing friends
+- Friends backend routes are implemented for loading friends, loading pending requests, sending requests, accepting requests, declining requests, cancelling outgoing requests, and removing friends
 - Profile backend routes are implemented for loading profile data, updating profile data, uploading profile pictures, and updating account information
 - WebSocket messaging backend is implemented for real-time chat delivery
 - Database support is implemented for users, sessions, conversations, friendship data, encrypted message storage, and room-key verification state
@@ -69,22 +54,24 @@ We plan to implement functionality to support user stories 2, 4, 8, and 14. In a
 - Real-time messaging is working through the WebSocket connection between the Angular frontend and Go backend
 - Room and chat encryption is implemented on the client using a conversation key derived from the room key, and messages are encrypted before send and decrypted after receipt
 - Conversation access flow now supports room key verification for existing chats and one-time room key retrieval for recipients
-- Conversation list UI is implemented with names, encrypted-message previews, and timestamps in the messaging sidebar
+- Conversation list UI is implemented with names, encrypted-message previews, timestamps, and profile pictures in chat views
 - Key-management is implemented in the backend and frontend for storing user keys, retrieving public keys, saving encrypted conversation keys, and loading stored conversation keys
+- User search functionality is implemented for finding users and starting conversations with specific people
+- File-type messaging is implemented for sending images, videos, PDFs, and other attachments through encrypted chats
+- Message expiration is implemented so messages can disappear after a configured amount of time
+- Message deletion is implemented so users can remove previously sent messages
+- Message editing is implemented so users can update previously sent messages in real time
+- Backend and frontend support for profile pictures in chats is implemented so users can visually identify conversation participants
 - Backend unit tests exist for database and handler coverage
 - Frontend test scaffolds exist for the app, services, and several components
 
 ## Incomplete / Carried Over
 All issues that were incomplete are due to time constraints. The team decided to continue prioritizing core messaging, privacy, authentication, and account functionality first for the MVP, while carrying lower-priority or unfinished features into the next sprint.
-- User search functionality has not been completed yet
-- Sending images has not been implemented yet
-- Sending videos has not been implemented yet
-- Disappearing messages have not been implemented yet
-- Message deletion has not been implemented yet
-- Blocking users has not been implemented yet
-- Message editing has not been implemented yet
-- Sending PDF files has not been implemented yet
+- Blocking users has not been completed yet
+- Group chats and all related group-chat features have not been completed yet
+- Unencrypted chat options for users who want easily accessible non-secret chats have not been implemented yet
 - Chat muting has not been implemented yet
+- Browser-based access validation across all intended web-facing workflows has not been completed yet
 - Additional frontend and backend test coverage
 
 ---
