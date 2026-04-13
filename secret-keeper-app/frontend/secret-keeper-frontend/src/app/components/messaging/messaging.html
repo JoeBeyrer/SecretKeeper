@@ -278,6 +278,12 @@
                 }
                 <p class="text-35" [class.text-white]="msg.isMine"><span [class.text-white]="msg.isMine" [class.text-rgb-124-124-124]="!msg.isMine">{{ msg.time }}</span></p>
 
+                @if (formatExpiryLabel(msg.expiresAt)) {
+                  <p class="message-expiry-label" [class.mine]="msg.isMine">
+                    ⏳ {{ formatExpiryLabel(msg.expiresAt) }}
+                  </p>
+                }
+
                 @if (getMessageReactions(msg.id).length > 0) {
                   <div class="reaction-bar" [class.mine]="msg.isMine">
                     @for (reaction of getMessageReactions(msg.id); track reaction.emoji) {
