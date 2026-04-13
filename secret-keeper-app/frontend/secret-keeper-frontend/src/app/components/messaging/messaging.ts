@@ -227,7 +227,19 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
       });
 
       if (incoming.conversation_id !== this.conversationId) return;
-      if (incoming.sender_id === this.currentUsername) return;
+      // When the server echoes our own sent message back, use it to update
+      // the optimistic message with the real expiresAt from the server.
+      if (incoming.sender_id === this.currentUsername) {
+        if (incoming.expires_at !== undefined && incoming.message_id) {
+          this.ngZone.run(() => {
+            const optimistic = this.messages.find(m => m.id === incoming.message_id);
+            if (optimistic) {
+              optimistic.expiresAt = incoming.expires_at;
+            }
+          });
+        }
+        return;
+      }
 
       const convKey = this.conversationKeys.get(incoming.conversation_id);
       if (!convKey) return;
@@ -239,7 +251,10 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
           this.formatTime(new Date()),
           false,
           plaintext,
-          incoming.profile_picture_url ?? ''
+          incoming.profile_picture_url ?? '',
+          // Pass the expiry from the WS broadcast so the label shows immediately
+          // for real-time messages, matching the label shown in loaded history.
+          incoming.expires_at ?? undefined
         );
         this.ngZone.run(() => {
           this.messages.push(msg);
@@ -464,6 +479,10 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
         const payload = await this.buildRichMessagePayload(text, this.pendingAttachments);
         ciphertext = await this.cryptoService.encryptMessage(JSON.stringify(payload), convKey);
         optimisticMessage = this.createRichMessageFromFiles(tempMessageId, this.currentDisplayName, this.formatTime(new Date()), true, text, this.pendingAttachments);
+        // Same local expiresAt estimate for rich messages.
+        if (this.messageLifetime > 0) {
+          optimisticMessage.expiresAt = Math.floor(Date.now() / 1000) + this.messageLifetime * 60;
+        }
       } else {
         ciphertext = await this.cryptoService.encryptMessage(text, convKey);
         optimisticMessage = {
@@ -474,6 +493,11 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
           isMine: true,
           attachments: [],
           profilePictureUrl: this.currentUserPictureUrl,
+          // Estimate expiresAt locally so the expiry label appears immediately.
+          // The server echo will overwrite this with the authoritative value.
+          expiresAt: this.messageLifetime > 0
+            ? Math.floor(Date.now() / 1000) + this.messageLifetime * 60
+            : undefined,
         };
       }
 
@@ -671,6 +695,30 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
 
   getMessageLifetimeLabel(value: number = this.messageLifetime): string {
     return this.lifetimeOptions.find(option => option.value === value)?.label ?? 'Never';
+  }
+
+  formatExpiryLabel(expiresAt: number | undefined): string {
+    if (expiresAt === undefined || expiresAt === null) {
+      return '';
+    }
+    const nowSec = Math.floor(Date.now() / 1000);
+    const remaining = expiresAt - nowSec;
+    if (remaining <= 0) {
+      return 'Expiring…';
+    }
+    if (remaining < 60) {
+      return 'Expires in < 1 min';
+    }
+    if (remaining < 3600) {
+      const mins = Math.floor(remaining / 60);
+      return `Expires in ${mins} min`;
+    }
+    if (remaining < 86400) {
+      const hours = Math.floor(remaining / 3600);
+      return `Expires in ${hours} hr`;
+    }
+    const days = Math.floor(remaining / 86400);
+    return `Expires in ${days} day${days !== 1 ? 's' : ''}`;
   }
 
   getAttachmentBadgeLabel(attachment: PendingAttachment): string {
