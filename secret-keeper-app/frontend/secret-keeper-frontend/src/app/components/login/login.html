@@ -1,38 +1,41 @@
-<div class="login-container">
-  <div class="login-card">
-    <h1>Login</h1>
+<div class="auth-page">
+  <div class="auth-card">
+    <h1 class="auth-title">Welcome back</h1>
+    <p class="auth-subtitle">Sign in to SecretKeeper</p>
+
     <form [formGroup]="loginForm" (ngSubmit)="onSubmit()">
-      <div class="form-group">
+      <div class="field">
         <input
           type="text"
-          id="username"
           formControlName="username"
           placeholder="Username"
-          class="form-control"
+          class="field-input"
+          autocomplete="username"
         />
       </div>
-      <div class="form-group">
+      <div class="field">
         <input
           type="password"
-          id="password"
           formControlName="password"
           placeholder="Password"
-          class="form-control"
+          class="field-input"
+          autocomplete="current-password"
         />
       </div>
+
       @if (successMessage) {
-        <div class="success-message">{{ successMessage }}</div>
+        <div class="feedback success">{{ successMessage }}</div>
       }
       @if (errorMessage) {
-        <div class="error-message">{{ errorMessage }}</div>
+        <div class="feedback error">{{ errorMessage }}</div>
       }
-      <button type="submit" class="login-button">Login</button>
-      <div class="signup-link">
-        <p>No account? <a (click)="goToSignup()">Sign up here!</a></p>
-      </div>
-      <div class="signup-link">
-        <p>Forgot your password? <a (click)="goToForgotPassword()">Reset it here</a></p>
-      </div>
+
+      <button type="submit" class="auth-btn">Login</button>
     </form>
+
+    <div class="auth-links">
+      <p>No account? <a (click)="goToSignup()">Sign up here</a></p>
+      <p>Forgot your password? <a (click)="goToForgotPassword()">Reset it here</a></p>
+    </div>
   </div>
 </div>
