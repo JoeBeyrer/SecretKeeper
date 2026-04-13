@@ -114,6 +114,17 @@ func readPump(c *messaging.Client, hub *messaging.Hub, db *sql.DB) {
 		senderDisplayName, _ := database.GetDisplayNameByID(db, senderID)
 		senderPictureURL, _ := database.GetProfilePictureURLByID(db, senderID)
 
+		// Read back the expires_at that SaveMessage computed so the broadcast
+		// carries the exact expiry timestamp. Clients use this to render per-message
+		// expiry labels immediately, without needing to reload message history.
+		var savedExpiresAt *int64
+		var rawExpiry *int64
+		if scanErr := db.QueryRow(
+			`SELECT expires_at FROM messages WHERE id = ?`, id,
+		).Scan(&rawExpiry); scanErr == nil {
+			savedExpiresAt = rawExpiry
+		}
+
 		outgoing := models.WSMessage{
 			Type:              "new_message",
 			ConversationID:    convID,
@@ -122,6 +133,7 @@ func readPump(c *messaging.Client, hub *messaging.Hub, db *sql.DB) {
 			DisplayName:       senderDisplayName,
 			ProfilePictureURL: senderPictureURL,
 			MessageID:         id,
+			ExpiresAt:         savedExpiresAt,
 		}
 
 		jsonData, err := json.Marshal(outgoing)
