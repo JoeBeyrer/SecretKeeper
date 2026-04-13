@@ -127,6 +127,29 @@ func GetMessagesByConversation(db *sql.DB, conversationID string, limit int) ([]
     return result, nil
 }
 
+func UpdateMessage(db *sql.DB, messageID, senderID, ciphertext string) (string, error) {
+	var convID string
+	err := db.QueryRow(`
+        SELECT conversation_id
+        FROM messages
+        WHERE id = ? AND sender_id = ?
+    `, messageID, senderID).Scan(&convID)
+	if err != nil {
+		return "", err
+	}
+
+	_, err = db.Exec(`
+        UPDATE messages
+        SET ciphertext = ?
+        WHERE id = ? AND sender_id = ?
+    `, ciphertext, messageID, senderID)
+	if err != nil {
+		return "", err
+	}
+
+	return convID, nil
+}
+
 func SaveUserKeys(db *sql.DB, userID, publicKey, encryptedPrivateKey string) error {
     _, err := db.Exec(`
         INSERT INTO user_keys (user_id, public_key, encrypted_private_key)

@@ -107,6 +107,11 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
   messageLifetime: number = 0;
   selectedMessageLifetime: number = 0;
   settingsError: string = '';
+  openMessageMenuId: string | null = null;
+  editingMessageId: string | null = null;
+  editDraft: string = '';
+  editError: string = '';
+  isSavingEdit: boolean = false;
 
   modal: ModalState = { type: 'none' };
   roomKeyInput: string = '';
@@ -162,10 +167,18 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     this.messagingService.connect();
 
     this.messageSub = this.messagingService.messages$.subscribe({ next: async (incoming) => {
+      if (incoming.type === 'message_ack') {
+        this.ngZone.run(() => {
+          this.applyMessageAck(incoming.message_id, incoming.client_message_id);
+        });
+        return;
+      }
+
       if (incoming.type === 'messages_updated') {
         console.log('[Frontend] messages_updated received for', incoming.conversation_id);
         await this.refreshConversationList();
         if (incoming.conversation_id === this.conversationId) {
+          this.cancelEditingMessage(false);
           await this.loadMessages(this.conversationId);
         }
         return;
@@ -192,7 +205,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
 
       this.cryptoService.decryptMessage(incoming.ciphertext, convKey).then(plaintext => {
         const msg = this.buildMessageFromDecryptedContent(
-          '',
+          incoming.message_id ?? '',
           incoming.display_name || incoming.sender_id,
           this.formatTime(new Date()),
           false,
@@ -246,6 +259,8 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     this.composerError = '';
     this.errorMessage = '';
     this.settingsError = '';
+    this.cancelEditingMessage(false);
+    this.openMessageMenuId = null;
     this.activeConversationPictureUrl = '';
     this.stopPictureRefresh();
     const conv = this.conversations.find(c => c.id === convId);
@@ -412,27 +427,28 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     this.isSendingMessage = true;
 
     try {
+      const tempMessageId = this.createTempMessageId();
       let ciphertext: string;
       let optimisticMessage: Message;
 
       if (hasAttachments) {
         const payload = await this.buildRichMessagePayload(text, this.pendingAttachments);
         ciphertext = await this.cryptoService.encryptMessage(JSON.stringify(payload), convKey);
-        optimisticMessage = this.createRichMessageFromFiles(this.currentDisplayName, this.formatTime(new Date()), true, text, this.pendingAttachments);
+        optimisticMessage = this.createRichMessageFromFiles(tempMessageId, this.currentDisplayName, this.formatTime(new Date()), true, text, this.pendingAttachments);
       } else {
         ciphertext = await this.cryptoService.encryptMessage(text, convKey);
         optimisticMessage = {
-          id: '',
+          id: tempMessageId,
           username: this.currentDisplayName,
           time: this.formatTime(new Date()),
           content: text,
           isMine: true,
           attachments: [],
-	  profilePictureUrl: this.currentUserPictureUrl,
+          profilePictureUrl: this.currentUserPictureUrl,
         };
       }
 
-      this.messagingService.sendMessage(this.conversationId, ciphertext);
+      this.messagingService.sendMessage(this.conversationId, ciphertext, tempMessageId);
       this.messages.push(optimisticMessage);
       this.updateConversationPreview(this.conversationId, ciphertext);
       this.newMessage = '';
@@ -448,11 +464,93 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     }
   }
 
+  toggleMessageMenu(messageId: string): void {
+    this.openMessageMenuId = this.openMessageMenuId === messageId ? null : messageId;
+  }
+
+  startEditingMessage(message: Message): void {
+    if (!message.isMine || !message.id || message.id.startsWith('temp-')) {
+      return;
+    }
+
+    this.editingMessageId = message.id;
+    this.editDraft = message.content;
+    this.editError = '';
+    this.openMessageMenuId = null;
+  }
+
+  cancelEditingMessage(clearMenu: boolean = true): void {
+    this.editingMessageId = null;
+    this.editDraft = '';
+    this.editError = '';
+    this.isSavingEdit = false;
+    if (clearMenu) {
+      this.openMessageMenuId = null;
+    }
+  }
+
+  async saveEditedMessage(message: Message): Promise<void> {
+    if (!message.isMine || !message.id || message.id.startsWith('temp-')) {
+      this.editError = 'Message is not ready to edit yet.';
+      return;
+    }
+
+    const convKey = this.ensureReadyForOutgoingContent();
+    if (!convKey) {
+      this.editError = this.composerError;
+      return;
+    }
+
+    const trimmedDraft = this.editDraft.trim();
+    if (!trimmedDraft && message.attachments.length === 0) {
+      this.editError = 'Message cannot be empty.';
+      return;
+    }
+
+    this.isSavingEdit = true;
+    this.editError = '';
+
+    try {
+      let ciphertext: string;
+      if (message.attachments.length > 0) {
+        const payload = await this.buildRichMessagePayloadFromExistingAttachments(trimmedDraft, message.attachments);
+        ciphertext = await this.cryptoService.encryptMessage(JSON.stringify(payload), convKey);
+      } else {
+        ciphertext = await this.cryptoService.encryptMessage(trimmedDraft, convKey);
+      }
+
+      await this.conversationService.editMessage(message.id, ciphertext);
+      message.content = trimmedDraft;
+      this.cancelEditingMessage();
+    } catch (e) {
+      console.error('[Messaging] Failed to edit message:', e);
+      this.editError = 'Failed to save message changes.';
+    } finally {
+      this.isSavingEdit = false;
+    }
+  }
+
+  onEditDraftKeydown(event: KeyboardEvent, message: Message): void {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      void this.saveEditedMessage(message);
+      return;
+    }
+
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      this.cancelEditingMessage();
+    }
+  }
+
   async deleteMessage(messageId: string, index: number): Promise<void> {
     if (!messageId) return;
     try {
       await this.conversationService.DeleteMessage(messageId);
       this.ngZone.run(() => {
+        if (this.editingMessageId === messageId) {
+          this.cancelEditingMessage();
+        }
         this.releaseMessageResources([this.messages[index]]);
         this.messages.splice(index, 1);
       });
@@ -757,6 +855,29 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     };
   }
 
+  private async buildRichMessagePayloadFromExistingAttachments(text: string, attachments: MessageAttachment[]): Promise<RichMessagePayload> {
+    const serializedAttachments = await Promise.all(attachments.map(attachment => this.serializeAttachmentForEdit(attachment)));
+
+    return {
+      version: 1,
+      type: 'rich_message',
+      text,
+      attachments: serializedAttachments,
+    };
+  }
+
+  private async serializeAttachmentForEdit(attachment: MessageAttachment): Promise<RichMessageAttachmentPayload> {
+    const response = await fetch(attachment.downloadUrl);
+    const buffer = await response.arrayBuffer();
+
+    return {
+      file_name: attachment.fileName,
+      mime_type: attachment.mimeType,
+      size: attachment.size,
+      data_b64: this.cryptoService.bytesToBase64(new Uint8Array(buffer)),
+    };
+  }
+
   private buildMessageFromDecryptedContent(id: string, username: string, time: string, isMine: boolean, plaintext: string, profilePictureUrl: string = ''): Message {
   const payload = this.tryParseRichMessagePayload(plaintext);
     if (!payload) {
@@ -782,9 +903,9 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     };
   }
 
-  private createRichMessageFromFiles(username: string, time: string, isMine: boolean, text: string, attachments: PendingAttachment[]): Message {
+  private createRichMessageFromFiles(id: string, username: string, time: string, isMine: boolean, text: string, attachments: PendingAttachment[]): Message {
     return {
-      id: '',
+      id,
       username,
       time,
       content: text,
@@ -859,6 +980,21 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
         URL.revokeObjectURL(attachment.downloadUrl);
       }
     }
+  }
+
+  private applyMessageAck(messageId: string, clientMessageId?: string): void {
+    if (!messageId || !clientMessageId) {
+      return;
+    }
+
+    const optimisticMessage = this.messages.find(message => message.id === clientMessageId);
+    if (optimisticMessage) {
+      optimisticMessage.id = messageId;
+    }
+  }
+
+  private createTempMessageId(): string {
+    return `temp-${this.createUniqueId()}`;
   }
 
   private createUniqueId(): string {
