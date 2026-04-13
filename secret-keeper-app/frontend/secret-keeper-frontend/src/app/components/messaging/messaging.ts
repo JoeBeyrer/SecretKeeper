@@ -497,7 +497,13 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
         if (!res.ok) return;
         const data = await res.json();
         this.ngZone.run(() => {
-          this.activeConversationPictureUrl = data.profile_picture_url || '';
+          const newUrl = data.profile_picture_url || '';
+          this.activeConversationPictureUrl = newUrl;
+          for (const msg of this.messages) {
+            if (!msg.isMine) {
+              msg.profilePictureUrl = newUrl;
+            }
+          }
         });
       } catch {}
     }, 15000);
