@@ -104,4 +104,16 @@ describe('ConversationService', () => {
       await expect(service.claimRoomKey('conv-1')).rejects.toThrow();
     });
   });
+
+  describe('editMessage()', () => {
+    it('should PATCH /messages/:id with ciphertext', async () => {
+      fetchSpy = vi.spyOn(window, 'fetch').mockResolvedValue(new Response('', { status: 204 }));
+      await service.editMessage('msg-1', 'edited-ciphertext');
+      const [url, opts] = fetchSpy.mock.calls[0] as [string, RequestInit];
+      expect(url).toContain('/messages/msg-1');
+      expect(opts.method).toBe('PATCH');
+      expect(JSON.parse(opts.body as string)).toEqual({ ciphertext: 'edited-ciphertext' });
+    });
+  });
+
 });
