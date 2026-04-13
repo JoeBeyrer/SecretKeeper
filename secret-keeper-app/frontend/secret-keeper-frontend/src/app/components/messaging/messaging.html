@@ -261,42 +261,22 @@
                         } @else if (attachment.isVideo) {
                           <video class="message-attachment-preview" [src]="attachment.downloadUrl" controls preload="metadata"></video>
                         }
-
-              <!-- bubble + reactions stacked vertically -->
-              <div class="message-content-col" [class.mine]="msg.isMine">
-                <div class="message-bubble" [class.sent]="msg.isMine" [class.received]="!msg.isMine">
-                  @if (!msg.isMine) {
-                    <p class="text-25"><span class="text-rgb-48-48-48">{{ msg.username }}</span></p>
-                  }
-                  @if (msg.content) {
-                    <p class="text-38" [class.text-white]="msg.isMine"><span [class.text-white]="msg.isMine" [class.text-rgb-48-48-48]="!msg.isMine">{{ msg.content }}</span></p>
-                  }
-                  @if (msg.attachments.length > 0) {
-                    <div class="message-attachments">
-                      @for (attachment of msg.attachments; track attachment.id) {
-                        <div class="message-attachment-card">
-                          @if (attachment.isImage) {
-                            <img class="message-attachment-preview" [src]="attachment.downloadUrl" [alt]="attachment.fileName" />
-                          } @else if (attachment.isVideo) {
-                            <video class="message-attachment-preview" [src]="attachment.downloadUrl" controls preload="metadata"></video>
-                          }
-                          <div class="message-attachment-info">
-                            <p class="message-attachment-name">{{ attachment.fileName }}</p>
-                            <p class="message-attachment-meta">{{ getAttachmentMeta(attachment) }}</p>
-                          </div>
-                          <a
-                            class="message-attachment-download"
-                            [href]="attachment.downloadUrl"
-                            [attr.download]="attachment.fileName"
-                          >
-                            Download
-                          </a>
+                        <div class="message-attachment-info">
+                          <p class="message-attachment-name">{{ attachment.fileName }}</p>
+                          <p class="message-attachment-meta">{{ getAttachmentMeta(attachment) }}</p>
                         </div>
-                      }
-                    </div>
-                  }
-                  <p class="text-35" [class.text-white]="msg.isMine"><span [class.text-white]="msg.isMine" [class.text-rgb-124-124-124]="!msg.isMine">{{ msg.time }}</span></p>
-                </div>
+                        <a
+                          class="message-attachment-download"
+                          [href]="attachment.downloadUrl"
+                          [attr.download]="attachment.fileName"
+                        >
+                          Download
+                        </a>
+                      </div>
+                    }
+                  </div>
+                }
+                <p class="text-35" [class.text-white]="msg.isMine"><span [class.text-white]="msg.isMine" [class.text-rgb-124-124-124]="!msg.isMine">{{ msg.time }}</span></p>
 
                 @if (getMessageReactions(msg.id).length > 0) {
                   <div class="reaction-bar" [class.mine]="msg.isMine">
@@ -310,7 +290,6 @@
                     }
                   </div>
                 }
-              </div>
 
               <!-- emoji reaction button + picker (shown on hover, for all messages) -->
               <div class="emoji-reaction-wrapper" [class.mine]="msg.isMine">
