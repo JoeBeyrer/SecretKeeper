@@ -150,7 +150,11 @@
                 <span class="friend-sub">&#64;{{ f.username }}</span>
               </div>
               <div class="row-actions">
-                <span class="status-chip pending">Pending</span>
+                <button
+                  class="action-btn danger"
+                  (click)="rescind(f)"
+                  [disabled]="isActing(f.username)"
+                >{{ isActing(f.username) ? '...' : 'Cancel' }}</button>
               </div>
             </div>
           }
@@ -238,7 +242,11 @@
                     } @else if (r.status === 'friend') {
                       <span class="status-chip friend-chip">Friends</span>
                     } @else if (r.status === 'pending_outgoing') {
-                      <span class="status-chip pending">Pending</span>
+                      <button
+                        class="action-btn danger"
+                        (click)="rescindFromSearch(r)"
+                        [disabled]="isActing(r.username)"
+                      >{{ isActing(r.username) ? '…' : 'Cancel' }}</button>
                     } @else if (r.status === 'pending_incoming') {
                       <button class="action-btn accept" (click)="setTab('requests')">Respond</button>
                     }

@@ -74,6 +74,16 @@ export class FriendService {
     return res.json();
   }
 
+  async rescindRequest(username: string): Promise<void> {
+    const res = await fetch(`${this.base}/friends/rescind`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ username }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+  }
+
   async removeFriend(username: string): Promise<void> {
     const res = await fetch(`${this.base}/friends/remove`, {
       method: 'DELETE',

@@ -148,6 +148,22 @@ export class Friends implements OnInit {
     }
   }
 
+  async rescind(f: FriendEntry): Promise<void> {
+    this.actionInProgress = { ...this.actionInProgress, [f.username]: true };
+    this.clearMessages();
+    try {
+      await this.friendService.rescindRequest(f.username);
+      await this.loadAll();
+    } catch (e: any) {
+      this.errorMessage = e.message || 'Failed to rescind request.';
+    } finally {
+      const u = { ...this.actionInProgress };
+      delete u[f.username];
+      this.actionInProgress = u;
+      this.cdr.detectChanges();
+    }
+  }
+
   async remove(f: FriendEntry): Promise<void> {
     this.actionInProgress = { ...this.actionInProgress, [f.username]: true };
     this.clearMessages();
@@ -206,6 +222,23 @@ export class Friends implements OnInit {
       this.cdr.detectChanges();
     } catch (e: any) {
       this.searchError = e.message || 'Failed to send friend request.';
+    } finally {
+      const u = { ...this.actionInProgress };
+      delete u[result.username];
+      this.actionInProgress = u;
+      this.cdr.detectChanges();
+    }
+  }
+
+  async rescindFromSearch(result: UserSearchResult): Promise<void> {
+    this.actionInProgress = { ...this.actionInProgress, [result.username]: true };
+    this.searchError = '';
+    try {
+      await this.friendService.rescindRequest(result.username);
+      result.status = 'none';
+      this.cdr.detectChanges();
+    } catch (e: any) {
+      this.searchError = e.message || 'Failed to cancel request.';
     } finally {
       const u = { ...this.actionInProgress };
       delete u[result.username];
