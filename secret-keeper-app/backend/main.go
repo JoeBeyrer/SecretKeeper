@@ -52,8 +52,8 @@ func main() {
     auth := handlers.AuthMiddleware(db)
     mux.Handle("/ws", auth(http.HandlerFunc(handlers.WebSocketHandler(hub, db))))
     mux.Handle("/api/profile", auth(http.HandlerFunc(handlers.GetProfileHandler(db))))
-    mux.Handle("/api/profile/update", auth(http.HandlerFunc(handlers.UpdateProfileHandler(db))))
-    mux.Handle("/api/profile/picture", auth(http.HandlerFunc(handlers.UploadProfilePictureHandler(db))))
+    mux.Handle("/api/profile/update", auth(http.HandlerFunc(handlers.UpdateProfileHandler(db, hub))))
+    mux.Handle("/api/profile/picture", auth(http.HandlerFunc(handlers.UploadProfilePictureHandler(db, hub))))
 	  mux.Handle("/api/profile/by-username/{username}", auth(http.HandlerFunc(handlers.GetProfileByUsernameHandler(db))))
     mux.Handle("/api/account", auth(http.HandlerFunc(handlers.UpdateAccountHandler(db))))
 
