@@ -21,7 +21,7 @@ export class AuthService {
 
   async loadCurrentUser(): Promise<UserProfile | null> {
     if (this.currentUser) {
-      return this.currentUser;
+      return this.currentUser; // already loaded, return cached value
     }
 
     try {
