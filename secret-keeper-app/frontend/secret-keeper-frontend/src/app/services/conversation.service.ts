@@ -122,6 +122,9 @@ export class ConversationService {
     if (!response.ok) {
       const text = await response.text();
       throw new Error(`Failed to toggle reaction: ${text}`);
+    }
+  }
+
   async editMessage(messageId: string, ciphertext: string): Promise<void> {
     const response = await fetch(`http://localhost:8080/api/messages/${messageId}`, {
       method: 'PATCH',
@@ -136,17 +139,15 @@ export class ConversationService {
     }
   }
 
-  async DeleteMessage(message_id: string): Promise<void> {
-    const response = await fetch(`http://localhost:8080/api/messages/${message_id}`, {
+  async deleteMessage(messageId: string): Promise<void> {
+    const response = await fetch(`http://localhost:8080/api/messages/${messageId}`, {
       method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({message_id}),
     });
     console.log('[message deletion] response status:', response.status);
     if (!response.ok) {
       const text = await response.text();
-      throw new Error(`Failed to set message lifetime: ${text}`);
+      throw new Error(`Failed to delete message: ${text}`);
     }
   }
 }
