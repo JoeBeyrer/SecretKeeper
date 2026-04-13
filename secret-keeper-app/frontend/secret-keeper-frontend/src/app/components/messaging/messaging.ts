@@ -25,6 +25,7 @@ interface Message {
   content: string;
   isMine: boolean;
   attachments: MessageAttachment[];
+  profilePictureUrl: string;
 }
 
 interface Conversation {
@@ -100,6 +101,8 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
 
   currentUsername: string = '';
   currentDisplayName: string = '';
+  currentUserPictureUrl: string = '';
+  activeConversationPictureUrl: string = '';
   conversations: Conversation[] = [];
   messageLifetime: number = 0;
   selectedMessageLifetime: number = 0;
@@ -138,6 +141,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     }
     this.currentUsername = user.username;
     this.currentDisplayName = user.display_name || user.username;
+    this.currentUserPictureUrl = user.profile_picture_url || '';
 
     this.routeQuerySub = this.route.queryParamMap.subscribe(params => {
       const chatWith = params.get('chatWith')?.trim();
@@ -193,10 +197,14 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
           this.formatTime(new Date()),
           false,
           plaintext,
+          incoming.profile_picture_url ?? ''
         );
         this.ngZone.run(() => {
           this.messages.push(msg);
           this.shouldScrollToBottom = true;
+	  if (!this.activeConversationPictureUrl && msg.profilePictureUrl) {
+            this.activeConversationPictureUrl = msg.profilePictureUrl;
+	  }
         });
       }).catch(() => {
         this.ngZone.run(() => {
@@ -207,6 +215,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
             content: '🔒 Could not decrypt message',
             isMine: false,
             attachments: [],
+	    profilePictureUrl: incoming.profile_picture_url ?? '',
           });
           this.shouldScrollToBottom = true;
         });
@@ -237,6 +246,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     this.composerError = '';
     this.errorMessage = '';
     this.settingsError = '';
+    this.activeConversationPictureUrl = '';
     const conv = this.conversations.find(c => c.id === convId);
     this.messageLifetime = conv?.messageLifetime ?? 0;
     this.selectedMessageLifetime = this.messageLifetime;
@@ -417,6 +427,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
           content: text,
           isMine: true,
           attachments: [],
+	  profilePictureUrl: this.currentUserPictureUrl,
         };
       }
 
@@ -633,6 +644,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
               this.formatTime(new Date(m.CreatedAt * 1000)),
               m.Username === this.currentUsername,
               content,
+	      m.ProfilePictureURL ?? '',
             );
           } catch {
             return {
@@ -642,6 +654,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
               content: '🔒 Could not decrypt message',
               isMine: m.Username === this.currentUsername,
               attachments: [],
+	      profilePictureUrl: m.ProfilePictureURL ?? '',
             };
           }
         })
@@ -650,6 +663,8 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
         this.releaseMessageResources(this.messages);
         this.messages = decrypted;
         this.shouldScrollToBottom = true;
+	const otherMsg = decrypted.find(m => !m.isMine);
+	this.activeConversationPictureUrl = otherMsg?.profilePictureUrl ?? '';
       });
     } catch (e) {
       console.error('[Messaging] Failed to load messages:', e);
@@ -705,8 +720,8 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     };
   }
 
-  private buildMessageFromDecryptedContent(id: string, username: string, time: string, isMine: boolean, plaintext: string): Message {
-    const payload = this.tryParseRichMessagePayload(plaintext);
+  private buildMessageFromDecryptedContent(id: string, username: string, time: string, isMine: boolean, plaintext: string, profilePictureUrl: string = ''): Message {
+  const payload = this.tryParseRichMessagePayload(plaintext);
     if (!payload) {
       return {
         id,
@@ -715,6 +730,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
         content: plaintext,
         isMine,
         attachments: [],
+        profilePictureUrl,
       };
     }
 
@@ -725,6 +741,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
       content: payload.text,
       isMine,
       attachments: payload.attachments.map(attachment => this.createMessageAttachmentFromPayload(attachment)),
+      profilePictureUrl,
     };
   }
 
@@ -736,6 +753,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
       content: text,
       isMine,
       attachments: attachments.map(attachment => this.createMessageAttachmentFromFile(attachment.file)),
+      profilePictureUrl: this.currentUserPictureUrl,
     };
   }
 
