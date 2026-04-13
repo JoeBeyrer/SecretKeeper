@@ -5,7 +5,15 @@ export interface FriendEntry {
   username: string;
   display_name: string;
   accepted: boolean;
-  direction?: string; 
+  direction?: string;
+}
+
+export interface UserSearchResult {
+  user_id: string;
+  username: string;
+  display_name: string;
+  /** "none" | "friend" | "pending_outgoing" | "pending_incoming" */
+  status: string;
 }
 
 @Injectable({
@@ -54,6 +62,16 @@ export class FriendService {
       body: JSON.stringify({ username }),
     });
     if (!res.ok) throw new Error(await res.text());
+  }
+
+  async searchUsers(query: string): Promise<UserSearchResult[]> {
+    if (!query.trim()) return [];
+    const res = await fetch(
+      `${this.base}/users/search?q=${encodeURIComponent(query.trim())}`,
+      { credentials: 'include' },
+    );
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
   }
 
   async removeFriend(username: string): Promise<void> {

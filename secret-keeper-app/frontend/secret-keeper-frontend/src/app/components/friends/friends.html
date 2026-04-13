@@ -56,6 +56,9 @@
       <button class="tab" [class.active]="activeTab === 'add'" (click)="setTab('add')">
         Add Friend
       </button>
+      <button class="tab" [class.active]="activeTab === 'search'" (click)="setTab('search')">
+        Search Users
+      </button>
     </div>
 
     <!-- Scrollable body -->
@@ -179,6 +182,71 @@
               [disabled]="!addUsername.trim()"
             >Send Request</button>
           </div>
+        </div>
+      }
+
+      <!-- TAB: Search users -->
+      @if (!initialLoading && activeTab === 'search') {
+        <div class="search-section">
+          <div class="search-hero">
+            <div class="search-hero-icon">🔍</div>
+            <h2 class="search-hero-title">Find People</h2>
+            <p class="search-hero-hint">Search by username to connect with others.</p>
+            <div class="search-input-wrap">
+              <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+              <input
+                type="text"
+                class="search-input"
+                [(ngModel)]="searchQuery"
+                (input)="onSearchInput()"
+                placeholder="Search by username…"
+                autocomplete="off"
+                autofocus
+              />
+              @if (isSearching) {
+                <span class="search-spinner"></span>
+              }
+            </div>
+          </div>
+
+          @if (searchError) {
+            <div class="feedback error search-feedback">{{ searchError }}</div>
+          }
+
+          @if (searchQuery.trim() && !isSearching && searchResults.length === 0 && !searchError) {
+            <div class="search-empty">No users found for "{{ searchQuery }}"</div>
+          }
+
+          @if (searchResults.length > 0) {
+            <div class="search-results">
+              @for (r of searchResults; track r.user_id) {
+                <div class="friend-row">
+                  <div class="avatar">{{ (r.display_name || r.username)[0].toUpperCase() }}</div>
+                  <div class="friend-info">
+                    <span class="friend-name">{{ r.display_name || r.username }}</span>
+                    <span class="friend-sub">&#64;{{ r.username }}</span>
+                  </div>
+                  <div class="row-actions">
+                    @if (r.status === 'none') {
+                      <button
+                        class="action-btn primary"
+                        (click)="sendRequestFromSearch(r)"
+                        [disabled]="isActing(r.username)"
+                      >{{ isActing(r.username) ? '…' : 'Add Friend' }}</button>
+                    } @else if (r.status === 'friend') {
+                      <span class="status-chip friend-chip">Friends</span>
+                    } @else if (r.status === 'pending_outgoing') {
+                      <span class="status-chip pending">Pending</span>
+                    } @else if (r.status === 'pending_incoming') {
+                      <button class="action-btn accept" (click)="setTab('requests')">Respond</button>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+          }
         </div>
       }
 
