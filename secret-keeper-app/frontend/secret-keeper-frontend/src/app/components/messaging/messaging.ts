@@ -31,6 +31,7 @@ interface Message {
   isMine: boolean;
   attachments: MessageAttachment[];
   profilePictureUrl: string;
+  expiresAt?: number;
 }
 
 interface Conversation {
@@ -290,6 +291,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     this.cancelEditingMessage(false);
     this.openMessageMenuId = null;
     this.activeConversationPictureUrl = '';
+    this.stopPictureRefresh();
     const conv = this.conversations.find(c => c.id === convId);
     this.messageLifetime = conv?.messageLifetime ?? 0;
     this.selectedMessageLifetime = this.messageLifetime;
@@ -688,9 +690,44 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     return conv ? conv.name : this.conversationId.substring(0, 8);
   }
 
+  private pictureRefreshInterval: ReturnType<typeof setInterval> | null = null;
+
+  private startPictureRefresh(convId: string): void {
+    this.stopPictureRefresh();
+    this.pictureRefreshInterval = setInterval(async () => {
+      const otherMsg = this.messages.find(m => !m.isMine);
+      if (!otherMsg) return;
+      try {
+        const res = await fetch(
+          `http://localhost:8080/api/profile/by-username/${otherMsg.username}`,
+          { credentials: 'include' }
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        this.ngZone.run(() => {
+          const newUrl = data.profile_picture_url || '';
+          this.activeConversationPictureUrl = newUrl;
+          for (const msg of this.messages) {
+            if (!msg.isMine) {
+              msg.profilePictureUrl = newUrl;
+            }
+          }
+        });
+      } catch {}
+    }, 15000);
+  }
+
+  private stopPictureRefresh(): void {
+    if (this.pictureRefreshInterval !== null) {
+      clearInterval(this.pictureRefreshInterval);
+      this.pictureRefreshInterval = null;
+    }
+  }
+
   ngOnDestroy(): void {
     this.messageSub?.unsubscribe();
     this.routeQuerySub?.unsubscribe();
+    this.stopPictureRefresh();
     this.releaseMessageResources(this.messages);
   }
 
@@ -852,6 +889,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
               m.Username === this.currentUsername,
               content,
 	      m.ProfilePictureURL ?? '',
+              m.ExpiresAt ?? undefined,
             );
           } catch {
             return {
@@ -862,6 +900,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
               isMine: m.Username === this.currentUsername,
               attachments: [],
 	      profilePictureUrl: m.ProfilePictureURL ?? '',
+              expiresAt: m.ExpiresAt ?? undefined,
             };
           }
         })
@@ -895,6 +934,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
         }
         const otherMsg = decrypted.find(m => !m.isMine);
         this.activeConversationPictureUrl = otherMsg?.profilePictureUrl ?? '';
+        this.startPictureRefresh(convId);
       });
     } catch (e) {
       console.error('[Messaging] Failed to load messages:', e);
@@ -973,7 +1013,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     };
   }
 
-  private buildMessageFromDecryptedContent(id: string, username: string, time: string, isMine: boolean, plaintext: string, profilePictureUrl: string = ''): Message {
+  private buildMessageFromDecryptedContent(id: string, username: string, time: string, isMine: boolean, plaintext: string, profilePictureUrl: string = '', expiresAt?: number): Message {
   const payload = this.tryParseRichMessagePayload(plaintext);
     if (!payload) {
       return {
@@ -984,6 +1024,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
         isMine,
         attachments: [],
         profilePictureUrl,
+        expiresAt,
       };
     }
 
@@ -995,6 +1036,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
       isMine,
       attachments: payload.attachments.map(attachment => this.createMessageAttachmentFromPayload(attachment)),
       profilePictureUrl,
+      expiresAt,
     };
   }
 
