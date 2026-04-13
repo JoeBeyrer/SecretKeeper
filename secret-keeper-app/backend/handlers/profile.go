@@ -15,6 +15,8 @@ import (
     "secret-keeper-app/backend/auth"
     "secret-keeper-app/backend/database"
     "secret-keeper-app/backend/email"
+    "secret-keeper-app/backend/messaging"
+    "secret-keeper-app/backend/models"
     "github.com/google/uuid"
 )
 
@@ -79,7 +81,7 @@ func GetProfileHandler(db *sql.DB) http.HandlerFunc {
 
 
 // Updates display name and bio. Picture is handled separately.
-func UpdateProfileHandler(db *sql.DB) http.HandlerFunc {
+func UpdateProfileHandler(db *sql.DB, hub *messaging.Hub) http.HandlerFunc {
     return func(w http.ResponseWriter, r *http.Request) {
         if r.Method != http.MethodPut {
             http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -127,13 +129,35 @@ func UpdateProfileHandler(db *sql.DB) http.HandlerFunc {
 
         w.Header().Set("Content-Type", "application/json")
         w.Write([]byte(`{"message":"Profile updated successfully."}`))
+
+        displayName, _ := database.GetDisplayNameByID(db, userID)
+        username, _ := database.GetUsernameByID(db, userID)
+        pictureURL, _ := database.GetProfilePictureURLByID(db, userID)
+        event, err := json.Marshal(models.WSMessage{
+            Type:              "profile_updated",
+            UserID:            userID,
+            Username:          username,
+            DisplayName:       displayName,
+            ProfilePictureURL: pictureURL,
+        })
+        if err == nil {
+            convIDs, _ := database.GetConversationIDsForUser(db, userID)
+            for _, convID := range convIDs {
+                members, _ := database.GetConversationMembers(db, convID)
+                for _, memberID := range members {
+                    if memberID != userID {
+                        hub.SendToUser(memberID, event)
+                    }
+                }
+            }
+        }
     }
 }
 
 // Accepts an image file and converts it to a base64 data URL
 // Max file size: 2 MB. Accepted types: jpeg, png, gif, webp.
 
-func UploadProfilePictureHandler(db *sql.DB) http.HandlerFunc {
+func UploadProfilePictureHandler(db *sql.DB, hub *messaging.Hub) http.HandlerFunc {
     return func(w http.ResponseWriter, r *http.Request) {
         if r.Method != http.MethodPost {
             http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -194,6 +218,27 @@ func UploadProfilePictureHandler(db *sql.DB) http.HandlerFunc {
 
         w.Header().Set("Content-Type", "application/json")
         w.Write([]byte(`{"message":"Profile picture updated successfully.","profile_picture_url":"` + strings.ReplaceAll(dataURL, `"`, `\"`) + `"}`))
+
+        username, _ := database.GetUsernameByID(db, userID)
+        displayName, _ := database.GetDisplayNameByID(db, userID)
+        event, err := json.Marshal(models.WSMessage{
+            Type:              "profile_updated",
+            UserID:            userID,
+            Username:          username,
+            DisplayName:       displayName,
+            ProfilePictureURL: dataURL,
+        })
+        if err == nil {
+            convIDs, _ := database.GetConversationIDsForUser(db, userID)
+            for _, convID := range convIDs {
+                members, _ := database.GetConversationMembers(db, convID)
+                for _, memberID := range members {
+                    if memberID != userID {
+                        hub.SendToUser(memberID, event)
+                    }
+                }
+            }
+        }
     }
 }
 
