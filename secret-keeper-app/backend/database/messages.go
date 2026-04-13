@@ -12,6 +12,7 @@ type MessageRow struct {
     SenderID string
     Username string
     DisplayName string
+    ProfilePictureURL string
     Ciphertext string
     CreatedAt int64
 }
@@ -58,6 +59,17 @@ func GetDisplayNameByID(db *sql.DB, userID string) (string, error) {
 	return displayName.String, nil
 }
 
+func GetProfilePictureURLByID(db *sql.DB, userID string) (string, error) {
+    var url sql.NullString
+    err := db.QueryRow(
+        `SELECT profile_picture_url FROM user_profiles WHERE user_id = ?`, userID,
+    ).Scan(&url)
+    if err != nil {
+        return "", err
+    }
+    return url.String, nil
+}
+
 func GetConversationMembers(db *sql.DB, conversationID string) ([]string, error) {
 	rows, err := db.Query(`
 		SELECT user_id FROM conversation_members
@@ -88,6 +100,7 @@ func GetMessagesByConversation(db *sql.DB, conversationID string, limit int) ([]
             m.sender_id,
             u.username,
             COALESCE(p.display_name, u.username) AS display_name,
+            COALESCE(p.profile_picture_url, ''),
             m.ciphertext,
             m.created_at
         FROM messages m
@@ -106,7 +119,7 @@ func GetMessagesByConversation(db *sql.DB, conversationID string, limit int) ([]
     var result []MessageRow
     for rows.Next() {
         var msg MessageRow
-        if err := rows.Scan(&msg.ID, &msg.SenderID, &msg.Username, &msg.DisplayName, &msg.Ciphertext, &msg.CreatedAt); err != nil {
+        if err := rows.Scan(&msg.ID, &msg.SenderID, &msg.Username, &msg.DisplayName, &msg.ProfilePictureURL, &msg.Ciphertext, &msg.CreatedAt); err != nil {
             return nil, err
         }
         result = append(result, msg)
