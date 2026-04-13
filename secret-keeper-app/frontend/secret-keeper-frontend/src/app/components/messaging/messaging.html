@@ -140,10 +140,14 @@
             [class.locked]="!conversationKeys.has(conv.id)"
             (click)="selectConversation(conv.id)"
           >
-            <svg class="ellipse-1-7" viewBox="0 0 48 48">
-              <circle cx="24" cy="24" r="24" fill="rgba(231, 231, 231, 1)"/>
-              <text x="24" y="32" text-anchor="middle" font-size="20" font-weight="700" fill="rgba(48, 48, 48, 1)">{{ conv.name.charAt(0).toUpperCase() }}</text>
-            </svg>
+            @if (activeConversationPictureUrl && conv.id === conversationId) {
+              <img class="ellipse-1-7 avatar-img" [src]="activeConversationPictureUrl" [alt]="conv.name" />
+            } @else {
+              <svg class="ellipse-1-7" viewBox="0 0 48 48">
+                <circle cx="24" cy="24" r="24" fill="rgba(231, 231, 231, 1)"/>
+                <text x="24" y="32" text-anchor="middle" font-size="20" font-weight="700" fill="rgba(48, 48, 48, 1)">{{ conv.name.charAt(0).toUpperCase() }}</text>
+              </svg>
+            }
             <div class="conv-info">
               <div class="conv-top-row">
                 <p class="text-26"><span class="text-rgb-48-48-48">{{ conv.name }}</span></p>
@@ -185,11 +189,14 @@
     <div class="rectangle-4-5">
       @if (isConnected && conversationId && conversationKeys.has(conversationId)) {
         <div class="chat-header">
-          <svg class="ellipse-2-12" viewBox="0 0 52 52">
-            <circle cx="26" cy="26" r="24" fill="rgba(231, 231, 231, 1)"/>
-            <circle cx="26" cy="26" r="24" stroke="rgba(83, 34, 188, 1)" stroke-width="4" fill="none"/>
-            <text x="26" y="34" text-anchor="middle" font-size="22" font-weight="700" fill="rgba(48, 48, 48, 1)">{{ getActiveConversationName().charAt(0).toUpperCase() }}</text>
-          </svg>
+          @if (activeConversationPictureUrl) {
+            <img class="ellipse-2-12 avatar-img header-avatar" [src]="activeConversationPictureUrl" [alt]="getActiveConversationName()" />
+          } @else {
+            <svg class="ellipse-2-12" viewBox="0 0 52 52">
+              <circle cx="26" cy="26" r="24" fill="rgba(231, 231, 231, 1)"/>
+              <text x="26" y="34" text-anchor="middle" font-size="22" font-weight="700" fill="rgba(48, 48, 48, 1)">{{ getActiveConversationName().charAt(0).toUpperCase() }}</text>
+            </svg>
+          }
           <div class="chat-header-info">
             <p class="text-26"><span class="text-rgb-48-48-48">{{ getActiveConversationName() }}</span></p>
             <p class="encrypted-badge">🔐 End-to-end encrypted</p>
@@ -209,10 +216,14 @@
           @for (msg of messages; track $index) {
             <div class="message-row" [class.mine]="msg.isMine" [class.theirs]="!msg.isMine">
               @if (!msg.isMine) {
-                <svg class="ellipse-12-51" viewBox="0 0 36 36">
-                  <circle cx="18" cy="18" r="18" fill="rgba(231, 231, 231, 1)"/>
-                  <text x="18" y="26" text-anchor="middle" font-size="14" font-weight="700" fill="rgba(48, 48, 48, 1)">{{ msg.username.charAt(0).toUpperCase() }}</text>
-                </svg>
+                @if (msg.profilePictureUrl) {
+                  <img class="ellipse-12-51 avatar-img" [src]="msg.profilePictureUrl" [alt]="msg.username" />
+                } @else {
+                  <svg class="ellipse-12-51" viewBox="0 0 36 36">
+                    <circle cx="18" cy="18" r="18" fill="rgba(231, 231, 231, 1)"/>
+                    <text x="18" y="26" text-anchor="middle" font-size="14" font-weight="700" fill="rgba(48, 48, 48, 1)">{{ msg.username.charAt(0).toUpperCase() }}</text>
+                  </svg>
+                }
               }
               <div class="message-bubble" [class.sent]="msg.isMine" [class.received]="!msg.isMine">
                 @if (!msg.isMine) {
@@ -265,10 +276,14 @@
                     <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
                   </svg>
                 </button>
-                <svg class="ellipse-15-54" viewBox="0 0 36 36">
-                  <circle cx="18" cy="18" r="18" fill="rgba(110, 0, 255, 1)"/>
-                  <text x="18" y="26" text-anchor="middle" font-size="14" font-weight="700" fill="rgba(255, 255, 255, 1)">{{ currentDisplayName.charAt(0).toUpperCase() }}</text>
-                </svg>
+                @if (currentUserPictureUrl) {
+                  <img class="ellipse-15-54 avatar-img" [src]="currentUserPictureUrl" [alt]="currentDisplayName" />
+                } @else {
+                  <svg class="ellipse-15-54" viewBox="0 0 36 36">
+                    <circle cx="18" cy="18" r="18" fill="rgba(110, 0, 255, 1)"/>
+                    <text x="18" y="26" text-anchor="middle" font-size="14" font-weight="700" fill="rgba(255, 255, 255, 1)">{{ currentDisplayName.charAt(0).toUpperCase() }}</text>
+                  </svg>
+                }
               }
             </div>
           }
