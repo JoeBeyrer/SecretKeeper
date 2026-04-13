@@ -11,4 +11,5 @@ type WSMessage struct {
 	ClientMessageID   string `json:"client_message_id,omitempty"`
 	UserID            string `json:"user_id,omitempty"`
 	Username          string `json:"username,omitempty"`
+	ExpiresAt         *int64 `json:"expires_at,omitempty"`
 }
