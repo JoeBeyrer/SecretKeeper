@@ -559,7 +559,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
   async deleteMessage(messageId: string, index: number): Promise<void> {
     if (!messageId) return;
     try {
-      await this.conversationService.DeleteMessage(messageId);
+      await this.conversationService.deleteMessage(messageId);
       this.ngZone.run(() => {
         if (this.editingMessageId === messageId) {
           this.cancelEditingMessage();
