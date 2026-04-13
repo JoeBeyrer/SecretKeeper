@@ -284,8 +284,70 @@ func GetConversationMessagesHandler(db *sql.DB) http.HandlerFunc {
             msgs = []database.MessageRow{}
         }
 
+        reactionsByMessage, err := database.GetReactionsForConversation(db, convID)
+        if err != nil {
+            log.Println("[Conversations] failed to load reactions:", err)
+            reactionsByMessage = map[string][]database.ReactionRow{}
+        }
+        for i := range msgs {
+            if rs, ok := reactionsByMessage[msgs[i].ID]; ok {
+                msgs[i].Reactions = rs
+            } else {
+                msgs[i].Reactions = []database.ReactionRow{}
+            }
+        }
+
         w.Header().Set("Content-Type", "application/json")
         json.NewEncoder(w).Encode(msgs)
+    }
+}
+
+func ToggleMessageReactionHandler(db *sql.DB, hub *messaging.Hub) http.HandlerFunc {
+    return func(w http.ResponseWriter, r *http.Request) {
+        userID, ok := GetUserIDFromContext(r)
+        if !ok {
+            http.Error(w, "unauthorized", http.StatusUnauthorized)
+            return
+        }
+
+        messageID := r.PathValue("id")
+        if messageID == "" {
+            http.Error(w, "missing message id", http.StatusBadRequest)
+            return
+        }
+
+        var body struct {
+            Emoji string `json:"emoji"`
+        }
+        if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+            http.Error(w, "invalid request", http.StatusBadRequest)
+            return
+        }
+        if body.Emoji == "" {
+            http.Error(w, "missing emoji", http.StatusBadRequest)
+            return
+        }
+
+        convID, err := database.GetConversationIDForMessage(db, messageID)
+        if err != nil {
+            http.Error(w, "message not found", http.StatusNotFound)
+            return
+        }
+
+        if !database.IsUserInConversation(db, userID, convID) {
+            http.Error(w, "forbidden", http.StatusForbidden)
+            return
+        }
+
+        if _, err := database.ToggleReaction(db, messageID, userID, body.Emoji); err != nil {
+            log.Println("[Reactions] toggle failed:", err)
+            http.Error(w, "could not toggle reaction", http.StatusInternalServerError)
+            return
+        }
+
+        notifyConversationMembers(db, hub, convID)
+
+        w.WriteHeader(http.StatusNoContent)
     }
 }
 
@@ -522,33 +584,30 @@ func EditMessageHandler(db *sql.DB, hub *messaging.Hub) http.HandlerFunc {
 }
 
 func DeleteMessageHandler(db *sql.DB, hub *messaging.Hub) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		userID, ok := GetUserIDFromContext(r)
-		if !ok {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
-			return
-		}
-		messageID := r.PathValue("id")
-		if messageID == "" {
-			http.Error(w, "missing message id", http.StatusBadRequest)
-			return
-		}
-		var convID string
-		err := db.QueryRow(`
-            SELECT conversation_id
-            FROM messages
-            WHERE sender_id = ? AND id = ?
-        `, userID, messageID).Scan(&convID)
-		if err == sql.ErrNoRows {
-			http.Error(w, "message not found or not yours", http.StatusNotFound)
-			return
-		}
-		if err != nil {
-			http.Error(w, "could not load message", http.StatusInternalServerError)
-			return
-		}
+    return func(w http.ResponseWriter, r *http.Request) {
+        userID, ok := GetUserIDFromContext(r)
+        if !ok {
+            http.Error(w, "unauthorized", http.StatusUnauthorized)
+            return
+        }
+        messageID := r.PathValue("id")
+        if messageID == "" {
+            http.Error(w, "missing message id", http.StatusBadRequest)
+            return
+        }
+        // Get convID before deleting so we can notify members after
+        convID, err := database.GetConversationIDForMessage(db, messageID)
+        if err != nil {
+            http.Error(w, "message not found", http.StatusNotFound)
+            return
+        }
 
-		result, err := db.Exec(`
+        if !database.IsUserInConversation(db, userID, convID) {
+            http.Error(w, "forbidden", http.StatusForbidden)
+            return
+        }
+
+        result, err := db.Exec(`
             DELETE FROM messages
             WHERE sender_id = ? AND id = ?
         `, userID, messageID)
@@ -563,7 +622,7 @@ func DeleteMessageHandler(db *sql.DB, hub *messaging.Hub) http.HandlerFunc {
             return
         }
 
-		notifyConversationMembers(db, hub, convID)
-		w.WriteHeader(http.StatusNoContent)
-	}
+        notifyConversationMembers(db, hub, convID)
+        w.WriteHeader(http.StatusNoContent)
+    }
 }

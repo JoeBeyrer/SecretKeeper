@@ -262,24 +262,85 @@
                           <video class="message-attachment-preview" [src]="attachment.downloadUrl" controls preload="metadata"></video>
                         }
 
-                        <div class="message-attachment-info">
-                          <p class="message-attachment-name">{{ attachment.fileName }}</p>
-                          <p class="message-attachment-meta">{{ getAttachmentMeta(attachment) }}</p>
+              <!-- bubble + reactions stacked vertically -->
+              <div class="message-content-col" [class.mine]="msg.isMine">
+                <div class="message-bubble" [class.sent]="msg.isMine" [class.received]="!msg.isMine">
+                  @if (!msg.isMine) {
+                    <p class="text-25"><span class="text-rgb-48-48-48">{{ msg.username }}</span></p>
+                  }
+                  @if (msg.content) {
+                    <p class="text-38" [class.text-white]="msg.isMine"><span [class.text-white]="msg.isMine" [class.text-rgb-48-48-48]="!msg.isMine">{{ msg.content }}</span></p>
+                  }
+                  @if (msg.attachments.length > 0) {
+                    <div class="message-attachments">
+                      @for (attachment of msg.attachments; track attachment.id) {
+                        <div class="message-attachment-card">
+                          @if (attachment.isImage) {
+                            <img class="message-attachment-preview" [src]="attachment.downloadUrl" [alt]="attachment.fileName" />
+                          } @else if (attachment.isVideo) {
+                            <video class="message-attachment-preview" [src]="attachment.downloadUrl" controls preload="metadata"></video>
+                          }
+                          <div class="message-attachment-info">
+                            <p class="message-attachment-name">{{ attachment.fileName }}</p>
+                            <p class="message-attachment-meta">{{ getAttachmentMeta(attachment) }}</p>
+                          </div>
+                          <a
+                            class="message-attachment-download"
+                            [href]="attachment.downloadUrl"
+                            [attr.download]="attachment.fileName"
+                          >
+                            Download
+                          </a>
                         </div>
+                      }
+                    </div>
+                  }
+                  <p class="text-35" [class.text-white]="msg.isMine"><span [class.text-white]="msg.isMine" [class.text-rgb-124-124-124]="!msg.isMine">{{ msg.time }}</span></p>
+                </div>
 
-                        <a
-                          class="message-attachment-download"
-                          [href]="attachment.downloadUrl"
-                          [attr.download]="attachment.fileName"
-                        >
-                          Download
-                        </a>
-                      </div>
+                @if (getMessageReactions(msg.id).length > 0) {
+                  <div class="reaction-bar" [class.mine]="msg.isMine">
+                    @for (reaction of getMessageReactions(msg.id); track reaction.emoji) {
+                      <button
+                        class="reaction-chip"
+                        [class.reacted]="reaction.isMine"
+                        (click)="toggleReaction(msg.id, reaction.emoji, $event)"
+                        [title]="reaction.users.join(', ')"
+                      >{{ reaction.emoji }}{{ reaction.count > 1 ? ' ' + reaction.count : '' }}</button>
                     }
                   </div>
                 }
-                <p class="text-35" [class.text-white]="msg.isMine"><span [class.text-white]="msg.isMine" [class.text-rgb-124-124-124]="!msg.isMine">{{ msg.time }}</span></p>
               </div>
+
+              <!-- emoji reaction button + picker (shown on hover, for all messages) -->
+              <div class="emoji-reaction-wrapper" [class.mine]="msg.isMine">
+                <button
+                  class="emoji-react-btn"
+                  [disabled]="!msg.id"
+                  (click)="openReactionPicker(msg.id, $event)"
+                  title="React"
+                  aria-label="Add reaction"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="M8 13s1.5 2 4 2 4-2 4-2"/>
+                    <line x1="9" y1="9" x2="9.01" y2="9"/>
+                    <line x1="15" y1="9" x2="15.01" y2="9"/>
+                  </svg>
+                </button>
+                @if (reactionPickerMessageId === msg.id) {
+                  <div class="emoji-picker-popup" [class.mine]="msg.isMine" (click)="$event.stopPropagation()">
+                    @for (emoji of QUICK_REACTIONS; track emoji) {
+                      <button
+                        class="emoji-option"
+                        [class.selected]="hasMyReaction(msg.id, emoji)"
+                        (click)="toggleReaction(msg.id, emoji, $event)"
+                      >{{ emoji }}</button>
+                    }
+                  </div>
+                }
+              </div>
+
               @if (msg.isMine) {
                 <div class="message-actions-menu">
                   <button

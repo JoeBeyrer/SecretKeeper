@@ -54,7 +54,7 @@ func main() {
     mux.Handle("/api/profile", auth(http.HandlerFunc(handlers.GetProfileHandler(db))))
     mux.Handle("/api/profile/update", auth(http.HandlerFunc(handlers.UpdateProfileHandler(db))))
     mux.Handle("/api/profile/picture", auth(http.HandlerFunc(handlers.UploadProfilePictureHandler(db))))
-	mux.Handle("/api/profile/by-username/{username}", auth(http.HandlerFunc(handlers.GetProfileByUsernameHandler(db))))
+	  mux.Handle("/api/profile/by-username/{username}", auth(http.HandlerFunc(handlers.GetProfileByUsernameHandler(db))))
     mux.Handle("/api/account", auth(http.HandlerFunc(handlers.UpdateAccountHandler(db))))
 
     // CONVERSATION ROUTES
@@ -64,15 +64,16 @@ func main() {
     mux.Handle("/api/conversations/{id}/verify-room-key", auth(http.HandlerFunc(handlers.VerifyConversationRoomKeyHandler(db))))
     mux.Handle("/api/conversations/{id}/claim-room-key", auth(http.HandlerFunc(handlers.ClaimConversationRoomKeyHandler(db))))
     mux.Handle("/api/conversations/{id}/lifetime", auth(http.HandlerFunc(handlers.SetMessageLifetimeHandler(db, hub))))
+    mux.Handle("/api/messages/{id}/react", auth(http.HandlerFunc(handlers.ToggleMessageReactionHandler(db, hub))))
     mux.Handle("/api/messages/{id}", auth(http.HandlerFunc(handlers.MessageHandler(db, hub))))
     
     // FRIENDS ROUTES
-	mux.Handle("/api/friends", auth(http.HandlerFunc(handlers.GetFriendsHandler(db))))
-	mux.Handle("/api/friends/requests", auth(http.HandlerFunc(handlers.GetPendingRequestsHandler(db))))
-	mux.Handle("/api/friends/request", auth(http.HandlerFunc(handlers.SendFriendRequestHandler(db))))
-	mux.Handle("/api/friends/accept", auth(http.HandlerFunc(handlers.AcceptFriendRequestHandler(db))))
-	mux.Handle("/api/friends/decline", auth(http.HandlerFunc(handlers.DeclineFriendRequestHandler(db))))
-	mux.Handle("/api/friends/remove", auth(http.HandlerFunc(handlers.RemoveFriendHandler(db))))
+  	mux.Handle("/api/friends", auth(http.HandlerFunc(handlers.GetFriendsHandler(db))))
+  	mux.Handle("/api/friends/requests", auth(http.HandlerFunc(handlers.GetPendingRequestsHandler(db))))
+  	mux.Handle("/api/friends/request", auth(http.HandlerFunc(handlers.SendFriendRequestHandler(db))))
+  	mux.Handle("/api/friends/accept", auth(http.HandlerFunc(handlers.AcceptFriendRequestHandler(db))))
+  	mux.Handle("/api/friends/decline", auth(http.HandlerFunc(handlers.DeclineFriendRequestHandler(db))))
+  	mux.Handle("/api/friends/remove", auth(http.HandlerFunc(handlers.RemoveFriendHandler(db))))
 
     // ENCRYPTION ROUTES
     mux.Handle("/api/keys/save", auth(http.HandlerFunc(handlers.SaveKeysHandler(db))))

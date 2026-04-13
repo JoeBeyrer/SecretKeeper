@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
+import { ThemeService } from '../../services/theme.service';
 
 interface ProfileData {
   username: string;
@@ -34,7 +35,8 @@ export class Profile implements OnInit {
     private http: HttpClient,
     private fb: FormBuilder,
     private router: Router,
-    private route: ActivatedRoute
+    private route: ActivatedRoute,
+    public themeService: ThemeService,
   ) {
     this.profileForm = this.fb.group({
       display_name: ['', [Validators.maxLength(50)]],

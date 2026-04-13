@@ -1,4 +1,4 @@
-import { Component, NgZone, OnInit, OnDestroy, ViewChild, ElementRef, AfterViewChecked, ChangeDetectorRef } from '@angular/core';
+import { Component, NgZone, OnInit, OnDestroy, ViewChild, ElementRef, AfterViewChecked, ChangeDetectorRef, HostListener } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
 import { Subscription } from 'rxjs';
@@ -7,6 +7,11 @@ import { MessagingService } from '../../services/messaging.service';
 import { ConversationService } from '../../services/conversation.service';
 import { AuthService } from '../../services/auth.service';
 import { CryptoService } from '../../services/crypto.service';
+
+interface ReactionUser {
+  username: string;
+  displayName: string;
+}
 
 interface MessageAttachment {
   id: string;
@@ -79,6 +84,8 @@ type ModalState =
   styleUrl: './messaging.css',
 })
 export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
+  readonly QUICK_REACTIONS = ['❤️', '👍', '😂', '😮', '😢', '🙏'];
+
   readonly lifetimeOptions: LifetimeOption[] = [
     { label: '1 hour', value: 60 },
     { label: '1 day', value: 1440 },
@@ -117,6 +124,10 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
   roomKeyInput: string = '';
   roomKeyError: string = '';
   roomKeyCopied: boolean = false;
+
+  reactionPickerMessageId: string | null = null;
+  // messageId → emoji → reaction users
+  messageReactions = new Map<string, Map<string, ReactionUser[]>>();
 
   conversationKeys = new Map<string, CryptoKey>();
 
@@ -176,11 +187,13 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
 
       if (incoming.type === 'messages_updated') {
         console.log('[Frontend] messages_updated received for', incoming.conversation_id);
+      await this.ngZone.run(async () => {
         await this.refreshConversationList();
         if (incoming.conversation_id === this.conversationId) {
           this.cancelEditingMessage(false);
-          await this.loadMessages(this.conversationId);
+          await this.loadMessages(this.conversationId, false);
         }
+      });
         return;
       }
 
@@ -554,9 +567,90 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
         this.releaseMessageResources([this.messages[index]]);
         this.messages.splice(index, 1);
       });
+      // Backend now broadcasts messages_updated so the other user reloads too
     } catch (e: any) {
       console.error('[Messaging] Failed to delete message:', e);
     }
+  }
+
+  @HostListener('document:click')
+  closeReactionPicker(): void {
+    this.reactionPickerMessageId = null;
+  }
+
+  openReactionPicker(messageId: string, event: MouseEvent): void {
+    event.stopPropagation();
+    this.reactionPickerMessageId = this.reactionPickerMessageId === messageId ? null : messageId;
+  }
+
+  async toggleReaction(messageId: string, emoji: string, event: MouseEvent): Promise<void> {
+    event.stopPropagation();
+    this.reactionPickerMessageId = null;
+    if (!messageId) return;
+
+    const wasMine = this.hasMyReaction(messageId, emoji);
+    this.applyReactionLocally(messageId, emoji, !wasMine);
+
+    try {
+      await this.conversationService.toggleReaction(messageId, emoji);
+      // The backend broadcasts messages_updated to ALL conversation members (including this user).
+      // The WS handler below catches that and calls loadMessages(false) for everyone.
+      // No direct loadMessages call here — that would race with the WS-triggered one.
+    } catch (e) {
+      console.error('[Messaging] Failed to toggle reaction:', e);
+      this.applyReactionLocally(messageId, emoji, wasMine);
+    }
+  }
+
+  private applyReactionLocally(messageId: string, emoji: string, add: boolean): void {
+    // Clone outer map so Angular detects the reference change and re-evaluates template methods.
+    const nextReactions = new Map(this.messageReactions);
+
+    let emojiMap = nextReactions.get(messageId);
+    if (!emojiMap) {
+      emojiMap = new Map();
+    } else {
+      emojiMap = new Map(emojiMap);
+    }
+    nextReactions.set(messageId, emojiMap);
+
+    const users = emojiMap.get(emoji) ?? [];
+    const idx = users.findIndex(u => u.username === this.currentUsername);
+
+    if (add) {
+      if (idx < 0) {
+        emojiMap.set(emoji, [...users, { username: this.currentUsername, displayName: this.currentDisplayName }]);
+      }
+    } else {
+      if (idx >= 0) {
+        const updated = [...users];
+        updated.splice(idx, 1);
+        if (updated.length === 0) {
+          emojiMap.delete(emoji);
+        } else {
+          emojiMap.set(emoji, updated);
+        }
+      }
+    }
+
+    this.messageReactions = nextReactions;
+  }
+
+  getMessageReactions(messageId: string): { emoji: string; count: number; users: string[]; isMine: boolean }[] {
+    const emojiMap = this.messageReactions.get(messageId);
+    if (!emojiMap) return [];
+    return Array.from(emojiMap.entries())
+      .filter(([, users]) => users.length > 0)
+      .map(([emoji, users]) => ({
+        emoji,
+        count: users.length,
+        users: users.map(u => u.displayName),
+        isMine: users.some(u => u.username === this.currentUsername),
+      }));
+  }
+
+  hasMyReaction(messageId: string, emoji: string): boolean {
+    return this.messageReactions.get(messageId)?.get(emoji)?.some(u => u.username === this.currentUsername) ?? false;
   }
 
   getMessageLifetimeLabel(value: number = this.messageLifetime): string {
@@ -762,7 +856,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     }
   }
 
-  private async loadMessages(convId: string): Promise<void> {
+  private async loadMessages(convId: string, scroll = true): Promise<void> {
     const convKey = this.conversationKeys.get(convId);
     if (!convKey) return;
 
@@ -793,13 +887,36 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
           }
         })
       );
+      const nextReactions = new Map<string, Map<string, ReactionUser[]>>();
+      for (const m of history) {
+        const messageId = m.ID ?? m.id ?? '';
+        const rawReactions: any[] = m.Reactions ?? [];
+        if (!messageId || rawReactions.length === 0) continue;
+        const emojiMap = new Map<string, ReactionUser[]>();
+        for (const r of rawReactions) {
+          const username = r.Username ?? r.username ?? '';
+          const displayName = r.DisplayName ?? r.display_name ?? username;
+          const emoji = r.Emoji ?? r.emoji ?? '';
+          if (!emoji || !username) continue;
+          const users = emojiMap.get(emoji) ?? [];
+          users.push({ username, displayName });
+          emojiMap.set(emoji, users);
+        }
+        if (emojiMap.size > 0) {
+          nextReactions.set(messageId, emojiMap);
+        }
+      }
+
       this.ngZone.run(() => {
         this.releaseMessageResources(this.messages);
         this.messages = decrypted;
-        this.shouldScrollToBottom = true;
-	const otherMsg = decrypted.find(m => !m.isMine);
-	this.activeConversationPictureUrl = otherMsg?.profilePictureUrl ?? '';
-	this.startPictureRefresh(convId);
+        this.messageReactions = nextReactions;
+        if (scroll) {
+          this.shouldScrollToBottom = true;
+        }
+        const otherMsg = decrypted.find(m => !m.isMine);
+        this.activeConversationPictureUrl = otherMsg?.profilePictureUrl ?? '';
+        this.startPictureRefresh(convId);
       });
     } catch (e) {
       console.error('[Messaging] Failed to load messages:', e);
