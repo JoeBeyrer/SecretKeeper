@@ -134,7 +134,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
   ) {}
 
   async ngOnInit(): Promise<void> {
-    const user = await this.authService.loadCurrentUser();
+    const user = await this.authService.reloadCurrentUser();
     if (!user) {
       this.router.navigate(['/login']);
       return;
@@ -247,6 +247,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     this.errorMessage = '';
     this.settingsError = '';
     this.activeConversationPictureUrl = '';
+    this.stopPictureRefresh();
     const conv = this.conversations.find(c => c.id === convId);
     this.messageLifetime = conv?.messageLifetime ?? 0;
     this.selectedMessageLifetime = this.messageLifetime;
@@ -481,9 +482,38 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     return conv ? conv.name : this.conversationId.substring(0, 8);
   }
 
+  private pictureRefreshInterval: ReturnType<typeof setInterval> | null = null;
+
+  private startPictureRefresh(convId: string): void {
+    this.stopPictureRefresh();
+    this.pictureRefreshInterval = setInterval(async () => {
+      const otherMsg = this.messages.find(m => !m.isMine);
+      if (!otherMsg) return;
+      try {
+        const res = await fetch(
+          `http://localhost:8080/api/profile/by-username/${otherMsg.username}`,
+          { credentials: 'include' }
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        this.ngZone.run(() => {
+          this.activeConversationPictureUrl = data.profile_picture_url || '';
+        });
+      } catch {}
+    }, 15000);
+  }
+
+  private stopPictureRefresh(): void {
+    if (this.pictureRefreshInterval !== null) {
+      clearInterval(this.pictureRefreshInterval);
+      this.pictureRefreshInterval = null;
+    }
+  }
+
   ngOnDestroy(): void {
     this.messageSub?.unsubscribe();
     this.routeQuerySub?.unsubscribe();
+    this.stopPictureRefresh();
     this.releaseMessageResources(this.messages);
   }
 
@@ -665,6 +695,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
         this.shouldScrollToBottom = true;
 	const otherMsg = decrypted.find(m => !m.isMine);
 	this.activeConversationPictureUrl = otherMsg?.profilePictureUrl ?? '';
+	this.startPictureRefresh(convId);
       });
     } catch (e) {
       console.error('[Messaging] Failed to load messages:', e);
