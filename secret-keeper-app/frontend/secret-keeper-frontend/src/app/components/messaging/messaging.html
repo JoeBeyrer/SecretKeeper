@@ -225,11 +225,31 @@
                   </svg>
                 }
               }
-              <div class="message-bubble" [class.sent]="msg.isMine" [class.received]="!msg.isMine">
+              <div class="message-bubble" [class.sent]="msg.isMine" [class.received]="!msg.isMine" [class.is-editing]="editingMessageId === msg.id">
                 @if (!msg.isMine) {
                   <p class="text-25"><span class="text-rgb-48-48-48">{{ msg.username }}</span></p>
                 }
-                @if (msg.content) {
+                @if (editingMessageId === msg.id) {
+                  <div class="message-edit-shell">
+                    <textarea
+                      class="message-edit-input"
+                      [(ngModel)]="editDraft"
+                      rows="2"
+                      (keydown)="onEditDraftKeydown($event, msg)"
+                    ></textarea>
+                    @if (editError) {
+                      <p class="message-edit-error">{{ editError }}</p>
+                    }
+                    <div class="message-edit-actions">
+                      <button class="message-edit-confirm" type="button" (click)="saveEditedMessage(msg)" [disabled]="isSavingEdit" aria-label="Save message edit">
+                        ✓
+                      </button>
+                      <button class="message-edit-cancel" type="button" (click)="cancelEditingMessage()" aria-label="Cancel message edit">
+                        ×
+                      </button>
+                    </div>
+                  </div>
+                } @else if (msg.content) {
                   <p class="text-38" [class.text-white]="msg.isMine"><span [class.text-white]="msg.isMine" [class.text-rgb-48-48-48]="!msg.isMine">{{ msg.content }}</span></p>
                 }
                 @if (msg.attachments.length > 0) {
@@ -261,10 +281,33 @@
                 <p class="text-35" [class.text-white]="msg.isMine"><span [class.text-white]="msg.isMine" [class.text-rgb-124-124-124]="!msg.isMine">{{ msg.time }}</span></p>
               </div>
               @if (msg.isMine) {
+                <div class="message-actions-menu">
+                  <button
+                    class="message-menu-trigger"
+                    type="button"
+                    (click)="toggleMessageMenu(msg.id)"
+                    [attr.aria-expanded]="openMessageMenuId === msg.id"
+                    [disabled]="!msg.id || msg.id.startsWith('temp-')"
+                    aria-label="Open message actions"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                      <circle cx="5" cy="12" r="2"></circle>
+                      <circle cx="12" cy="12" r="2"></circle>
+                      <circle cx="19" cy="12" r="2"></circle>
+                    </svg>
+                  </button>
+                  @if (openMessageMenuId === msg.id) {
+                    <div class="message-menu-dropdown">
+                      <button class="message-menu-item" type="button" (click)="startEditingMessage(msg)">
+                        Edit
+                      </button>
+                    </div>
+                  }
+                </div>
                 <button
                   class="delete-msg-btn"
                   (click)="deleteMessage(msg.id, $index)"
-                  [disabled]="!msg.id"
+                  [disabled]="!msg.id || msg.id.startsWith('temp-')"
                   title="Delete message"
                   aria-label="Delete message"
                 >
