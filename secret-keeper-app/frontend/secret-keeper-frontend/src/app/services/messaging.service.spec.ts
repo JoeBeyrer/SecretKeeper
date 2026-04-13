@@ -108,6 +108,18 @@ describe('MessagingService', () => {
       });
     });
 
+    it('should include client_message_id when provided', () => {
+      service.connect();
+      service.sendMessage('conv-1', 'cipher-abc', 'temp-123');
+      const payload = JSON.parse(mockSocket.sentMessages[0]);
+      expect(payload).toEqual({
+        type: 'send_message',
+        conversation_id: 'conv-1',
+        ciphertext: 'cipher-abc',
+        client_message_id: 'temp-123',
+      });
+    });
+
     it('should not throw when socket is not open', () => {
       expect(() => service.sendMessage('conv-1', 'cipher')).not.toThrow();
     });
@@ -141,6 +153,8 @@ describe('MessagingService', () => {
           ciphertext: 'encrypted-blob',
           sender_id: 'alice',
           display_name: 'Alice',
+          profile_picture_url: '',
+          message_id: 'msg-1',
         };
 
         service.messages$.subscribe((msg) => {

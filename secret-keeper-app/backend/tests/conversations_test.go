@@ -371,3 +371,141 @@ func Test_claim_conversation_room_key_handler(t *testing.T) {
 	}
 	t.Log("non-member correctly returned 403")
 }
+
+
+func Test_edit_message_handler(t *testing.T) {
+	db := database.InitDB(":memory:")
+	defer db.Close()
+
+	for _, u := range []struct{ name, email string }{
+		{"alice", "alice@test.com"},
+		{"bob", "bob@test.com"},
+	} {
+		body := `{"username":"` + u.name + `","email":"` + u.email + `","password":"password123"}`
+		req := httptest.NewRequest("POST", "/api/register", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		handlers.RegisterHandler(db)(w, req)
+		if w.Code != http.StatusCreated {
+			t.Fatalf("setup: register %s got %d", u.name, w.Code)
+		}
+		db.Exec(`UPDATE users SET email_verified = 1 WHERE username = ?`, u.name)
+	}
+
+	var aliceID, bobID string
+	db.QueryRow(`SELECT id FROM users WHERE username = 'alice'`).Scan(&aliceID)
+	db.QueryRow(`SELECT id FROM users WHERE username = 'bob'`).Scan(&bobID)
+
+	body := `{"member_ids":["bob"],"room_key":"supersecretkey"}`
+	req := requestWithUserID("POST", "/api/conversations/create", body, aliceID)
+	w := httptest.NewRecorder()
+	handlers.CreateConversationHandler(db)(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("setup: failed to create conversation: %d", w.Code)
+	}
+
+	var convResp map[string]interface{}
+	if err := json.NewDecoder(w.Body).Decode(&convResp); err != nil {
+		t.Fatalf("setup: decode conversation response: %v", err)
+	}
+	convID := convResp["conversation_id"].(string)
+
+	if err := database.SaveMessage(db, "msg-edit-1", convID, aliceID, "original-ciphertext", 1700000000); err != nil {
+		t.Fatalf("setup: SaveMessage: %v", err)
+	}
+
+	handler := handlers.MessageHandler(db, messaging.NewHub())
+
+	req = requestWithUserID("PATCH", "/api/messages/msg-edit-1", `{}`, aliceID)
+	req.SetPathValue("id", "msg-edit-1")
+	w = httptest.NewRecorder()
+	handler(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for missing ciphertext, got %d", w.Code)
+	}
+
+	req = requestWithUserID("PATCH", "/api/messages/msg-edit-1", `{"ciphertext":"bob-edit"}`, bobID)
+	req.SetPathValue("id", "msg-edit-1")
+	w = httptest.NewRecorder()
+	handler(w, req)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 for editing another user's message, got %d", w.Code)
+	}
+
+	req = requestWithUserID("PATCH", "/api/messages/msg-edit-1", `{"ciphertext":"updated-ciphertext"}`, aliceID)
+	req.SetPathValue("id", "msg-edit-1")
+	w = httptest.NewRecorder()
+	handler(w, req)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("expected 204 for valid edit, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var ciphertext string
+	if err := db.QueryRow(`SELECT ciphertext FROM messages WHERE id = ?`, "msg-edit-1").Scan(&ciphertext); err != nil {
+		t.Fatalf("query updated message: %v", err)
+	}
+	if ciphertext != "updated-ciphertext" {
+		t.Fatalf("expected ciphertext to be updated, got %q", ciphertext)
+	}
+}
+
+func Test_get_conversation_messages_handler_attachment_ciphertext(t *testing.T) {
+	db := database.InitDB(":memory:")
+	defer db.Close()
+
+	for _, u := range []struct{ name, email string }{
+		{"alice", "alice@test.com"},
+		{"bob", "bob@test.com"},
+	} {
+		body := `{"username":"` + u.name + `","email":"` + u.email + `","password":"password123"}`
+		req := httptest.NewRequest("POST", "/api/register", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		handlers.RegisterHandler(db)(w, req)
+		if w.Code != http.StatusCreated {
+			t.Fatalf("setup: register %s got %d", u.name, w.Code)
+		}
+		db.Exec(`UPDATE users SET email_verified = 1 WHERE username = ?`, u.name)
+	}
+
+	var aliceID string
+	db.QueryRow(`SELECT id FROM users WHERE username = 'alice'`).Scan(&aliceID)
+
+	body := `{"member_ids":["bob"],"room_key":"supersecretkey"}`
+	req := requestWithUserID("POST", "/api/conversations/create", body, aliceID)
+	w := httptest.NewRecorder()
+	handlers.CreateConversationHandler(db)(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("setup: failed to create conversation: %d", w.Code)
+	}
+
+	var convResp map[string]interface{}
+	if err := json.NewDecoder(w.Body).Decode(&convResp); err != nil {
+		t.Fatalf("setup: decode conversation response: %v", err)
+	}
+	convID := convResp["conversation_id"].(string)
+
+	richCiphertext := "encrypted-rich-message-payload"
+	if err := database.SaveMessage(db, "msg-file-1", convID, aliceID, richCiphertext, 1700000001); err != nil {
+		t.Fatalf("setup: SaveMessage: %v", err)
+	}
+
+	req = requestWithUserID("GET", "/api/conversations/"+convID+"/messages", "", aliceID)
+	req.SetPathValue("id", convID)
+	w = httptest.NewRecorder()
+	handlers.GetConversationMessagesHandler(db)(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 for message fetch, got %d", w.Code)
+	}
+
+	var msgs []map[string]interface{}
+	if err := json.NewDecoder(w.Body).Decode(&msgs); err != nil {
+		t.Fatalf("decode messages: %v", err)
+	}
+	if len(msgs) != 1 {
+		t.Fatalf("expected 1 message, got %d", len(msgs))
+	}
+	if msgs[0]["Ciphertext"] != richCiphertext {
+		t.Fatalf("expected ciphertext %q, got %v", richCiphertext, msgs[0]["Ciphertext"])
+	}
+}
