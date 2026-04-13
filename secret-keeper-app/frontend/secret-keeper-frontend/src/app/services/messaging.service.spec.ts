@@ -153,6 +153,8 @@ describe('MessagingService', () => {
           ciphertext: 'encrypted-blob',
           sender_id: 'alice',
           display_name: 'Alice',
+          profile_picture_url: '',
+          message_id: 'msg-1',
         };
 
         service.messages$.subscribe((msg) => {
