@@ -201,8 +201,6 @@ img {
   width: 52px;
   height: 52px;
   min-width: 52px;
-  border: 4px solid rgba(83, 34, 188, 1);
-  outline: none;
 }
 
 .ellipse-12-51 {
@@ -210,8 +208,6 @@ img {
   flex-shrink: 1;
   flex-basis: auto;
   fill: rgba(231, 231, 231, 1);
-  border: none;
-  outline: none;
   width: 36px;
   height: 36px;
   min-width: 36px;
@@ -222,8 +218,6 @@ img {
   flex-shrink: 1;
   flex-basis: auto;
   fill: rgba(110, 0, 255, 1);
-  border: none;
-  outline: none;
   width: 36px;
   height: 36px;
   min-width: 36px;
@@ -1022,6 +1016,153 @@ img {
 }
 
 
+.message-bubble.is-editing {
+  min-width: 320px;
+}
+
+.message-edit-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.message-edit-input {
+  width: 100%;
+  min-height: 82px;
+  resize: vertical;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.16);
+  padding: 12px 14px;
+  font-family: var(--font-family-roboto);
+  font-size: 14px;
+  color: inherit;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.message-bubble.received .message-edit-input {
+  border-color: rgba(0, 0, 0, 0.18);
+  background: rgba(255, 255, 255, 0.5);
+  color: #1a1e24;
+}
+
+.message-edit-input:focus {
+  border-color: rgba(52, 201, 235, 0.75);
+}
+
+.message-edit-error {
+  margin: 0;
+  font-family: var(--font-family-roboto);
+  font-size: 12px;
+  color: #ffb4c2;
+}
+
+.message-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.message-edit-confirm,
+.message-edit-cancel {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.message-edit-confirm {
+  background: rgba(52, 201, 235, 0.2);
+  color: #e0f7ff;
+}
+
+.message-edit-confirm:hover:not(:disabled),
+.message-edit-cancel:hover {
+  transform: translateY(-1px);
+}
+
+.message-edit-confirm:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.message-edit-cancel {
+  background: rgba(255, 255, 255, 0.12);
+  color: #f8fafc;
+}
+
+.message-actions-menu {
+  position: relative;
+  order: -2;
+}
+
+.message-menu-trigger {
+  opacity: 0;
+  background: transparent;
+  border: none;
+  color: #cbd5e1;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.message-menu-trigger:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.message-menu-trigger:disabled {
+  opacity: 0;
+  cursor: not-allowed;
+}
+
+.message-row:hover .message-menu-trigger:not(:disabled),
+.message-actions-menu:focus-within .message-menu-trigger,
+.message-menu-trigger[aria-expanded='true'] {
+  opacity: 1;
+}
+
+.message-menu-dropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  min-width: 120px;
+  padding: 6px;
+  border-radius: 12px;
+  background: #1f242c;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+  z-index: 2;
+}
+
+.message-menu-item {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: #f8fafc;
+  padding: 10px 12px;
+  text-align: left;
+  border-radius: 8px;
+  font-family: var(--font-family-roboto);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.message-menu-item:hover {
+  background: rgba(52, 201, 235, 0.12);
+}
+
+
 .delete-msg-btn {
   opacity: 0;
   background: transparent;
@@ -1050,5 +1191,8 @@ img {
   opacity: 1;
 }
 
-/* Light mode overrides live in styles.css (global) so Angular's ViewEncapsulation
-   does not scope them with [_ngcontent-*] attribute selectors. */
+.avatar-img {
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}

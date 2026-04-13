@@ -7,12 +7,16 @@ export interface IncomingMessage {
   ciphertext: string;
   sender_id: string;
   display_name: string;
+  profile_picture_url: string;
+  message_id: string;
+  client_message_id?: string;
 }
  
 export interface OutgoingMessage {
   type: string;
   conversation_id: string;
   ciphertext: string;
+  client_message_id?: string;
 }
  
 @Injectable({
@@ -21,7 +25,6 @@ export interface OutgoingMessage {
 export class MessagingService implements OnDestroy {
   private socket: WebSocket | null = null;
   private messageSubject = new Subject<IncomingMessage>();
-  // Users subscribe to this to receive incoming messages
   messages$: Observable<IncomingMessage> = this.messageSubject.asObservable();
  
   connect(): void {
@@ -38,7 +41,7 @@ export class MessagingService implements OnDestroy {
     this.socket.onmessage = (event: MessageEvent) => {
       try {
         const msg: IncomingMessage = JSON.parse(event.data);
-        if (msg.type === 'new_message' || msg.type === 'messages_updated') {
+        if (msg.type === 'new_message' || msg.type === 'messages_updated' || msg.type === 'message_ack') {
           this.messageSubject.next(msg);
         }
       } catch (e) {
@@ -56,7 +59,7 @@ export class MessagingService implements OnDestroy {
     };
   }
  
-  sendMessage(conversationId: string, ciphertext: string): void {
+  sendMessage(conversationId: string, ciphertext: string, clientMessageId?: string): void {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
       console.error('[MessagingService] Socket is not open. Cannot send.');
       return;
@@ -65,7 +68,8 @@ export class MessagingService implements OnDestroy {
     const payload: OutgoingMessage = {
       type: 'send_message',
       conversation_id: conversationId,
-      ciphertext: ciphertext,
+      ciphertext,
+      client_message_id: clientMessageId,
     };
  
     this.socket.send(JSON.stringify(payload));

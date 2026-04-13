@@ -379,3 +379,37 @@ func LogoutHandler(db *sql.DB) http.HandlerFunc {
         w.Write([]byte(`{"message":"Logged out successfully."}`))
     }
 }
+
+func GetProfileByUsernameHandler(db *sql.DB) http.HandlerFunc {
+    return func(w http.ResponseWriter, r *http.Request) {
+        if r.Method != http.MethodGet {
+            http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+            return
+        }
+        _, ok := GetUserIDFromContext(r)
+        if !ok {
+            http.Error(w, "unauthorized", http.StatusUnauthorized)
+            return
+        }
+        username := r.PathValue("username")
+        if username == "" {
+            http.Error(w, "missing username", http.StatusBadRequest)
+            return
+        }
+        var profilePictureURL string
+        err := db.QueryRow(`
+            SELECT COALESCE(up.profile_picture_url, '')
+            FROM users u
+            LEFT JOIN user_profiles up ON up.user_id = u.id
+            WHERE u.username = ?
+        `, username).Scan(&profilePictureURL)
+        if err != nil {
+            http.Error(w, "user not found", http.StatusNotFound)
+            return
+        }
+        w.Header().Set("Content-Type", "application/json")
+        json.NewEncoder(w).Encode(map[string]string{
+            "profile_picture_url": profilePictureURL,
+        })
+    }
+}

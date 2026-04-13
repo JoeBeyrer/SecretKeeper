@@ -122,6 +122,17 @@ export class ConversationService {
     if (!response.ok) {
       const text = await response.text();
       throw new Error(`Failed to toggle reaction: ${text}`);
+  async editMessage(messageId: string, ciphertext: string): Promise<void> {
+    const response = await fetch(`http://localhost:8080/api/messages/${messageId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ ciphertext }),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Failed to edit message: ${text}`);
     }
   }
 

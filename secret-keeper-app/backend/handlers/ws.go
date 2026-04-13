@@ -1,19 +1,18 @@
 package handlers
 
 import (
+	"database/sql"
+	"encoding/json"
 	"log"
 	"net/http"
-	"encoding/json"
-	"database/sql"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	"secret-keeper-app/backend/database"
 	"secret-keeper-app/backend/messaging"
 	"secret-keeper-app/backend/models"
-	"secret-keeper-app/backend/database"
 )
-
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
@@ -23,8 +22,6 @@ var upgrader = websocket.Upgrader{
 
 func WebSocketHandler(hub *messaging.Hub, db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-
-		// Authenticate user via cookie
 		cookie, err := r.Cookie("sk_session")
 		if err != nil {
 			http.Error(w, "Unauthorized: no cookie", http.StatusUnauthorized)
@@ -37,7 +34,6 @@ func WebSocketHandler(hub *messaging.Hub, db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// Upgrade connection
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			log.Println("Upgrade error:", err)
@@ -90,52 +86,67 @@ func readPump(c *messaging.Client, hub *messaging.Hub, db *sql.DB) {
 			continue
 		}
 
-		if msg.Type == "send_message" {
+		if msg.Type != "send_message" {
+			continue
+		}
 
-			id := uuid.New().String()
-			convID := msg.ConversationID
-			senderID := c.UserID
-			ciphertext := msg.Ciphertext
-			createdAt := time.Now().Unix()
+		id := uuid.New().String()
+		convID := msg.ConversationID
+		senderID := c.UserID
+		ciphertext := msg.Ciphertext
+		createdAt := time.Now().Unix()
 
-			if !database.IsUserInConversation(db, senderID, convID) {
-				continue
-			}
+		if !database.IsUserInConversation(db, senderID, convID) {
+			continue
+		}
 
-			err := database.SaveMessage(db, id, convID, senderID, ciphertext, createdAt)
-			if err != nil {
-				log.Println("Failed to save message:", err)
-				continue
-			}
+		err = database.SaveMessage(db, id, convID, senderID, ciphertext, createdAt)
+		if err != nil {
+			log.Println("Failed to save message:", err)
+			continue
+		}
 
-			senderUsername, err := database.GetUsernameByID(db, senderID)
-			if err != nil {
-				continue
-			}
+		senderUsername, err := database.GetUsernameByID(db, senderID)
+		if err != nil {
+			continue
+		}
 
-			senderDisplayName, _ := database.GetDisplayNameByID(db, senderID)
+		senderDisplayName, _ := database.GetDisplayNameByID(db, senderID)
+		senderPictureURL, _ := database.GetProfilePictureURLByID(db, senderID)
 
-			outgoing := models.WSMessage{
-				Type:           "new_message",
-				ConversationID: convID,
-				Ciphertext:     ciphertext,
-				SenderID:       senderUsername,
-				DisplayName:    senderDisplayName,
-			}
+		outgoing := models.WSMessage{
+			Type:              "new_message",
+			ConversationID:    convID,
+			Ciphertext:        ciphertext,
+			SenderID:          senderUsername,
+			DisplayName:       senderDisplayName,
+			ProfilePictureURL: senderPictureURL,
+			MessageID:         id,
+		}
 
-			jsonData, err := json.Marshal(outgoing)
-			if err != nil {
-				continue
-			}
+		jsonData, err := json.Marshal(outgoing)
+		if err != nil {
+			continue
+		}
 
-			// Get conversation members and broadcast to all of them
-			members, err := database.GetConversationMembers(db, convID)
-			if err != nil {
-				continue
-			}
+		members, err := database.GetConversationMembers(db, convID)
+		if err != nil {
+			continue
+		}
 
-			for _, userID := range members {
-				hub.SendToUser(userID, jsonData)
+		for _, userID := range members {
+			hub.SendToUser(userID, jsonData)
+		}
+
+		if msg.ClientMessageID != "" {
+			ack, err := json.Marshal(models.WSMessage{
+				Type:            "message_ack",
+				ConversationID:  convID,
+				MessageID:       id,
+				ClientMessageID: msg.ClientMessageID,
+			})
+			if err == nil {
+				hub.SendToUser(senderID, ack)
 			}
 		}
 	}
