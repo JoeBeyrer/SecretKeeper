@@ -280,6 +280,21 @@ func VerifyConversationRoomKey(db *sql.DB, conversationID, roomKey string) (bool
 	return true, nil
 }
 
+func GetConversationIDsForUser(db *sql.DB, userID string) ([]string, error) {
+	rows, err := db.Query(`SELECT conversation_id FROM conversation_members WHERE user_id = ?`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		rows.Scan(&id)
+		ids = append(ids, id)
+	}
+	return ids, nil
+}
+
 // ToggleReaction inserts the reaction if missing, deletes it if present.
 // Returns true if the reaction was added, false if removed.
 func ToggleReaction(db *sql.DB, messageID, userID, emoji string) (bool, error) {
