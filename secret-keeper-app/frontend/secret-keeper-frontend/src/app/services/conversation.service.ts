@@ -112,6 +112,19 @@ export class ConversationService {
       throw new Error(`Failed to set message lifetime: ${text}`);
     }
   }
+  async toggleReaction(messageId: string, emoji: string): Promise<void> {
+    const response = await fetch(`http://localhost:8080/api/messages/${messageId}/react`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ emoji }),
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Failed to toggle reaction: ${text}`);
+    }
+  }
+
   async DeleteMessage(message_id: string): Promise<void> {
     const response = await fetch(`http://localhost:8080/api/messages/${message_id}`, {
       method: 'DELETE',

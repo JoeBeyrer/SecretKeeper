@@ -14,6 +14,15 @@ type MessageRow struct {
     DisplayName string
     Ciphertext string
     CreatedAt int64
+    Reactions []ReactionRow
+}
+
+type ReactionRow struct {
+    MessageID   string
+    UserID      string
+    Username    string
+    DisplayName string
+    Emoji       string
 }
 
 func SaveMessage(db *sql.DB, id, convID, senderID, ciphertext string, createdAt int64) error {
@@ -233,4 +242,72 @@ func VerifyConversationRoomKey(db *sql.DB, conversationID, roomKey string) (bool
 	}
 
 	return true, nil
+}
+
+// ToggleReaction inserts the reaction if missing, deletes it if present.
+// Returns true if the reaction was added, false if removed.
+func ToggleReaction(db *sql.DB, messageID, userID, emoji string) (bool, error) {
+	var exists int
+	err := db.QueryRow(`
+        SELECT 1 FROM message_reactions
+        WHERE message_id = ? AND user_id = ? AND emoji = ?
+    `, messageID, userID, emoji).Scan(&exists)
+
+	if err == nil {
+		_, delErr := db.Exec(`
+            DELETE FROM message_reactions
+            WHERE message_id = ? AND user_id = ? AND emoji = ?
+        `, messageID, userID, emoji)
+		return false, delErr
+	}
+
+	if err != sql.ErrNoRows {
+		return false, err
+	}
+
+	_, insErr := db.Exec(`
+        INSERT INTO message_reactions (message_id, user_id, emoji, created_at)
+        VALUES (?, ?, ?, ?)
+    `, messageID, userID, emoji, time.Now().Unix())
+	return true, insErr
+}
+
+// GetConversationIDForMessage returns the conversation the message belongs to.
+func GetConversationIDForMessage(db *sql.DB, messageID string) (string, error) {
+	var convID string
+	err := db.QueryRow(`SELECT conversation_id FROM messages WHERE id = ?`, messageID).Scan(&convID)
+	return convID, err
+}
+
+// GetReactionsForConversation returns all reactions on messages in a conversation,
+// grouped by message_id and ordered by created_at.
+func GetReactionsForConversation(db *sql.DB, conversationID string) (map[string][]ReactionRow, error) {
+	rows, err := db.Query(`
+        SELECT
+            r.message_id,
+            r.user_id,
+            u.username,
+            COALESCE(p.display_name, u.username) AS display_name,
+            r.emoji
+        FROM message_reactions r
+        JOIN messages m ON m.id = r.message_id
+        JOIN users u ON u.id = r.user_id
+        LEFT JOIN user_profiles p ON p.user_id = r.user_id
+        WHERE m.conversation_id = ?
+        ORDER BY r.created_at ASC
+    `, conversationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make(map[string][]ReactionRow)
+	for rows.Next() {
+		var r ReactionRow
+		if err := rows.Scan(&r.MessageID, &r.UserID, &r.Username, &r.DisplayName, &r.Emoji); err != nil {
+			return nil, err
+		}
+		result[r.MessageID] = append(result[r.MessageID], r)
+	}
+	return result, nil
 }
