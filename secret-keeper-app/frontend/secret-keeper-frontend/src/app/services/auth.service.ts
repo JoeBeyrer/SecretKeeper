@@ -14,9 +14,14 @@ export interface UserProfile {
 export class AuthService {
   private currentUser: UserProfile | null = null;
 
+  async reloadCurrentUser(): Promise<UserProfile | null> {
+    this.currentUser = null;
+    return this.loadCurrentUser();
+  }
+
   async loadCurrentUser(): Promise<UserProfile | null> {
     if (this.currentUser) {
-      return this.currentUser; // already loaded, return cached value
+      return this.currentUser;
     }
 
     try {
