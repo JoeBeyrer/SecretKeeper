@@ -22,6 +22,10 @@ type createConvResp struct {
 	Created        bool   `json:"created"`
 }
 
+type editMessageReq struct {
+	Ciphertext string `json:"ciphertext"`
+}
+
 var allowedMessageLifetimes = map[int]struct{}{
 	0:      {},
 	60:     {},
@@ -455,24 +459,96 @@ func SetMessageLifetimeHandler(db *sql.DB, hub *messaging.Hub) http.HandlerFunc 
 		}
 
 		notifyConversationMembers(db, hub, convID)
-        log.Println("[Lifetime] success")
-        w.WriteHeader(http.StatusNoContent)
-    }
+		log.Println("[Lifetime] success")
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func MessageHandler(db *sql.DB, hub *messaging.Hub) http.HandlerFunc {
+	editHandler := EditMessageHandler(db, hub)
+	deleteHandler := DeleteMessageHandler(db, hub)
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPatch:
+			editHandler(w, r)
+		case http.MethodDelete:
+			deleteHandler(w, r)
+		default:
+			w.Header().Set("Allow", "DELETE, PATCH")
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	}
+}
+
+func EditMessageHandler(db *sql.DB, hub *messaging.Hub) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := GetUserIDFromContext(r)
+		if !ok {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		messageID := r.PathValue("id")
+		if messageID == "" {
+			http.Error(w, "missing message id", http.StatusBadRequest)
+			return
+		}
+
+		var req editMessageReq
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "invalid request", http.StatusBadRequest)
+			return
+		}
+
+		if req.Ciphertext == "" {
+			http.Error(w, "missing ciphertext", http.StatusBadRequest)
+			return
+		}
+
+		convID, err := database.UpdateMessage(db, messageID, userID, req.Ciphertext)
+		if err == sql.ErrNoRows {
+			http.Error(w, "message not found or not yours", http.StatusNotFound)
+			return
+		}
+		if err != nil {
+			http.Error(w, "could not edit message", http.StatusInternalServerError)
+			return
+		}
+
+		notifyConversationMembers(db, hub, convID)
+		w.WriteHeader(http.StatusNoContent)
+	}
 }
 
 func DeleteMessageHandler(db *sql.DB, hub *messaging.Hub) http.HandlerFunc {
-    return func(w http.ResponseWriter, r *http.Request) {
-        userID, ok := GetUserIDFromContext(r)
-        if !ok {
-            http.Error(w, "unauthorized", http.StatusUnauthorized)
-            return
-        }
-        messageID := r.PathValue("id")
-        if messageID == "" {
-            http.Error(w, "missing message id", http.StatusBadRequest)
-            return
-        }
-        result, err := db.Exec(`
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := GetUserIDFromContext(r)
+		if !ok {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		messageID := r.PathValue("id")
+		if messageID == "" {
+			http.Error(w, "missing message id", http.StatusBadRequest)
+			return
+		}
+		var convID string
+		err := db.QueryRow(`
+            SELECT conversation_id
+            FROM messages
+            WHERE sender_id = ? AND id = ?
+        `, userID, messageID).Scan(&convID)
+		if err == sql.ErrNoRows {
+			http.Error(w, "message not found or not yours", http.StatusNotFound)
+			return
+		}
+		if err != nil {
+			http.Error(w, "could not load message", http.StatusInternalServerError)
+			return
+		}
+
+		result, err := db.Exec(`
             DELETE FROM messages
             WHERE sender_id = ? AND id = ?
         `, userID, messageID)
@@ -487,22 +563,7 @@ func DeleteMessageHandler(db *sql.DB, hub *messaging.Hub) http.HandlerFunc {
             return
         }
 
-        var convID string
-        db.QueryRow(`SELECT conversation_id FROM messages WHERE id = ?`, messageID).Scan(&convID)
-
-        members, err := database.GetConversationMembers(db, convID)
-        if err != nil {
-            http.Error(w, "failed to get members", http.StatusNotFound)
-        }
-
-        notification, _ := json.Marshal(models.WSMessage{
-            Type: "messages_updated",
-            ConversationID: convID,
-        })
-
-        for _, userID := range members {
-            hub.SendToUser(userID, notification)
-        }
-        w.WriteHeader(http.StatusNoContent)
-    }
+		notifyConversationMembers(db, hub, convID)
+		w.WriteHeader(http.StatusNoContent)
+	}
 }
