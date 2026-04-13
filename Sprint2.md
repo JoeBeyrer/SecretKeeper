@@ -646,6 +646,3 @@ go test ./tests/... -v
 - `type: string`
 - `conversation_id: string`
 - `ciphertext: string`
-
-## Demo Video
-[Sprint 2 Demo Video](https://www.youtube.com/watch?v=81LtIXOoIwg)
