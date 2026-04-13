@@ -90,6 +90,3 @@ All issues that were incomplete are due to time constraints. The team decided to
 - No rate limiting on password reset requests
 - No email verification at signup before allowing password resets
 - Used/expired reset tokens are not archived from the password_resets table 
-
-## Demo Video
-[Sprint 1 Demo Video](https://www.youtube.com/watch?v=LeLfc1uK1j0)
