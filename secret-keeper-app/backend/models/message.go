@@ -6,4 +6,5 @@ type WSMessage struct {
 	Ciphertext     string `json:"ciphertext"`
 	SenderID       string `json:"sender_id"`
 	DisplayName    string `json:"display_name"`
+	ProfilePictureURL string `json:"profile_picture_url"`
 }
