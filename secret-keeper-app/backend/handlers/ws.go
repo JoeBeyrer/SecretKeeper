@@ -114,6 +114,7 @@ func readPump(c *messaging.Client, hub *messaging.Hub, db *sql.DB) {
 			}
 
 			senderDisplayName, _ := database.GetDisplayNameByID(db, senderID)
+			senderPictureURL, _ := database.GetProfilePictureURLByID(db, senderID)
 
 			outgoing := models.WSMessage{
 				Type:           "new_message",
@@ -121,6 +122,7 @@ func readPump(c *messaging.Client, hub *messaging.Hub, db *sql.DB) {
 				Ciphertext:     ciphertext,
 				SenderID:       senderUsername,
 				DisplayName:    senderDisplayName,
+				ProfilePictureURL: senderPictureURL,
 			}
 
 			jsonData, err := json.Marshal(outgoing)
