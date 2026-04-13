@@ -635,6 +635,25 @@ img {
   border-radius: 3px;
 }
 
+.message-expiry-label {
+  font-family: var(--font-family-roboto, Roboto, sans-serif);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  color: rgba(100, 160, 100, 0.85);
+  margin: 2px 0 0 0;
+  padding: 0;
+  line-height: 1.3;
+  text-align: left;
+  user-select: none;
+}
+
+.message-expiry-label.mine {
+  text-align: right;
+  /* Slightly brighter on the dark sent bubble for readability */
+  color: rgba(180, 230, 180, 0.95);
+}
+
 @media (max-width: 1440px) {
   .macbook-pro-16-1-1 {
     padding-left: 24px;
