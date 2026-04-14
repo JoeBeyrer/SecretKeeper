@@ -65,7 +65,7 @@ func notifyConversationMembers(db *sql.DB, hub *messaging.Hub, convID string) {
 	}
 }
 
-func CreateConversationHandler(db *sql.DB) http.HandlerFunc {
+func CreateConversationHandler(db *sql.DB, hub *messaging.Hub) http.HandlerFunc {
     return func(w http.ResponseWriter, r *http.Request) {
         userID, ok := GetUserIDFromContext(r)
         if !ok {
@@ -175,6 +175,10 @@ func CreateConversationHandler(db *sql.DB) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(createConvResp{ConversationID: convID, Created: true})
+
+		// Notify all members so their conversation list refreshes immediately,
+		// without requiring a page reload.
+		go notifyConversationMembers(db, hub, convID)
 	}
 }
 
