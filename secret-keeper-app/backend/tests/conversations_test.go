@@ -39,7 +39,7 @@ func Test_create_conversation_handler(t *testing.T) {
 	body := `{"member_ids":["bob"]}`
 	req := requestWithUserID("POST", "/api/conversations/create", body, aliceID)
 	w := httptest.NewRecorder()
-	handlers.CreateConversationHandler(db)(w, req)
+	handlers.CreateConversationHandler(db, messaging.NewHub())(w, req)
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400 for missing room key, got %d", w.Code)
 	} else {
@@ -50,7 +50,7 @@ func Test_create_conversation_handler(t *testing.T) {
 	body = `{"member_ids":["nobody"],"room_key":"testkey"}`
 	req = requestWithUserID("POST", "/api/conversations/create", body, aliceID)
 	w = httptest.NewRecorder()
-	handlers.CreateConversationHandler(db)(w, req)
+	handlers.CreateConversationHandler(db, messaging.NewHub())(w, req)
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400 for unknown member, got %d", w.Code)
 	} else {
@@ -61,7 +61,7 @@ func Test_create_conversation_handler(t *testing.T) {
 	body = `{"member_ids":["bob"],"room_key":"supersecretkey"}`
 	req = requestWithUserID("POST", "/api/conversations/create", body, aliceID)
 	w = httptest.NewRecorder()
-	handlers.CreateConversationHandler(db)(w, req)
+	handlers.CreateConversationHandler(db, messaging.NewHub())(w, req)
 	if w.Code != http.StatusCreated {
 		t.Fatalf("expected 201 for valid creation, got %d: %s", w.Code, w.Body.String())
 	}
@@ -82,7 +82,7 @@ func Test_create_conversation_handler(t *testing.T) {
 	// Duplicate request should return existing conversation without created=true
 	req = requestWithUserID("POST", "/api/conversations/create", body, aliceID)
 	w = httptest.NewRecorder()
-	handlers.CreateConversationHandler(db)(w, req)
+	handlers.CreateConversationHandler(db, messaging.NewHub())(w, req)
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200 for existing conversation, got %d", w.Code)
 	}
@@ -97,7 +97,7 @@ func Test_create_conversation_handler(t *testing.T) {
 	req = httptest.NewRequest("POST", "/api/conversations/create", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	w = httptest.NewRecorder()
-	handlers.CreateConversationHandler(db)(w, req)
+	handlers.CreateConversationHandler(db, messaging.NewHub())(w, req)
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("expected 401 for unauthenticated request, got %d", w.Code)
 	}
@@ -141,7 +141,7 @@ func Test_get_conversations_handler(t *testing.T) {
 	body := `{"member_ids":["bob"],"room_key":"testkey"}`
 	req = requestWithUserID("POST", "/api/conversations/create", body, aliceID)
 	w = httptest.NewRecorder()
-	handlers.CreateConversationHandler(db)(w, req)
+	handlers.CreateConversationHandler(db, messaging.NewHub())(w, req)
 	if w.Code != http.StatusCreated {
 		t.Fatalf("setup: failed to create conversation: %d", w.Code)
 	}
@@ -190,7 +190,7 @@ func Test_get_conversation_messages_handler(t *testing.T) {
 	body := `{"member_ids":["bob"],"room_key":"testkey"}`
 	req := requestWithUserID("POST", "/api/conversations/create", body, aliceID)
 	w := httptest.NewRecorder()
-	handlers.CreateConversationHandler(db)(w, req)
+	handlers.CreateConversationHandler(db, messaging.NewHub())(w, req)
 	var convResp map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&convResp)
 	convID := convResp["conversation_id"].(string)
@@ -267,7 +267,7 @@ func Test_verify_conversation_room_key_handler(t *testing.T) {
 	body := `{"member_ids":["bob"],"room_key":"correct-room-key"}`
 	req := requestWithUserID("POST", "/api/conversations/create", body, aliceID)
 	w := httptest.NewRecorder()
-	handlers.CreateConversationHandler(db)(w, req)
+	handlers.CreateConversationHandler(db, messaging.NewHub())(w, req)
 	var convResp map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&convResp)
 	convID := convResp["conversation_id"].(string)
@@ -332,7 +332,7 @@ func Test_claim_conversation_room_key_handler(t *testing.T) {
 	body := `{"member_ids":["bob"],"room_key":"the-real-room-key"}`
 	req := requestWithUserID("POST", "/api/conversations/create", body, aliceID)
 	w := httptest.NewRecorder()
-	handlers.CreateConversationHandler(db)(w, req)
+	handlers.CreateConversationHandler(db, messaging.NewHub())(w, req)
 	var convResp map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&convResp)
 	convID := convResp["conversation_id"].(string)
@@ -400,7 +400,7 @@ func Test_edit_message_handler(t *testing.T) {
 	body := `{"member_ids":["bob"],"room_key":"supersecretkey"}`
 	req := requestWithUserID("POST", "/api/conversations/create", body, aliceID)
 	w := httptest.NewRecorder()
-	handlers.CreateConversationHandler(db)(w, req)
+	handlers.CreateConversationHandler(db, messaging.NewHub())(w, req)
 	if w.Code != http.StatusCreated {
 		t.Fatalf("setup: failed to create conversation: %d", w.Code)
 	}
@@ -475,7 +475,7 @@ func Test_get_conversation_messages_handler_attachment_ciphertext(t *testing.T) 
 	body := `{"member_ids":["bob"],"room_key":"supersecretkey"}`
 	req := requestWithUserID("POST", "/api/conversations/create", body, aliceID)
 	w := httptest.NewRecorder()
-	handlers.CreateConversationHandler(db)(w, req)
+	handlers.CreateConversationHandler(db, messaging.NewHub())(w, req)
 	if w.Code != http.StatusCreated {
 		t.Fatalf("setup: failed to create conversation: %d", w.Code)
 	}
