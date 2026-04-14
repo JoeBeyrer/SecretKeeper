@@ -55,7 +55,7 @@ func WebSocketHandler(hub *messaging.Hub, db *sql.DB) http.HandlerFunc {
 
 func writePump(c *messaging.Client, hub *messaging.Hub) {
 	defer func() {
-		hub.Unregister(c.UserID)
+		hub.Unregister(c.UserID, c)
 		c.Conn.Close()
 	}()
 
@@ -69,7 +69,7 @@ func writePump(c *messaging.Client, hub *messaging.Hub) {
 
 func readPump(c *messaging.Client, hub *messaging.Hub, db *sql.DB) {
 	defer func() {
-		hub.Unregister(c.UserID)
+		hub.Unregister(c.UserID, c)
 		c.Conn.Close()
 	}()
 
