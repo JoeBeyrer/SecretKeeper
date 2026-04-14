@@ -141,11 +141,15 @@ func UpdateProfileHandler(db *sql.DB, hub *messaging.Hub) http.HandlerFunc {
             ProfilePictureURL: pictureURL,
         })
         if err == nil {
+            // Notify the user's own other open tabs as well.
+            hub.SendToUser(userID, event)
+            notified := map[string]bool{userID: true}
             convIDs, _ := database.GetConversationIDsForUser(db, userID)
             for _, convID := range convIDs {
                 members, _ := database.GetConversationMembers(db, convID)
                 for _, memberID := range members {
-                    if memberID != userID {
+                    if !notified[memberID] {
+                        notified[memberID] = true
                         hub.SendToUser(memberID, event)
                     }
                 }
@@ -229,11 +233,15 @@ func UploadProfilePictureHandler(db *sql.DB, hub *messaging.Hub) http.HandlerFun
             ProfilePictureURL: dataURL,
         })
         if err == nil {
+            // Notify the user's own other open tabs as well.
+            hub.SendToUser(userID, event)
+            notified := map[string]bool{userID: true}
             convIDs, _ := database.GetConversationIDsForUser(db, userID)
             for _, convID := range convIDs {
                 members, _ := database.GetConversationMembers(db, convID)
                 for _, memberID := range members {
-                    if memberID != userID {
+                    if !notified[memberID] {
+                        notified[memberID] = true
                         hub.SendToUser(memberID, event)
                     }
                 }
