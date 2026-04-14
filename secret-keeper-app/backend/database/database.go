@@ -168,6 +168,16 @@ func InitDB(path string) *sql.DB {
 		)
     `)
 
+    execOrFatal(db, `
+        CREATE TABLE IF NOT EXISTS blocks (
+            id         TEXT    NOT NULL PRIMARY KEY,
+            blocker_id TEXT    NOT NULL REFERENCES users(id),
+            blockee_id TEXT    NOT NULL REFERENCES users(id),
+            created_at INTEGER NOT NULL,
+            UNIQUE(blocker_id, blockee_id)
+        )
+    `)
+
 	log.Println("Database initialized")
 	return db
 }

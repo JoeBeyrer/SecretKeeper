@@ -54,7 +54,7 @@ func main() {
     mux.Handle("/api/profile", auth(http.HandlerFunc(handlers.GetProfileHandler(db))))
     mux.Handle("/api/profile/update", auth(http.HandlerFunc(handlers.UpdateProfileHandler(db, hub))))
     mux.Handle("/api/profile/picture", auth(http.HandlerFunc(handlers.UploadProfilePictureHandler(db, hub))))
-	  mux.Handle("/api/profile/by-username/{username}", auth(http.HandlerFunc(handlers.GetProfileByUsernameHandler(db))))
+    mux.Handle("/api/profile/by-username/{username}", auth(http.HandlerFunc(handlers.GetProfileByUsernameHandler(db))))
     mux.Handle("/api/account", auth(http.HandlerFunc(handlers.UpdateAccountHandler(db))))
 
     // CONVERSATION ROUTES
@@ -78,6 +78,10 @@ func main() {
 
     // USER SEARCH
     mux.Handle("/api/users/search", auth(http.HandlerFunc(handlers.SearchUsersHandler(db))))
+
+    // BLOCKED ROUTES
+    mux.Handle("/api/blocks/block/{blockee_id}", auth(http.HandlerFunc(handlers.BlockUser(db))))
+    mux.Handle("/api/blocks/unblock/{blockee_id}", auth(http.HandlerFunc(handlers.UnblockUser(db))))
 
     // ENCRYPTION ROUTES
     mux.Handle("/api/keys/save", auth(http.HandlerFunc(handlers.SaveKeysHandler(db))))

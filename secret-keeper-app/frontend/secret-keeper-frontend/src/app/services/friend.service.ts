@@ -93,4 +93,20 @@ export class FriendService {
     });
     if (!res.ok) throw new Error(await res.text());
   }
+
+  async blockUser(blockeeid: string): Promise<void> {
+    const res = await fetch(`/api/blocks/block/${blockeeid}`, {
+      method: 'POST',
+      credentials: 'include',
+    });
+    if (!res.ok) throw new Error(await res.text());
+  }
+
+  async unBlockUser(blockeeid: string): Promise<void> {
+    const res = await fetch(`/api/blocks/unblock/${blockeeid}`, {
+      method: 'DELETE',
+      credentials: 'include',
+    });
+    if (!res.ok) throw new Error(await res.text());
+  }
 }

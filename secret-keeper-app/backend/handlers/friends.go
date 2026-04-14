@@ -42,6 +42,23 @@ func SendFriendRequestHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
+		var exists bool
+		err = db.QueryRow(`
+			SELECT EXISTS(
+				SELECT 1 FROM blocks 
+				WHERE blocker_id = ? AND blockee_id = ?
+			)
+		`, addresseeID, requesterID).Scan(&exists)
+
+		if err != nil {
+			http.Error(w, "error checking blocked users", http.StatusInternalServerError)
+			return
+		}
+		if exists {
+			http.Error(w, "can't add, user is blocked", http.StatusBadRequest)
+			return
+		}
+
 		exists, accepted, _, err := database.FriendshipExists(db, requesterID, addresseeID)
 		if err == nil && exists {
 			if accepted {

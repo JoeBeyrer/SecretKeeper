@@ -100,6 +100,33 @@ func readPump(c *messaging.Client, hub *messaging.Hub, db *sql.DB) {
 			continue
 		}
 
+		members, err := database.GetConversationMembers(db, convID)
+		if err != nil {
+			continue
+		}
+		var recipientID string
+		for _, memberID := range members {
+			if memberID != senderID {
+				recipientID = memberID
+				break
+			}
+		}
+
+		var blocked bool
+		err = db.QueryRow(`
+			SELECT EXISTS(
+				SELECT 1 FROM blocks
+				WHERE blocker_id = ? AND blockee_id = ?
+			)
+		`, recipientID, senderID).Scan(&blocked)
+		if err != nil {
+			log.Println("Failed to check block status:", err)
+			continue
+		}
+		if blocked {
+			continue
+		}
+
 		err = database.SaveMessage(db, id, convID, senderID, ciphertext, createdAt)
 		if err != nil {
 			log.Println("Failed to save message:", err)
@@ -137,11 +164,6 @@ func readPump(c *messaging.Client, hub *messaging.Hub, db *sql.DB) {
 		}
 
 		jsonData, err := json.Marshal(outgoing)
-		if err != nil {
-			continue
-		}
-
-		members, err := database.GetConversationMembers(db, convID)
 		if err != nil {
 			continue
 		}
