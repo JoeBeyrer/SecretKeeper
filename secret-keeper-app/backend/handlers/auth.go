@@ -25,6 +25,8 @@ type registerReq struct {
     Password string `json:"password"`
 }
 
+var SendVerificationEmail = email.SendVerificationEmail
+
 func RegisterHandler(db *sql.DB) http.HandlerFunc {
     return func(w http.ResponseWriter, r *http.Request) {
         var req registerReq
@@ -67,7 +69,7 @@ func RegisterHandler(db *sql.DB) http.HandlerFunc {
         if err != nil {
             log.Printf("[REGISTER] failed to store verification token for user %s: %v", id, err)
         } else {
-            if err := email.SendVerificationEmail(req.Email, token); err != nil {
+            if err := SendVerificationEmail(req.Email, token); err != nil {
                 log.Printf("[REGISTER] verification email failed for user %s: %v", id, err)
             } else {
                 log.Printf("[REGISTER] verification email sent to %s", req.Email)

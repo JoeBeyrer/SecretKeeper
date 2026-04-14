@@ -2,17 +2,19 @@ package main
 
 import (
 	"database/sql"
-	"secret-keeper-app/backend/database"
-	"testing"
-	"time"
+	"io"
 	"log"
 	"os"
-	"io"
+	"secret-keeper-app/backend/database"
+	"secret-keeper-app/backend/handlers"
+	"testing"
+	"time"
 )
 
 func TestMain(m *testing.M) {
-    log.SetOutput(io.Discard)
-    os.Exit(m.Run())
+	log.SetOutput(io.Discard)
+	handlers.SendVerificationEmail = func(to, token string) error { return nil }
+	os.Exit(m.Run())
 }
 
 func Test_init_db_func(t *testing.T) {
@@ -507,13 +509,13 @@ func Test_get_user_id_by_username_func(t *testing.T) {
 	}
 
 	id, err := database.GetUserIDByUsername(db, "requester")
-	if err != nil{
+	if err != nil {
 		t.Fatal("failed to get user id by username")
 	} else {
 		t.Log("got user id by username")
 	}
 
-	if id != "user1"{
+	if id != "user1" {
 		t.Fatal("returned the incorrect id by username")
 	} else {
 		t.Log("returned the correct id by username")
