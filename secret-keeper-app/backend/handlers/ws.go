@@ -79,8 +79,6 @@ func readPump(c *messaging.Client, hub *messaging.Hub, db *sql.DB) {
 			break
 		}
 
-		log.Println("Received:", string(message))
-
 		var msg models.WSMessage
 		if err := json.Unmarshal(message, &msg); err != nil {
 			continue
