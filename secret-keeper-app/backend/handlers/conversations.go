@@ -11,6 +11,7 @@ import (
     "secret-keeper-app/backend/models"
     "time"
 )
+var NotifyAsync = true
 
 type createConvReq struct {
 	MemberIDs []string `json:"member_ids"`
@@ -178,7 +179,11 @@ func CreateConversationHandler(db *sql.DB, hub *messaging.Hub) http.HandlerFunc 
 
 		// Notify all members so their conversation list refreshes immediately,
 		// without requiring a page reload.
-		go notifyConversationMembers(db, hub, convID)
+        if NotifyAsync {
+            go notifyConversationMembers(db, hub, convID)
+        } else {
+            notifyConversationMembers(db, hub, convID)
+        }
 	}
 }
 

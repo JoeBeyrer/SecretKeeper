@@ -251,8 +251,10 @@ func ClaimConversationRoomKey(db *sql.DB, conversationID, userID string) (string
 	return roomKey.String, nil
 }
 
+var BcryptCost = bcrypt.DefaultCost
+
 func HashConversationRoomKey(roomKey string) (string, error) {
-	hash, err := bcrypt.GenerateFromPassword([]byte(roomKey), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(roomKey), BcryptCost)
 	if err != nil {
 		return "", err
 	}

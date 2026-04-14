@@ -7,12 +7,17 @@ import (
 	"os"
 	"secret-keeper-app/backend/database"
 	"secret-keeper-app/backend/handlers"
+	"secret-keeper-app/backend/auth"
+	"golang.org/x/crypto/bcrypt"
 	"testing"
 	"time"
 )
 
 func TestMain(m *testing.M) {
 	log.SetOutput(io.Discard)
+    auth.BcryptCost = bcrypt.MinCost
+    database.BcryptCost = bcrypt.MinCost
+	handlers.NotifyAsync = false
 	handlers.SendVerificationEmail = func(to, token string) error { return nil }
 	os.Exit(m.Run())
 }
