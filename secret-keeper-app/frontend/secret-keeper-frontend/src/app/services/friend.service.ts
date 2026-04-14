@@ -12,7 +12,7 @@ export interface UserSearchResult {
   user_id: string;
   username: string;
   display_name: string;
-  /** "none" | "friend" | "pending_outgoing" | "pending_incoming" */
+  /** "none" | "friend" | "pending_outgoing" | "pending_incoming" | "blocked" */
   status: string;
 }
 

@@ -525,6 +525,23 @@
   border: 1px solid rgba(52, 201, 235, 0.3);
 }
 
+.blocked-chip {
+  background: rgba(255, 107, 107, 0.08);
+  color: var(--danger);
+  border: 1px solid rgba(255, 107, 107, 0.25);
+}
+
+.action-btn.unblock-btn {
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid rgba(52, 201, 235, 0.35);
+  font-size: 13px;
+}
+
+.action-btn.unblock-btn:hover:not(:disabled) {
+  background: rgba(52, 201, 235, 0.08);
+}
+
 /* shared field-input used in other places (kept for any future use) */
 .field-input {
   flex: 1;

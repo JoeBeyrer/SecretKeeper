@@ -244,6 +244,11 @@
                         (click)="sendRequestFromSearch(r)"
                         [disabled]="isActing(r.username)"
                       >{{ isActing(r.username) ? '…' : 'Add Friend' }}</button>
+                      <button
+                        class="action-btn block-btn"
+                        (click)="blockFromSearch(r)"
+                        [disabled]="isActing(r.username)"
+                      >Block</button>
                     } @else if (r.status === 'friend') {
                       <span class="status-chip friend-chip">Friends</span>
                     } @else if (r.status === 'pending_outgoing') {
@@ -252,8 +257,24 @@
                         (click)="rescindFromSearch(r)"
                         [disabled]="isActing(r.username)"
                       >{{ isActing(r.username) ? '…' : 'Cancel' }}</button>
+                      <button
+                        class="action-btn block-btn"
+                        (click)="blockFromSearch(r)"
+                        [disabled]="isActing(r.username)"
+                      >Block</button>
                     } @else if (r.status === 'pending_incoming') {
                       <button class="action-btn accept" (click)="setTab('requests')">Respond</button>
+                      <button
+                        class="action-btn block-btn"
+                        (click)="blockFromSearch(r)"
+                        [disabled]="isActing(r.username)"
+                      >Block</button>
+                    } @else if (r.status === 'blocked') {
+                      <button
+                        class="action-btn unblock-btn"
+                        (click)="unblockFromSearch(r)"
+                        [disabled]="isActing(r.username)"
+                      >{{ isActing(r.username) ? '…' : 'Unblock' }}</button>
                     }
                   </div>
                 </div>

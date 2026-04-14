@@ -7,6 +7,8 @@ import { AuthService } from '../../services/auth.service';
 
 type Tab = 'friends' | 'requests' | 'add' | 'search';
 
+const BLOCKED_STORAGE_KEY = 'sk_blocked_ids';
+
 @Component({
   selector: 'app-friends',
   imports: [FormsModule],
@@ -35,6 +37,8 @@ export class Friends implements OnInit {
   searchError: string = '';
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
 
+  private blockedIds: Set<string> = new Set();
+
   constructor(
     private friendService: FriendService,
     private authService: AuthService,
@@ -48,8 +52,26 @@ export class Friends implements OnInit {
       this.router.navigate(['/login']);
       return;
     }
+    this.loadBlockedIds();
     await this.loadAll(true);
   }
+
+  // ── localStorage helpers ───────────────────────────────────────────────────
+
+  private loadBlockedIds(): void {
+    try {
+      const raw = localStorage.getItem(BLOCKED_STORAGE_KEY);
+      this.blockedIds = new Set(raw ? JSON.parse(raw) : []);
+    } catch {
+      this.blockedIds = new Set();
+    }
+  }
+
+  private saveBlockedIds(): void {
+    localStorage.setItem(BLOCKED_STORAGE_KEY, JSON.stringify([...this.blockedIds]));
+  }
+
+  // ── Data loading ───────────────────────────────────────────────────────────
 
   async loadAll(initial = false): Promise<void> {
     if (initial) {
@@ -85,6 +107,8 @@ export class Friends implements OnInit {
     this.loadAll();
   }
 
+  // ── Derived lists ──────────────────────────────────────────────────────────
+
   get incomingRequests(): FriendEntry[] {
     return this.pendingRequests.filter(r => r.direction === 'incoming');
   }
@@ -100,6 +124,8 @@ export class Friends implements OnInit {
   displayName(f: FriendEntry): string {
     return f.display_name || f.username;
   }
+
+  // ── Friend actions ─────────────────────────────────────────────────────────
 
   async sendRequest(): Promise<void> {
     const username = this.addUsername.trim();
@@ -185,6 +211,8 @@ export class Friends implements OnInit {
     this.clearMessages();
     try {
       await this.friendService.blockUser(f.user_id);
+      this.blockedIds.add(f.user_id);
+      this.saveBlockedIds();
       await this.loadAll();
     } catch (e: any) {
       this.errorMessage = e.message || 'Failed to block user.';
@@ -204,6 +232,8 @@ export class Friends implements OnInit {
     this.router.navigate(['/messaging'], { queryParams: { chatWith: f.username } });
   }
 
+  // ── Search ─────────────────────────────────────────────────────────────────
+
   onSearchInput(): void {
     if (this.searchTimer) clearTimeout(this.searchTimer);
     const q = this.searchQuery.trim();
@@ -219,7 +249,10 @@ export class Friends implements OnInit {
     this.isSearching = true;
     this.searchError = '';
     try {
-      this.searchResults = await this.friendService.searchUsers(query);
+      const results = await this.friendService.searchUsers(query);
+      this.searchResults = results.map(r =>
+        this.blockedIds.has(r.user_id) ? { ...r, status: 'blocked' } : r
+      );
       this.cdr.detectChanges();
     } catch (e: any) {
       this.searchError = e.message || 'Search failed.';
@@ -246,6 +279,44 @@ export class Friends implements OnInit {
     }
   }
 
+  async blockFromSearch(result: UserSearchResult): Promise<void> {
+    this.actionInProgress = { ...this.actionInProgress, [result.username]: true };
+    this.searchError = '';
+    try {
+      await this.friendService.blockUser(result.user_id);
+      this.blockedIds.add(result.user_id);
+      this.saveBlockedIds();
+      result.status = 'blocked';
+      this.cdr.detectChanges();
+    } catch (e: any) {
+      this.searchError = e.message || 'Failed to block user.';
+    } finally {
+      const u = { ...this.actionInProgress };
+      delete u[result.username];
+      this.actionInProgress = u;
+      this.cdr.detectChanges();
+    }
+  }
+
+  async unblockFromSearch(result: UserSearchResult): Promise<void> {
+    this.actionInProgress = { ...this.actionInProgress, [result.username]: true };
+    this.searchError = '';
+    try {
+      await this.friendService.unblockUser(result.user_id);
+      this.blockedIds.delete(result.user_id);
+      this.saveBlockedIds();
+      result.status = 'none';
+      this.cdr.detectChanges();
+    } catch (e: any) {
+      this.searchError = e.message || 'Failed to unblock user.';
+    } finally {
+      const u = { ...this.actionInProgress };
+      delete u[result.username];
+      this.actionInProgress = u;
+      this.cdr.detectChanges();
+    }
+  }
+
   async rescindFromSearch(result: UserSearchResult): Promise<void> {
     this.actionInProgress = { ...this.actionInProgress, [result.username]: true };
     this.searchError = '';
@@ -260,15 +331,6 @@ export class Friends implements OnInit {
       delete u[result.username];
       this.actionInProgress = u;
       this.cdr.detectChanges();
-    }
-  }
-
-  searchStatusLabel(status: string): string {
-    switch (status) {
-      case 'friend':           return 'Friends';
-      case 'pending_outgoing': return 'Pending';
-      case 'pending_incoming': return 'Respond';
-      default:                 return 'Add Friend';
     }
   }
 
