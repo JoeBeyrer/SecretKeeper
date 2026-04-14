@@ -181,14 +181,26 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     this.messageSub = this.messagingService.messages$.subscribe({ next: async (incoming) => {
       if (incoming.type === 'profile_updated') {
         this.ngZone.run(() => {
-          for (const msg of this.messages) {
-            if (!msg.isMine && msg.username === incoming.username) {
-              msg.profilePictureUrl = incoming.profile_picture_url ?? '';
+          if (incoming.username === this.currentUsername) {
+            // Update own picture on this tab (sent from account page on another tab).
+            this.currentUserPictureUrl = incoming.profile_picture_url ?? '';
+            for (const msg of this.messages) {
+              if (msg.isMine) {
+                msg.profilePictureUrl = incoming.profile_picture_url ?? '';
+              }
             }
-          }
-          const otherMsg = this.messages.find(m => !m.isMine);
-          if (otherMsg?.username === incoming.username) {
-            this.activeConversationPictureUrl = incoming.profile_picture_url ?? '';
+          } else {
+            for (const msg of this.messages) {
+              if (!msg.isMine && msg.username === incoming.username) {
+                msg.profilePictureUrl = incoming.profile_picture_url ?? '';
+              }
+            }
+            // Fix: update header picture even when there are zero messages from
+            // the other participant (previously stayed as the SVG placeholder).
+            const conv = this.conversations.find(c => c.id === this.conversationId);
+            if (conv && conv.name === incoming.username) {
+              this.activeConversationPictureUrl = incoming.profile_picture_url ?? '';
+            }
           }
         });
         return;
