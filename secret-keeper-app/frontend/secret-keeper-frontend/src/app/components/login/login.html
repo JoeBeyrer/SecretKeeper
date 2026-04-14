@@ -6,6 +6,7 @@
     <form [formGroup]="loginForm" (ngSubmit)="onSubmit()">
       <div class="field">
         <input
+          id="username"
           type="text"
           formControlName="username"
           placeholder="Username"
@@ -15,6 +16,7 @@
       </div>
       <div class="field">
         <input
+          id="password"
           type="password"
           formControlName="password"
           placeholder="Password"
@@ -30,7 +32,7 @@
         <div class="feedback error">{{ errorMessage }}</div>
       }
 
-      <button type="submit" class="auth-btn">Login</button>
+      <button type="submit" class="auth-btn login-button">Login</button>
     </form>
 
     <div class="auth-links">

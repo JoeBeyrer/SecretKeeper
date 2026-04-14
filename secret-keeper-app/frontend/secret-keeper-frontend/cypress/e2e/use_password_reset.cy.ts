@@ -10,13 +10,13 @@ describe('use_password_reset', () => {
     cy.get('.reset-button').click();
 
     cy.wait('@requestReset');
-    cy.get('.success-message').should('contain', 'reset link has been sent');
+    cy.get('.feedback.success').should('contain', 'reset link has been sent');
   });
 
   it('shows error for invalid email', () => {
     cy.visit('/reset-password');
     cy.get('input[formControlName="email"]').type('notanemail');
     cy.get('.reset-button').click();
-    cy.get('.error-message').should('contain', 'valid email');
+    cy.get('.feedback.error').should('contain', 'valid email');
   });
 });

@@ -3,7 +3,7 @@ describe('profile_logout', () => {
     cy.login('Alice', 'Alice123');
     cy.visit('/profile');
 
-    cy.get('.logout-button').click();
+    cy.get('.btn-logout').click();
     cy.url().should('include', '/login');
   });
 });

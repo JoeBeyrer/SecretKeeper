@@ -9,6 +9,6 @@ describe('Signup username validation', () => {
     cy.get('#password').type('password123');
     cy.get('#confirmPassword').type('password123');
     cy.get('.signup-button').click();
-    cy.get('.error-message').should('contain', 'Username must be at least 3 characters');
+    cy.get('.feedback.error').should('contain', 'Username must be at least 3 characters');
   });
 });

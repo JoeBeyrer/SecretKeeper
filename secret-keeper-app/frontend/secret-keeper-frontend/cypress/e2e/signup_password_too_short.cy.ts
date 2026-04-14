@@ -9,6 +9,6 @@ describe('Signup password validation', () => {
     cy.get('#password').type('pass');
     cy.get('#confirmPassword').type('pass');
     cy.get('.signup-button').click();
-    cy.get('.error-message').should('contain', 'Password must be at least 8 characters');
+    cy.get('.feedback.error').should('contain', 'Password must be at least 8 characters');
   });
 });

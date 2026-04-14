@@ -3,6 +3,6 @@ describe('messaging_nav_to_profile', () => {
     cy.login('Alice', 'Alice123');
     cy.get('.nav-icon-btn').eq(1).click();
     cy.url().should('include', '/profile');
-    cy.contains('Account Settings').should('be.visible');
+    cy.contains('Settings').should('be.visible');
   });
 });

@@ -5,8 +5,8 @@ describe('friends_view_requests', () => {
 
     cy.contains('.tab', 'Requests').click();
 
-    cy.get('.list').should('exist').then($list => {
-      if ($list.find('.friend-row').length > 0) {
+    cy.get('.panel-body').should('exist').then($body => {
+      if ($body.find('.friend-row').length > 0) {
         cy.get('.friend-row').first().should('be.visible');
       } else {
         cy.contains('No pending requests').should('be.visible');

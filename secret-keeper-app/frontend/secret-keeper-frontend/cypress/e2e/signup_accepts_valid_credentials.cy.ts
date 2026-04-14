@@ -16,6 +16,6 @@ describe('Signup success flow', () => {
     cy.get('.signup-button').click();
 
     cy.wait('@register');
-    cy.get('.success-message').should('contain', 'Account created');
+    cy.get('.feedback.success').should('contain', 'Account created');
   });
 });
