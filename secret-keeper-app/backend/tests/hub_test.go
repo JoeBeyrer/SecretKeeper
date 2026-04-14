@@ -52,7 +52,7 @@ func Test_hub_unregister(t *testing.T) {
 	}
 
 	hub.Register(client)
-	hub.Unregister("user-2")
+	hub.Unregister("user-2", client)
 
 	// After unregistering, messages sent to this user should be silently dropped
 	hub.SendToUser("user-2", []byte("should not arrive"))
@@ -65,36 +65,60 @@ func Test_hub_unregister(t *testing.T) {
 	}
 }
 
-func Test_hub_register_replaces_existing_client(t *testing.T) {
+func Test_hub_register_multiple_tabs_same_user(t *testing.T) {
 	hub := messaging.NewHub()
 
-	oldSend := make(chan []byte, 10)
-	newSend := make(chan []byte, 10)
+	tab1Send := make(chan []byte, 10)
+	tab2Send := make(chan []byte, 10)
 
-	old := &messaging.Client{UserID: "user-3", Send: oldSend}
-	new := &messaging.Client{UserID: "user-3", Send: newSend}
+	tab1 := &messaging.Client{UserID: "user-3", Send: tab1Send}
+	tab2 := &messaging.Client{UserID: "user-3", Send: tab2Send}
 
-	hub.Register(old)
-	hub.Register(new) // re-registration with same userID
+	hub.Register(tab1)
+	hub.Register(tab2) // second tab for same user
 
 	hub.SendToUser("user-3", []byte("ping"))
 
+	// Both tabs should receive the message
 	select {
-	case msg := <-newSend:
+	case msg := <-tab1Send:
 		if string(msg) != "ping" {
-			t.Fatalf("expected 'ping', got '%s'", msg)
+			t.Fatalf("tab1: expected 'ping', got '%s'", msg)
 		}
-		t.Log("re-registration correctly replaced old client")
+		t.Log("tab1 correctly received message")
 	default:
-		t.Fatal("expected message on new client, got none")
+		t.Fatal("tab1 expected message but got none")
 	}
 
-	// Old client should not have received anything
 	select {
-	case msg := <-oldSend:
-		t.Fatalf("old client unexpectedly received message: %s", msg)
+	case msg := <-tab2Send:
+		if string(msg) != "ping" {
+			t.Fatalf("tab2: expected 'ping', got '%s'", msg)
+		}
+		t.Log("tab2 correctly received message")
 	default:
-		t.Log("old client correctly received nothing after re-registration")
+		t.Fatal("tab2 expected message but got none")
+	}
+
+	// Unregister tab1 only - tab2 should still receive messages
+	hub.Unregister("user-3", tab1)
+	hub.SendToUser("user-3", []byte("ping2"))
+
+	select {
+	case msg := <-tab2Send:
+		if string(msg) != "ping2" {
+			t.Fatalf("tab2: expected 'ping2', got '%s'", msg)
+		}
+		t.Log("tab2 still receives after tab1 unregistered")
+	default:
+		t.Fatal("tab2 expected message after tab1 unregistered but got none")
+	}
+
+	select {
+	case msg := <-tab1Send:
+		t.Fatalf("tab1 unexpectedly received message after unregister: %s", msg)
+	default:
+		t.Log("tab1 correctly received nothing after unregister")
 	}
 }
 
