@@ -62,12 +62,12 @@ We plan to implement functionality to support user stories 3, 7, 8, 10 (expamnde
 - Message deletion is implemented so users can remove previously sent messages
 - Message editing is implemented so users can update previously sent messages in real time
 - Backend and frontend support for profile pictures in chats is implemented so users can visually identify conversation participants
+- Blocking users is implemented so blocked users cannot send messages through SecretKeeper, and blocking also removes the existing friendship
 - Backend unit tests exist for database and handler coverage
 - Frontend test scaffolds exist for the app, services, and several components
 
 ## Incomplete / Carried Over
 All issues that were incomplete are due to time constraints. The team decided to continue prioritizing core messaging, privacy, authentication, and account functionality first for the MVP, while carrying lower-priority or unfinished features into the next sprint.
-- Blocking users has not been completed yet
 - Group chats and all related group-chat features have not been completed yet
 - Unencrypted chat options for users who want easily accessible non-secret chats have not been implemented yet
 - Chat muting has not been implemented yet
@@ -382,7 +382,7 @@ go test ./tests/... -v
 - Test_hub_register_and_send — Registered client receives message.
 - Test_hub_send_to_unregistered_user — Sending to unknown user does not panic.
 - Test_hub_unregister — Unregistered client no longer receives messages.
-- Test_hub_register_replaces_existing_client — Re-registration replaces old client channel.
+- Test_hub_register_multiple_tabs_same_user — Re-registering the same user adds a second client; both tabs receive messages; unregistering one tab leaves the other active.
 - Test_hub_multiple_clients — Multiple clients each receive only their own messages.
 
 ---
@@ -482,6 +482,24 @@ go test ./tests/... -v
 - **Output:** `void`
 - **Description:** Updates an existing encrypted message in place
 
+### `deleteMessage(messageId: string): Promise<void>`
+- **Params:** `messageId`
+- **Input:** message ID in URL
+- **Output:** `void`
+- **Description:** Deletes a sent message. Only the sender can delete their own messages
+
+### `setMessageLifetime(conversationId: string, lifetime: number): Promise<void>`
+- **Params:** `conversationId`, `lifetime`
+- **Input:** `{ message_lifetime }` — value in minutes (0 = never)
+- **Output:** `void`
+- **Description:** Sets the message expiry lifetime for a conversation. Allowed values are 60, 1440, 10080, 43200, 525600, or 0
+
+### `toggleReaction(messageId: string, emoji: string): Promise<void>`
+- **Params:** `messageId`, `emoji`
+- **Input:** `{ emoji }`
+- **Output:** `void`
+- **Description:** Toggles an emoji reaction on a message. Adds the reaction if not present, removes it if already set
+
 ### `CreateConversationResponse`
 - `conversation_id: string`
 - `created: boolean`
@@ -491,6 +509,7 @@ go test ./tests/... -v
 - `name: string`
 - `last_message: string`
 - `last_message_time: number`
+- `message_lifetime: number`
 
 
 ## CryptoService
@@ -564,6 +583,12 @@ go test ./tests/... -v
 - **Input:** `{ username }`
 - **Output:** `void`
 - **Description:** Declines a friend request
+
+### `rescindRequest(username: string): Promise<void>`
+- **Params:** `username`
+- **Input:** `{ username }`
+- **Output:** `void`
+- **Description:** Cancels an outgoing friend request that has not yet been accepted
 
 ### `removeFriend(username: string): Promise<void>`
 - **Params:** `username`
@@ -673,3 +698,205 @@ go test ./tests/... -v
 - `mime_type: string`
 - `size: number`
 - `data_b64: string`
+
+
+---
+
+# Backend API Routes
+
+All protected routes require a valid `sk_session` cookie set at login.
+
+## Auth Routes
+
+### `POST /api/register`
+Registers a new user. Creates the account in an unverified state and sends a verification email.
+- **Body:** `{ username, email, password }`
+- **Response:** `200 OK`
+
+### `POST /api/login`
+Logs in with username and password. Requires a verified email address.
+- **Body:** `{ username, password }`
+- **Response:** `200 OK` with `sk_session` cookie
+
+### `POST /api/logout`
+Clears the session cookie.
+- **Response:** `200 OK`
+
+### `GET /api/verify-email?token=`
+Marks an account as verified using the token from the verification email. Redirects to `/login?verified=true`.
+
+### `GET /api/verify-email-change?token=`
+Confirms an email address change using the token from the change-verification email. Redirects to `/profile?email_updated=true`.
+
+### `POST /api/password-reset/request`
+Sends a password reset email if the address exists and is verified.
+- **Body:** `{ email }`
+- **Response:** `200 OK`
+
+### `GET /api/password-reset/validate?token=`
+Validates a password reset token without consuming it.
+- **Response:** `200 OK` or `401 Unauthorized`
+
+### `POST /api/password-reset/confirm`
+Resets the password using a valid reset token.
+- **Body:** `{ token, new_password }`
+- **Response:** `200 OK`
+
+## Profile Routes
+
+### `GET /api/profile`
+Returns the logged-in user's profile.
+- **Response:** `{ username, email, display_name, bio, profile_picture_url }`
+
+### `PUT /api/profile/update`
+Updates display name and/or bio. Optionally clears the profile picture.
+- **Body:** `{ display_name, bio, clear_picture? }`
+- **Response:** `200 OK`
+
+### `POST /api/profile/picture`
+Uploads a profile picture. Accepts JPEG, PNG, GIF, or WebP up to 2 MB. Stores as a base64 data URL and broadcasts a `profile_updated` WebSocket event to all conversation members.
+- **Body:** `multipart/form-data` with `picture` field
+- **Response:** `{ message, profile_picture_url }`
+
+### `GET /api/profile/by-username/{username}`
+Returns the profile picture URL for a given username. Used to resolve pictures in the conversation view.
+- **Response:** `{ profile_picture_url }`
+
+### `PUT /api/account`
+Updates the logged-in user's username, email, and/or password.
+- **Body:** `{ new_username?, new_email?, new_password? }`
+- **Response:** `200 OK`
+
+## Conversation Routes
+
+### `POST /api/conversations/create`
+Creates a new conversation or returns an existing one between the same members. Notifies all members via WebSocket on creation.
+- **Body:** `{ member_ids, room_key }`
+- **Response:** `{ conversation_id, created }` — `201 Created` for new, `200 OK` for existing
+
+### `GET /api/conversations/get`
+Returns all conversations the logged-in user is a member of, with name, last message preview, timestamp, and message lifetime.
+- **Response:** array of conversation summaries
+
+### `GET /api/conversations/{id}/messages`
+Returns the message history for a conversation. Requires membership.
+- **Response:** array of messages with `ID`, `Ciphertext`, `Username`, `DisplayName`, `ProfilePictureURL`, `CreatedAt`, `ExpiresAt`, `Reactions`
+
+### `POST /api/conversations/{id}/verify-room-key`
+Verifies a room key against the stored hash without consuming it.
+- **Body:** `{ room_key }`
+- **Response:** `204 No Content` or `401 Unauthorized`
+
+### `POST /api/conversations/{id}/claim-room-key`
+Claims the one-time pending room key stored for the recipient. Can only be claimed once.
+- **Response:** `{ room_key }` or `404 Not Found`
+
+### `PATCH /api/conversations/{id}/lifetime`
+Sets the message expiry lifetime for a conversation. Applies to all existing and future messages. Notifies members via WebSocket.
+- **Body:** `{ message_lifetime }` — minutes: `60`, `1440`, `10080`, `43200`, `525600`, or `0` (never)
+- **Response:** `204 No Content`
+
+## Message Routes
+
+### `PATCH /api/messages/{id}`
+Edits a sent message. Only the original sender can edit. Broadcasts a `messages_updated` event to all conversation members.
+- **Body:** `{ ciphertext }`
+- **Response:** `204 No Content`
+
+### `DELETE /api/messages/{id}`
+Deletes a sent message. Only the original sender can delete. Broadcasts a `messages_updated` event to all conversation members.
+- **Response:** `204 No Content`
+
+### `POST /api/messages/{id}/react`
+Toggles an emoji reaction on a message. Adds the reaction if not present, removes it if already set. Broadcasts a `messages_updated` event.
+- **Body:** `{ emoji }`
+- **Response:** `200 OK`
+
+## Friends Routes
+
+### `GET /api/friends`
+Returns the logged-in user's accepted friends and pending requests.
+
+### `GET /api/friends/requests`
+Returns all pending incoming and outgoing friend requests.
+
+### `POST /api/friends/request`
+Sends a friend request to another user.
+- **Body:** `{ username }`
+- **Response:** `200 OK`
+
+### `POST /api/friends/accept`
+Accepts an incoming friend request.
+- **Body:** `{ username }`
+- **Response:** `200 OK`
+
+### `POST /api/friends/decline`
+Declines an incoming friend request.
+- **Body:** `{ username }`
+- **Response:** `200 OK`
+
+### `DELETE /api/friends/rescind`
+Cancels an outgoing friend request that has not yet been accepted.
+- **Body:** `{ username }`
+- **Response:** `200 OK`
+
+### `DELETE /api/friends/remove`
+Removes an existing friend.
+- **Body:** `{ username }`
+- **Response:** `200 OK`
+
+## Block Routes
+
+### `POST /api/blocks/block/{blockee_id}`
+Blocks a user by their user ID. Blocked users cannot send messages through SecretKeeper. Also removes any existing friendship between the two users.
+- **Body:** `{ blockee_id }`
+- **Response:** `201 Created`
+
+### `DELETE /api/blocks/unblock/{blockee_id}`
+Unblocks a previously blocked user.
+- **Response:** `204 No Content`
+
+## User Routes
+
+### `GET /api/users/search?q=`
+Searches for users by username prefix. Excludes the calling user from results.
+- **Query:** `q` — search string
+- **Response:** array of `{ user_id, username, display_name }`
+
+## Key Routes
+
+### `POST /api/keys/save`
+Saves the user's public key and encrypted private key.
+- **Body:** `{ public_key, encrypted_private_key }`
+- **Response:** `204 No Content`
+
+### `GET /api/keys/get`
+Returns the logged-in user's stored key pair.
+- **Response:** `{ public_key, encrypted_private_key }`
+
+### `GET /api/users/{username}/public-key`
+Returns another user's public key.
+- **Response:** `{ public_key, user_id }`
+
+### `POST /api/conversations/{id}/keys`
+Saves encrypted conversation keys for all conversation members.
+- **Body:** `{ keys: [{ user_id, encrypted_key }] }`
+- **Response:** `204 No Content`
+
+### `GET /api/conversations/{id}/key`
+Returns the logged-in user's encrypted conversation key for a given conversation.
+- **Response:** `{ encrypted_key }`
+
+## WebSocket
+
+### `GET /ws`
+Upgrades the connection to a WebSocket. Requires a valid session cookie.
+
+**Outgoing (client → server):**
+- `{ type: "send_message", conversation_id, ciphertext, client_message_id? }`
+
+**Incoming (server → client):**
+- `{ type: "new_message", conversation_id, ciphertext, sender_id, display_name, profile_picture_url, message_id, expires_at? }`
+- `{ type: "message_ack", conversation_id, message_id, client_message_id }`
+- `{ type: "messages_updated", conversation_id }` — triggers client to reload message history
+- `{ type: "profile_updated", username, display_name, profile_picture_url }` — triggers client to patch profile pictures in place
