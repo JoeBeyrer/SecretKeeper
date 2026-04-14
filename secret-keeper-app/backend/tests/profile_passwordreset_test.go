@@ -8,6 +8,7 @@ import (
 	"net/textproto"
 	"secret-keeper-app/backend/database"
 	"secret-keeper-app/backend/handlers"
+    "secret-keeper-app/backend/messaging"
 	"strings"
 	"testing"
 	"time"
@@ -286,6 +287,7 @@ func Test_get_profile_handler(t *testing.T) {
 
 func Test_update_profile_handler(t *testing.T) {
 	db := database.InitDB(":memory:")
+	hub := messaging.NewHub()
 	defer db.Close()
 
 	db.Exec(`INSERT INTO users (id, username, email, password_hash, created_at, email_verified)
@@ -295,7 +297,7 @@ func Test_update_profile_handler(t *testing.T) {
 	req := httptest.NewRequest("PUT", "/api/profile/update", strings.NewReader(`{"display_name":"Test","bio":"Hello"}`))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
-	handlers.UpdateProfileHandler(db)(w, req)
+	handlers.UpdateProfileHandler(db, hub)(w, req)
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("expected 401 without user in context, got %d", w.Code)
 	} else {
@@ -305,7 +307,7 @@ func Test_update_profile_handler(t *testing.T) {
 	// Valid update
 	req = requestWithUserID("PUT", "/api/profile/update", `{"display_name":"Test User","bio":"My bio"}`, "u1")
 	w = httptest.NewRecorder()
-	handlers.UpdateProfileHandler(db)(w, req)
+	handlers.UpdateProfileHandler(db, hub)(w, req)
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200 for valid update, got %d", w.Code)
 	} else {
@@ -327,7 +329,7 @@ func Test_update_profile_handler(t *testing.T) {
 	// Clear picture flag
 	req = requestWithUserID("PUT", "/api/profile/update", `{"display_name":"Test User","bio":"My bio","clear_picture":true}`, "u1")
 	w = httptest.NewRecorder()
-	handlers.UpdateProfileHandler(db)(w, req)
+	handlers.UpdateProfileHandler(db, hub)(w, req)
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200 for clear picture, got %d", w.Code)
 	} else {
@@ -557,6 +559,7 @@ func Test_logout_handler(t *testing.T) {
 
 func Test_upload_profile_picture_handler(t *testing.T) {
 	db := database.InitDB(":memory:")
+	hub := messaging.NewHub()
 	defer db.Close()
 
 	db.Exec(`INSERT INTO users (id, username, email, password_hash, created_at, email_verified)
@@ -565,7 +568,7 @@ func Test_upload_profile_picture_handler(t *testing.T) {
 	// No user in context
 	req := httptest.NewRequest("POST", "/api/profile/picture", nil)
 	w := httptest.NewRecorder()
-	handlers.UploadProfilePictureHandler(db)(w, req)
+	handlers.UploadProfilePictureHandler(db, hub)(w, req)
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("expected 401 without user in context, got %d", w.Code)
 	} else {
@@ -586,7 +589,7 @@ func Test_upload_profile_picture_handler(t *testing.T) {
 	req2.Header.Set("Content-Type", writer.FormDataContentType())
 	req2 = handlers.SetTestUserID(req2, "u1")
 	w = httptest.NewRecorder()
-	handlers.UploadProfilePictureHandler(db)(w, req2)
+	handlers.UploadProfilePictureHandler(db, hub)(w, req2)
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200 for valid jpeg upload, got %d: %s", w.Code, w.Body.String())
 	} else {

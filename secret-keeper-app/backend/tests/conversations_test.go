@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"secret-keeper-app/backend/database"
 	"secret-keeper-app/backend/handlers"
+	"secret-keeper-app/backend/messaging"
 	"strings"
 	"testing"
 )
