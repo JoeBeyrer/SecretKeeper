@@ -28,7 +28,7 @@
 22. As a user, I want to access the app through the web, so that I can conveniently interface from any device
 
 ## Planned Issues
-We plan to implement functionality to support user stories 3, 7, 8, 10 (expamnded), 11, 12, 15, 16, and 20.
+We plan to implement functionality to support user stories 3, 7, 8, 10 (expanded), 11, 12, 15, 16, and 20.
 ### Blocking and Safety Controls
 - Implement support for blocking users so that blocked users cannot contact or interact with one another through SecretKeeper
 - Ensure blocked-user relationships are enforced consistently across friend, messaging, and conversation flows
