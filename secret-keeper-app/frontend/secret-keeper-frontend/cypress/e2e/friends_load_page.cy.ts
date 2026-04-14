@@ -4,8 +4,9 @@ describe('friends_load_page', () => {
     cy.visit('/friends');
 
     cy.contains('Friends').should('be.visible');
-    cy.get('.tab').should('have.length', 3);
+    cy.get('.tab').should('have.length', 4);
     cy.contains('Requests').should('be.visible');
     cy.contains('Add Friend').should('be.visible');
+    cy.contains('Search Users').should('be.visible');
   });
 });

@@ -6,6 +6,7 @@
     <form [formGroup]="signupForm" (ngSubmit)="onSubmit()">
       <div class="field">
         <input
+          id="username"
           type="text"
           formControlName="username"
           placeholder="Username"
@@ -15,6 +16,7 @@
       </div>
       <div class="field">
         <input
+          id="email"
           type="text"
           formControlName="email"
           placeholder="Email"
@@ -24,6 +26,7 @@
       </div>
       <div class="field">
         <input
+          id="password"
           type="password"
           formControlName="password"
           placeholder="Password"
@@ -33,6 +36,7 @@
       </div>
       <div class="field">
         <input
+          id="confirmPassword"
           type="password"
           formControlName="confirmPassword"
           placeholder="Confirm Password"
@@ -48,7 +52,7 @@
         <div class="feedback success">{{ successMessage }}</div>
       }
 
-      <button type="submit" class="auth-btn">Sign Up</button>
+      <button type="submit" class="auth-btn signup-button">Sign Up</button>
     </form>
 
     <div class="auth-links">

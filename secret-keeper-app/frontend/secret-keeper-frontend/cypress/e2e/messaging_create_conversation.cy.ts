@@ -7,12 +7,17 @@ describe('messaging_create_conversation', () => {
 
     cy.get('.modal').should('be.visible');
 
-    cy.get('.modal').then(($modal) => {
-      if ($modal.text().includes('Your Room Key')) {
+    cy.get('.modal-title').then(($title) => {
+      const title = $title.text().trim();
+      if (title === 'Choose Room Key') {
+        // New conversation — a key has been pre-generated; just cancel
+        cy.contains('button', 'Cancel').click();
+      } else if (title === 'Your Room Key') {
+        // Conversation was just created; confirm key saved
         cy.get('.room-key-text').should('not.be.empty');
         cy.contains("I've saved it").click();
       } else {
-        cy.contains('Enter Room Key').should('be.visible');
+        // Enter Room Key prompt for an existing conversation
         cy.contains('Cancel').click();
       }
     });

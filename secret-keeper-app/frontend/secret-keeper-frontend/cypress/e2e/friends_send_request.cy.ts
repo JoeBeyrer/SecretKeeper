@@ -6,7 +6,7 @@ describe('friends_send_request', () => {
     cy.contains('.tab', 'Add Friend').click();
 
     cy.get('.add-section .form-control').type('Bob');
-    cy.get('.send-button').click();
+    cy.get('.send-btn').click();
 
     cy.get('.feedback').should('be.visible');
   });
