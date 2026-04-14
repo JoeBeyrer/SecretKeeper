@@ -13,33 +13,46 @@ type Client struct {
 }
 
 type Hub struct {
-	clients map[string]*Client // userID -> client
+	clients map[string][]*Client // userID -> slice of clients (one per open tab)
 	mu      sync.RWMutex
 }
 
 func NewHub() *Hub {
 	return &Hub{
-		clients: make(map[string]*Client),
+		clients: make(map[string][]*Client),
 	}
 }
 
 func (h *Hub) Register(client *Client) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	h.clients[client.UserID] = client
+	h.clients[client.UserID] = append(h.clients[client.UserID], client)
 }
 
-func (h *Hub) Unregister(userID string) {
+// Unregister removes a specific client connection for a user.
+// Called with the exact *Client pointer so that only that tab's connection is removed.
+func (h *Hub) Unregister(userID string, client *Client) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	delete(h.clients, userID)
+	existing := h.clients[userID]
+	updated := existing[:0]
+	for _, c := range existing {
+		if c != client {
+			updated = append(updated, c)
+		}
+	}
+	if len(updated) == 0 {
+		delete(h.clients, userID)
+	} else {
+		h.clients[userID] = updated
+	}
 }
 
 func (h *Hub) SendToUser(userID string, message []byte) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 
-	if client, ok := h.clients[userID]; ok {
+	for _, client := range h.clients[userID] {
 		client.Send <- message
 	}
 }
