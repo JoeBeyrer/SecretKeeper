@@ -107,6 +107,11 @@
                 (click)="remove(f)"
                 [disabled]="isActing(f.username)"
               >{{ isActing(f.username) ? '...' : 'Remove' }}</button>
+              <button
+                class="action-btn block-btn"
+                (click)="block(f)"
+                [disabled]="isActing(f.username)"
+              >{{ isActing(f.username) ? '...' : 'Block' }}</button>
             </div>
           </div>
         }

@@ -334,6 +334,20 @@
   background: rgba(255, 107, 107, 0.08);
 }
 
+.action-btn.block-btn {
+  background: transparent;
+  color: var(--text-3);
+  border: 1px solid var(--border);
+  font-size: 12px;
+  padding: 7px 12px;
+}
+
+.action-btn.block-btn:hover:not(:disabled) {
+  background: rgba(255, 107, 107, 0.08);
+  color: var(--danger);
+  border-color: rgba(255, 107, 107, 0.35);
+}
+
 /* ── Status chips ─────────────────────────────────────────────────────────── */
 .status-chip {
   font-size: 12px;

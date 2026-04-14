@@ -94,16 +94,18 @@ export class FriendService {
     if (!res.ok) throw new Error(await res.text());
   }
 
-  async blockUser(blockeeid: string): Promise<void> {
-    const res = await fetch(`/api/blocks/block/${blockeeid}`, {
+  async blockUser(blockeeId: string): Promise<void> {
+    const res = await fetch(`${this.base}/blocks/block/${blockeeId}`, {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
+      body: JSON.stringify({ blockee_id: blockeeId }),
     });
     if (!res.ok) throw new Error(await res.text());
   }
 
-  async unBlockUser(blockeeid: string): Promise<void> {
-    const res = await fetch(`/api/blocks/unblock/${blockeeid}`, {
+  async unblockUser(blockeeId: string): Promise<void> {
+    const res = await fetch(`${this.base}/blocks/unblock/${blockeeId}`, {
       method: 'DELETE',
       credentials: 'include',
     });

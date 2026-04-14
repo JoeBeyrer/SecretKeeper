@@ -180,6 +180,22 @@ export class Friends implements OnInit {
     }
   }
 
+  async block(f: FriendEntry): Promise<void> {
+    this.actionInProgress = { ...this.actionInProgress, [f.username]: true };
+    this.clearMessages();
+    try {
+      await this.friendService.blockUser(f.user_id);
+      await this.loadAll();
+    } catch (e: any) {
+      this.errorMessage = e.message || 'Failed to block user.';
+    } finally {
+      const u = { ...this.actionInProgress };
+      delete u[f.username];
+      this.actionInProgress = u;
+      this.cdr.detectChanges();
+    }
+  }
+
   isActing(username: string): boolean {
     return !!this.actionInProgress[username];
   }
