@@ -99,6 +99,7 @@ func InitDB(path string) *sql.DB {
             id TEXT PRIMARY KEY,
             created_at INTEGER,
             room_key_hash TEXT,
+            group_name TEXT,
             message_lifetime INTEGER DEFAULT 0
         )
     `)
@@ -193,6 +194,12 @@ func InitDB(path string) *sql.DB {
             UNIQUE(blocker_id, blockee_id)
         )
     `)
+
+    // execOrFatal(db, `
+    //     UPDATE users
+    //     SET email_verified = 1;
+    // `)
+
 
 	log.Println("Database initialized")
 	return db
