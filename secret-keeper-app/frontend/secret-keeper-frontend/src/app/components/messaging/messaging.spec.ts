@@ -9,6 +9,7 @@ import { MessagingService, IncomingMessage } from '../../services/messaging.serv
 import { ConversationService } from '../../services/conversation.service';
 import { AuthService } from '../../services/auth.service';
 import { CryptoService } from '../../services/crypto.service';
+import { FriendService } from '../../services/friend.service';
 
 describe('Messaging', () => {
   let component: Messaging;
@@ -18,6 +19,7 @@ describe('Messaging', () => {
   let conversationServiceSpy: any;
   let authServiceSpy: any;
   let cryptoServiceSpy: any;
+  let friendServiceSpy: any;
   let routerSpy: { navigate: ReturnType<typeof vi.fn> };
   let messageSubject: Subject<IncomingMessage>;
   let queryParamMap$: BehaviorSubject<any>;
@@ -31,7 +33,12 @@ describe('Messaging', () => {
   };
 
   const mockConversations = [
-    { id: 'conv-1', name: 'Bob', last_message: 'encrypted', last_message_time: 1700000000, message_lifetime: 1440 },
+    { id: 'conv-1', name: 'bob', last_message: 'encrypted', last_message_time: 1700000000, message_lifetime: 1440 },
+  ];
+
+  const mockFriends = [
+    { user_id: 'friend-1', username: 'bob', display_name: 'Bob', accepted: true },
+    { user_id: 'friend-2', username: 'carol', display_name: 'Carol', accepted: true },
   ];
 
   beforeEach(async () => {
@@ -92,6 +99,10 @@ describe('Messaging', () => {
       }),
     };
 
+    friendServiceSpy = {
+      getFriends: vi.fn().mockResolvedValue(mockFriends),
+    };
+
     routerSpy = { navigate: vi.fn() };
 
     await TestBed.configureTestingModule({
@@ -101,6 +112,7 @@ describe('Messaging', () => {
         { provide: ConversationService, useValue: conversationServiceSpy },
         { provide: AuthService, useValue: authServiceSpy },
         { provide: CryptoService, useValue: cryptoServiceSpy },
+        { provide: FriendService, useValue: friendServiceSpy },
         { provide: Router, useValue: routerSpy },
         {
           provide: ActivatedRoute,
@@ -135,7 +147,7 @@ describe('Messaging', () => {
 
   it('should load and map conversations on init', () => {
     expect(component.conversations.length).toBe(1);
-    expect(component.conversations[0].name).toBe('Bob');
+    expect(component.conversations[0].name).toBe('bob');
     expect(component.conversations[0].id).toBe('conv-1');
     expect(component.conversations[0].messageLifetime).toBe(1440);
   });
@@ -148,30 +160,39 @@ describe('Messaging', () => {
     queryParamMap$.next(convertToParamMap({ chatWith: 'bob' }));
     await fixture.whenStable();
 
-    expect(component.modal).toEqual({ type: 'create-room-key', username: 'bob' });
+    expect(component.modal).toEqual({ type: 'create-room-key', memberUsernames: ['bob'] });
     expect(component.roomKeyInput).toBe('generated-room-key');
     expect(routerSpy.navigate).toHaveBeenCalled();
   });
 
-  it('startNewConversation() should set errorMessage when username is empty', async () => {
-    component.newConversationMemberId = '   ';
+  it('startNewConversation() should load friends and open the member picker', async () => {
     await component.startNewConversation();
-    expect(component.errorMessage).toBeTruthy();
+
+    expect(friendServiceSpy.getFriends).toHaveBeenCalled();
+    expect(component.modal).toEqual({ type: 'select-conversation-members' });
+    expect(component.availableFriends.length).toBe(2);
+  });
+
+  it('continueCreateConversation() should require at least one selected friend', () => {
+    component.modal = { type: 'select-conversation-members' };
+
+    component.continueCreateConversation();
+
+    expect(component.createConversationError).toContain('Please select at least one friend');
     expect(conversationServiceSpy.createConversation).not.toHaveBeenCalled();
   });
 
-  it('startNewConversation() should open a room-key modal with a generated key', async () => {
-    component.newConversationMemberId = 'bob';
+  it('continueCreateConversation() should open a room-key modal with the selected friends', () => {
+    component.selectedConversationMembers = ['bob', 'carol'];
 
-    await component.startNewConversation();
+    component.continueCreateConversation();
 
-    expect(component.modal).toEqual({ type: 'create-room-key', username: 'bob' });
+    expect(component.modal).toEqual({ type: 'create-room-key', memberUsernames: ['bob', 'carol'] });
     expect(component.roomKeyInput).toBe('generated-room-key');
-    expect(conversationServiceSpy.createConversation).not.toHaveBeenCalled();
   });
 
   it('submitCreateConversation() should set roomKeyError when the key is too short', async () => {
-    component.modal = { type: 'create-room-key', username: 'bob' };
+    component.modal = { type: 'create-room-key', memberUsernames: ['bob'] };
     component.roomKeyInput = 'short';
 
     await component.submitCreateConversation();
