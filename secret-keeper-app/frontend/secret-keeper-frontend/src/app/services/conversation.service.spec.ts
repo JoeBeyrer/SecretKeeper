@@ -20,16 +20,16 @@ describe('ConversationService', () => {
   });
 
   describe('createConversation()', () => {
-    it('should POST /conversations/create with member_ids and room_key', async () => {
+    it('should POST /conversations/create with member_ids, room_key, and optional group_name', async () => {
       const mockResponse = { conversation_id: 'conv-abc', created: true };
       fetchSpy = vi.spyOn(window, 'fetch').mockResolvedValue(
         new Response(JSON.stringify(mockResponse), { status: 200 })
       );
-      const result = await service.createConversation(['bob'], 'secret-key');
+      const result = await service.createConversation(['bob'], 'secret-key', 'Study Group');
       const [url, opts] = fetchSpy.mock.calls[0] as [string, RequestInit];
       expect(url).toContain('/conversations/create');
       expect(opts.method).toBe('POST');
-      expect(JSON.parse(opts.body as string)).toEqual({ member_ids: ['bob'], room_key: 'secret-key' });
+      expect(JSON.parse(opts.body as string)).toEqual({ member_ids: ['bob'], room_key: 'secret-key', group_name: 'Study Group' });
       expect(result).toEqual(mockResponse);
     });
 

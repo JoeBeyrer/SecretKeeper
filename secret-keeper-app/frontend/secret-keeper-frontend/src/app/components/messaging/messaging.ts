@@ -7,6 +7,7 @@ import { MessagingService } from '../../services/messaging.service';
 import { ConversationService } from '../../services/conversation.service';
 import { AuthService } from '../../services/auth.service';
 import { CryptoService } from '../../services/crypto.service';
+import { FriendService, FriendEntry } from '../../services/friend.service';
 
 interface ReactionUser {
   username: string;
@@ -73,7 +74,8 @@ interface RichMessagePayload {
 
 type ModalState =
   | { type: 'none' }
-  | { type: 'create-room-key'; username: string }
+  | { type: 'select-conversation-members' }
+  | { type: 'create-room-key'; memberUsernames: string[] }
   | { type: 'show-room-key'; convId: string; key: string }
   | { type: 'enter-room-key'; convId: string }
   | { type: 'conversation-settings'; convId: string };
@@ -104,8 +106,13 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
   isSendingMessage: boolean = false;
 
   conversationId: string = '';
-  newConversationMemberId: string = '';
   isConnected: boolean = false;
+
+  availableFriends: FriendEntry[] = [];
+  selectedConversationMembers: string[] = [];
+  isLoadingFriends: boolean = false;
+  createConversationError: string = '';
+  groupConversationNameInput: string = '';
 
   currentUsername: string = '';
   currentDisplayName: string = '';
@@ -148,6 +155,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     private conversationService: ConversationService,
     private authService: AuthService,
     private cryptoService: CryptoService,
+    private friendService: FriendService,
   ) {}
 
   async ngOnInit(): Promise<void> {
@@ -164,7 +172,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
       const chatWith = params.get('chatWith')?.trim();
       if (!chatWith) return;
 
-      this.openCreateConversationModalImmediately(chatWith);
+      this.openCreateConversationModalImmediately([chatWith]);
 
       void this.router.navigate([], {
         relativeTo: this.route,
@@ -352,7 +360,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
       return;
     }
 
-    await this.startNewConversationWith(this.modal.username, passphrase);
+    await this.startNewConversationWith(this.modal.memberUsernames, passphrase, this.groupConversationNameInput);
   }
 
   async submitRoomKey(): Promise<void> {
@@ -389,6 +397,9 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     this.roomKeyInput = '';
     this.roomKeyError = '';
     this.settingsError = '';
+    this.createConversationError = '';
+    this.selectedConversationMembers = [];
+    this.groupConversationNameInput = '';
   }
 
   copyRoomKey(): void {
@@ -431,13 +442,35 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
   }
 
   async startNewConversation(): Promise<void> {
-    const username = this.newConversationMemberId.trim();
-    if (!username) {
-      this.errorMessage = 'Please enter a username to start a conversation with.';
+    await this.openCreateConversationMemberModal();
+  }
+
+  toggleConversationMember(username: string): void {
+    const normalizedUsername = username.trim();
+    if (!normalizedUsername) {
       return;
     }
 
-    this.openCreateConversationModal(username);
+    this.createConversationError = '';
+
+    if (this.selectedConversationMembers.includes(normalizedUsername)) {
+      this.selectedConversationMembers = this.selectedConversationMembers.filter(member => member !== normalizedUsername);
+      if (this.selectedConversationMembers.length <= 1) {
+        this.groupConversationNameInput = '';
+      }
+      return;
+    }
+
+    this.selectedConversationMembers = [...this.selectedConversationMembers, normalizedUsername];
+  }
+
+  continueCreateConversation(): void {
+    if (this.selectedConversationMembers.length === 0) {
+      this.createConversationError = 'Please select at least one friend.';
+      return;
+    }
+
+    this.openCreateConversationModal(this.selectedConversationMembers);
   }
 
   triggerAttachmentPicker(): void {
@@ -791,19 +824,51 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     this.releaseMessageResources(this.messages);
   }
 
-  private openCreateConversationModal(username: string): void {
-    this.modal = { type: 'create-room-key', username };
+  private openCreateConversationModal(memberUsernames: string[]): void {
+    this.modal = { type: 'create-room-key', memberUsernames: [...memberUsernames] };
     this.roomKeyInput = this.cryptoService.generateRoomKey();
     this.roomKeyError = '';
     this.roomKeyCopied = false;
+    this.createConversationError = '';
     this.errorMessage = '';
   }
 
-  private openCreateConversationModalImmediately(username: string): void {
+  private openCreateConversationModalImmediately(memberUsernames: string[]): void {
     this.ngZone.run(() => {
-      this.openCreateConversationModal(username);
+      this.openCreateConversationModal(memberUsernames);
       this.cdr.detectChanges();
     });
+  }
+
+  private async openCreateConversationMemberModal(preselectedUsernames: string[] = []): Promise<void> {
+    this.modal = { type: 'select-conversation-members' };
+    this.isLoadingFriends = true;
+    this.createConversationError = '';
+    this.selectedConversationMembers = [...preselectedUsernames];
+    if (this.selectedConversationMembers.length <= 1) {
+      this.groupConversationNameInput = '';
+    }
+
+    try {
+      const friends = await this.friendService.getFriends();
+      this.ngZone.run(() => {
+        this.availableFriends = friends
+          .filter(friend => friend.accepted)
+          .sort((a, b) => a.username.localeCompare(b.username));
+
+        const validFriendUsernames = new Set(this.availableFriends.map(friend => friend.username));
+        this.selectedConversationMembers = this.selectedConversationMembers.filter(username => validFriendUsernames.has(username));
+      });
+    } catch (e: any) {
+      this.ngZone.run(() => {
+        this.availableFriends = [];
+        this.createConversationError = e?.message || 'Failed to load your friends.';
+      });
+    } finally {
+      this.ngZone.run(() => {
+        this.isLoadingFriends = false;
+      });
+    }
   }
 
   private async refreshConversationList(): Promise<void> {
@@ -812,7 +877,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
       this.ngZone.run(() => {
         this.conversations = convs.map(c => ({
           id: c.id,
-          name: c.name,
+          name: this.formatConversationName(c.name),
           lastMessage: c.last_message ? '🔒 Encrypted message' : '',
           lastMessageTime: c.last_message_time
             ? this.formatTimeShort(new Date(c.last_message_time * 1000))
@@ -861,9 +926,19 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     }
   }
 
-  private async startNewConversationWith(username: string, passphrase: string): Promise<void> {
+  private async startNewConversationWith(memberUsernames: string[], passphrase: string, groupName: string = ''): Promise<void> {
+    const uniqueMemberUsernames = Array.from(
+      new Set(memberUsernames.map(username => username.trim()).filter(Boolean)),
+    );
+
+    if (uniqueMemberUsernames.length === 0) {
+      this.errorMessage = 'Please select at least one friend.';
+      return;
+    }
+
     try {
-      const result = await this.conversationService.createConversation([username], passphrase);
+      const trimmedGroupName = uniqueMemberUsernames.length > 1 ? groupName.trim() : '';
+      const result = await this.conversationService.createConversation(uniqueMemberUsernames, passphrase, trimmedGroupName);
 
       this.ngZone.run(() => {
         this.conversationId = result.conversation_id;
@@ -873,9 +948,9 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
         this.newMessage = '';
         this.composerError = '';
         this.errorMessage = '';
+        this.createConversationError = '';
         this.isConnected = true;
-        this.newConversationMemberId = '';
-        this.addConversationToList(result.conversation_id, username);
+        this.addConversationToList(result.conversation_id, this.buildConversationName(uniqueMemberUsernames, trimmedGroupName));
       });
 
       if (result.created) {
@@ -1203,14 +1278,30 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
 
   private addConversationToList(id: string, name: string): void {
     if (this.conversations.find(c => c.id === id)) return;
-    this.conversations.unshift({ id, name, lastMessage: '', lastMessageTime: '', messageLifetime: 0 });
+    this.conversations.unshift({ id, name: this.formatConversationName(name), lastMessage: '', lastMessageTime: '', messageLifetime: 0 });
   }
 
   private updateConversationName(convId: string, displayName: string): void {
     const conv = this.conversations.find(c => c.id === convId);
     if (conv && conv.name === convId.substring(0, 8)) {
-      conv.name = displayName;
+      conv.name = this.formatConversationName(displayName);
     }
+  }
+
+  private buildConversationName(memberUsernames: string[], groupName: string = ''): string {
+    const normalizedGroupName = groupName.trim();
+    if (normalizedGroupName) {
+      return this.formatConversationName(normalizedGroupName);
+    }
+    return this.formatConversationName(memberUsernames.join(', '));
+  }
+
+  private formatConversationName(name: string): string {
+    const normalizedName = name.trim().replace(/\s+/g, ' ');
+    if (normalizedName.length <= 30) {
+      return normalizedName;
+    }
+    return `${normalizedName.slice(0, 27).trimEnd()}...`;
   }
 
   private updateConversationPreview(convId: string, _ciphertext: string): void {

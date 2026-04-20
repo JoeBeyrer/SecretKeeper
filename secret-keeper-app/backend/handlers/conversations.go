@@ -10,12 +10,14 @@ import (
     "secret-keeper-app/backend/messaging"
     "secret-keeper-app/backend/models"
     "time"
+    "strings"
 )
 var NotifyAsync = true
 
 type createConvReq struct {
 	MemberIDs []string `json:"member_ids"`
 	RoomKey   string   `json:"room_key"`
+	GroupName string   `json:"group_name"`
 }
 
 type createConvResp struct {
@@ -137,29 +139,23 @@ func CreateConversationHandler(db *sql.DB, hub *messaging.Hub) http.HandlerFunc 
 			return
 		}
 
+		groupName := ""
+		if len(uniqueMembers) > 2 {
+			groupName = strings.TrimSpace(req.GroupName)
+		}
+
 		// No existing conversation found - create a new one
 		convID := uuid.New().String()
 		now := time.Now().Unix()
-
-		var pendingRoomKeyRecipientID any
-		if len(uniqueMembers) == 2 {
-			for _, id := range uniqueMembers {
-				if id != userID {
-					pendingRoomKeyRecipientID = id
-					break
-				}
-			}
-		}
 
 		_, err = db.Exec(`
             INSERT INTO conversations (
                 id,
                 created_at,
                 room_key_hash,
-                pending_room_key,
-                pending_room_key_recipient_id
-            ) VALUES (?, ?, ?, ?, ?)
-        `, convID, now, roomKeyHash, req.RoomKey, pendingRoomKeyRecipientID)
+                group_name
+            ) VALUES (?, ?, ?, ?)
+        `, convID, now, roomKeyHash, groupName)
 		if err != nil {
 			http.Error(w, "could not create conversation", http.StatusInternalServerError)
 			return
@@ -169,6 +165,19 @@ func CreateConversationHandler(db *sql.DB, hub *messaging.Hub) http.HandlerFunc 
 			_, err := db.Exec(`INSERT INTO conversation_members (conversation_id, user_id, joined_at) VALUES (?, ?, ?)`, convID, id, now)
 			if err != nil {
 				http.Error(w, "could not add member", http.StatusInternalServerError)
+				return
+			}
+
+			if id == userID {
+				continue
+			}
+
+			_, err = db.Exec(`
+                INSERT INTO conversation_pending_room_keys (conversation_id, user_id, room_key)
+                VALUES (?, ?, ?)
+            `, convID, id, req.RoomKey)
+			if err != nil {
+				http.Error(w, "could not store room key", http.StatusInternalServerError)
 				return
 			}
 		}
@@ -207,12 +216,15 @@ func GetConversationsHandler(db *sql.DB) http.HandlerFunc {
             SELECT
                 c.id,
                 c.message_lifetime,
-                (
-                    SELECT GROUP_CONCAT(COALESCE(NULLIF(p.display_name, ''), u.username), ', ')
-                    FROM conversation_members cm2
-                    JOIN users u ON u.id = cm2.user_id
-                    LEFT JOIN user_profiles p ON p.user_id = u.id
-                    WHERE cm2.conversation_id = c.id AND cm2.user_id != ?
+                COALESCE(
+                    NULLIF(TRIM(c.group_name), ''),
+                    (
+                        SELECT GROUP_CONCAT(COALESCE(NULLIF(p.display_name, ''), u.username), ', ')
+                        FROM conversation_members cm2
+                        JOIN users u ON u.id = cm2.user_id
+                        LEFT JOIN user_profiles p ON p.user_id = u.id
+                        WHERE cm2.conversation_id = c.id AND cm2.user_id != ?
+                    )
                 ) AS name,
                 (
                     SELECT m.ciphertext

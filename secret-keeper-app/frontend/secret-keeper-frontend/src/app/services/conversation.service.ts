@@ -17,12 +17,12 @@ export interface ConversationSummary {
   providedIn: 'root',
 })
 export class ConversationService {
-  async createConversation(memberIds: string[], roomKey: string): Promise<CreateConversationResponse> {
+  async createConversation(memberIds: string[], roomKey: string, groupName: string = ''): Promise<CreateConversationResponse> {
     const response = await fetch('http://localhost:8080/api/conversations/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ member_ids: memberIds, room_key: roomKey }),
+      body: JSON.stringify({ member_ids: memberIds, room_key: roomKey, group_name: groupName }),
     });
 
     if (!response.ok) {

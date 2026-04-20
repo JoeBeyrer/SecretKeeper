@@ -155,6 +155,41 @@ func Test_get_conversations_handler(t *testing.T) {
 	}
 	t.Log("created conversation appears in list correctly")
 
+	// Add a third user, create a named group conversation, and verify the shared name is returned
+	body = `{"username":"carol","email":"carol@test.com","password":"password123"}`
+	req = httptest.NewRequest("POST", "/api/register", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w = httptest.NewRecorder()
+	handlers.RegisterHandler(db)(w, req)
+	db.Exec(`UPDATE users SET email_verified = 1 WHERE username = ?`, "carol")
+
+	body = `{"member_ids":["bob","carol"],"room_key":"groupkey","group_name":"Weekend Plans"}`
+	req = requestWithUserID("POST", "/api/conversations/create", body, aliceID)
+	w = httptest.NewRecorder()
+	handlers.CreateConversationHandler(db, messaging.NewHub())(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201 for named group creation, got %d: %s", w.Code, w.Body.String())
+	}
+
+	req = requestWithUserID("GET", "/api/conversations/get", "", aliceID)
+	w = httptest.NewRecorder()
+	handlers.GetConversationsHandler(db)(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 for named group get, got %d", w.Code)
+	}
+	var convSummaries []map[string]interface{}
+	json.NewDecoder(w.Body).Decode(&convSummaries)
+	var foundNamedGroup bool
+	for _, conv := range convSummaries {
+		if conv["name"] == "Weekend Plans" {
+			foundNamedGroup = true
+			break
+		}
+	}
+	if !foundNamedGroup {
+		t.Fatalf("expected named group conversation to appear in list, got %#v", convSummaries)
+	}
+
 	// Unauthorized
 	req = httptest.NewRequest("GET", "/api/conversations/get", nil)
 	w = httptest.NewRecorder()
@@ -304,6 +339,65 @@ func Test_verify_conversation_room_key_handler(t *testing.T) {
 		t.Fatalf("expected 400 for empty room key, got %d", w.Code)
 	}
 	t.Log("empty room key correctly returned 400")
+}
+
+func Test_claim_group_conversation_room_key_handler(t *testing.T) {
+	db := database.InitDB(":memory:")
+	defer db.Close()
+
+	for _, u := range []struct{ name, email string }{
+		{"alice", "alice@test.com"},
+		{"bob", "bob@test.com"},
+		{"carol", "carol@test.com"},
+	} {
+		body := `{"username":"` + u.name + `","email":"` + u.email + `","password":"password123"}`
+		req := httptest.NewRequest("POST", "/api/register", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		handlers.RegisterHandler(db)(w, req)
+		db.Exec(`UPDATE users SET email_verified = 1 WHERE username = ?`, u.name)
+	}
+
+	var aliceID, bobID, carolID string
+	db.QueryRow(`SELECT id FROM users WHERE username = 'alice'`).Scan(&aliceID)
+	db.QueryRow(`SELECT id FROM users WHERE username = 'bob'`).Scan(&bobID)
+	db.QueryRow(`SELECT id FROM users WHERE username = 'carol'`).Scan(&carolID)
+
+	body := `{"member_ids":["bob","carol"],"room_key":"shared-group-room-key"}`
+	req := requestWithUserID("POST", "/api/conversations/create", body, aliceID)
+	w := httptest.NewRecorder()
+	handlers.CreateConversationHandler(db, messaging.NewHub())(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201 creating group conversation, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var convResp map[string]interface{}
+	json.NewDecoder(w.Body).Decode(&convResp)
+	convID := convResp["conversation_id"].(string)
+
+	for _, claimantID := range []string{bobID, carolID} {
+		req = requestWithUserID("POST", "/api/conversations/"+convID+"/claim-room-key", "", claimantID)
+		req.SetPathValue("id", convID)
+		w = httptest.NewRecorder()
+		handlers.ClaimConversationRoomKeyHandler(db)(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected 200 when claiming group room key, got %d: %s", w.Code, w.Body.String())
+		}
+
+		var keyResp map[string]string
+		json.NewDecoder(w.Body).Decode(&keyResp)
+		if keyResp["room_key"] != "shared-group-room-key" {
+			t.Fatalf("expected shared-group-room-key, got %q", keyResp["room_key"])
+		}
+	}
+
+	req = requestWithUserID("POST", "/api/conversations/"+convID+"/claim-room-key", "", bobID)
+	req.SetPathValue("id", convID)
+	w = httptest.NewRecorder()
+	handlers.ClaimConversationRoomKeyHandler(db)(w, req)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 after room key was already claimed, got %d", w.Code)
+	}
 }
 
 func Test_claim_conversation_room_key_handler(t *testing.T) {

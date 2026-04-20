@@ -1,12 +1,69 @@
 <div class="macbook-pro-16-1-1">
 
   <!-- Room key modals -->
+  @if (modal.type === 'select-conversation-members') {
+    <div class="modal-backdrop">
+      <div class="modal">
+        <div class="modal-icon">👥</div>
+        <h2 class="modal-title">Create Conversation</h2>
+        <p class="modal-subtitle">Choose the friends you want to include in this conversation.</p>
+
+        <div class="friend-picker-list">
+          @if (isLoadingFriends) {
+            <p class="friend-picker-empty">Loading friends...</p>
+          } @else if (availableFriends.length === 0) {
+            <p class="friend-picker-empty">You do not have any friends to add yet.</p>
+          } @else {
+            @for (friend of availableFriends; track friend.user_id) {
+              <label class="friend-picker-item">
+                <input
+                  type="checkbox"
+                  [checked]="selectedConversationMembers.includes(friend.username)"
+                  (change)="toggleConversationMember(friend.username)"
+                />
+                <span class="friend-picker-copy">
+                  <span class="friend-picker-username">{{ friend.username }}</span>
+                  @if (friend.display_name && friend.display_name !== friend.username) {
+                    <span class="friend-picker-display-name">{{ friend.display_name }}</span>
+                  }
+                </span>
+              </label>
+            }
+          }
+        </div>
+        @if (selectedConversationMembers.length > 1) {
+          <div class="friend-picker-name">
+            <label class="friend-picker-name-label" for="group-conversation-name">Group chat name (optional)</label>
+            <input
+              id="group-conversation-name"
+              type="text"
+              class="modal-input"
+              [(ngModel)]="groupConversationNameInput"
+              placeholder="Enter a group name..."
+              maxlength="60"
+            />
+          </div>
+        }
+
+        @if (createConversationError) {
+          <p class="modal-error">{{ createConversationError }}</p>
+        }
+
+        <div class="modal-actions">
+          <button class="btn-secondary" (click)="closeModal()">Cancel</button>
+          <button class="btn-primary" (click)="continueCreateConversation()">Continue</button>
+        </div>
+      </div>
+    </div>
+  }
+
   @if (modal.type === 'create-room-key') {
     <div class="modal-backdrop">
       <div class="modal">
         <div class="modal-icon">🔐</div>
         <h2 class="modal-title">Choose Room Key</h2>
         <p class="modal-subtitle">A random key is prefilled as the strongly recommended option, but you can replace it with your own custom key. It must be longer than 6 characters.</p>
+        <p class="modal-members">Members: {{ modal.memberUsernames.join(', ') }}</p>
         <input
           type="text"
           class="modal-input"
@@ -31,7 +88,7 @@
       <div class="modal">
         <div class="modal-icon">🔐</div>
         <h2 class="modal-title">Your Room Key</h2>
-        <p class="modal-subtitle">Share this key securely with the other person. You won't see it again.</p>
+        <p class="modal-subtitle">Share this key securely with the other members. You won't see it again.</p>
         <div class="room-key-display">
           <code class="room-key-text">{{ modal.key }}</code>
         </div>
@@ -172,15 +229,8 @@
       </div>
 
       <div class="sidebar-footer">
-        <div class="sidebar-action">
-          <input
-            type="text"
-            [(ngModel)]="newConversationMemberId"
-            placeholder="Username to chat with"
-            class="rectangle-9-13"
-            (keydown.enter)="startNewConversation()"
-          />
-          <button class="rectangle-1-3" (click)="startNewConversation()">New</button>
+        <div class="sidebar-action single-action">
+          <button class="rectangle-1-3 sidebar-create-button" (click)="startNewConversation()">Create Conversation</button>
         </div>
       </div>
     </div>

@@ -400,6 +400,14 @@ img {
   gap: 8px;
 }
 
+.sidebar-action.single-action {
+  width: 100%;
+}
+
+.sidebar-create-button {
+  width: 100%;
+}
+
 .chat-header {
   display: flex;
   align-items: center;
@@ -712,6 +720,80 @@ img {
   text-align: center;
   margin: 0;
   line-height: 1.5;
+}
+
+.modal-members {
+  width: 100%;
+  color: #fff;
+  font-family: var(--font-family-roboto);
+  font-size: 13px;
+  text-align: left;
+}
+
+.friend-picker-list {
+  width: 100%;
+  max-height: 260px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-right: 4px;
+}
+
+.friend-picker-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #1a1e24;
+  color: #fff;
+  cursor: pointer;
+}
+
+.friend-picker-item input {
+  width: 16px;
+  height: 16px;
+  accent-color: #34c9eb;
+}
+
+.friend-picker-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.friend-picker-username {
+  font-family: var(--font-family-roboto);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.friend-picker-display-name,
+.friend-picker-empty {
+  font-family: var(--font-family-roboto);
+  font-size: 13px;
+  color: #999;
+}
+
+.friend-picker-name {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.friend-picker-name-label {
+  font-family: var(--font-family-roboto);
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.friend-picker-empty {
+  text-align: center;
+  padding: 20px 0;
 }
 
 .room-key-display {
