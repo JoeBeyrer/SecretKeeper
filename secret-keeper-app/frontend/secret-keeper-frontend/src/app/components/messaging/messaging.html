@@ -31,6 +31,19 @@
             }
           }
         </div>
+        @if (selectedConversationMembers.length > 1) {
+          <div class="friend-picker-name">
+            <label class="friend-picker-name-label" for="group-conversation-name">Group chat name (optional)</label>
+            <input
+              id="group-conversation-name"
+              type="text"
+              class="modal-input"
+              [(ngModel)]="groupConversationNameInput"
+              placeholder="Enter a group name..."
+              maxlength="60"
+            />
+          </div>
+        }
 
         @if (createConversationError) {
           <p class="modal-error">{{ createConversationError }}</p>

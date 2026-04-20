@@ -777,6 +777,20 @@ img {
   color: #999;
 }
 
+.friend-picker-name {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.friend-picker-name-label {
+  font-family: var(--font-family-roboto);
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+}
+
 .friend-picker-empty {
   text-align: center;
   padding: 20px 0;

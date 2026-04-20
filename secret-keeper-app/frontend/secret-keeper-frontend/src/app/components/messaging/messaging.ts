@@ -112,6 +112,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
   selectedConversationMembers: string[] = [];
   isLoadingFriends: boolean = false;
   createConversationError: string = '';
+  groupConversationNameInput: string = '';
 
   currentUsername: string = '';
   currentDisplayName: string = '';
@@ -359,7 +360,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
       return;
     }
 
-    await this.startNewConversationWith(this.modal.memberUsernames, passphrase);
+    await this.startNewConversationWith(this.modal.memberUsernames, passphrase, this.groupConversationNameInput);
   }
 
   async submitRoomKey(): Promise<void> {
@@ -398,6 +399,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     this.settingsError = '';
     this.createConversationError = '';
     this.selectedConversationMembers = [];
+    this.groupConversationNameInput = '';
   }
 
   copyRoomKey(): void {
@@ -453,6 +455,9 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
 
     if (this.selectedConversationMembers.includes(normalizedUsername)) {
       this.selectedConversationMembers = this.selectedConversationMembers.filter(member => member !== normalizedUsername);
+      if (this.selectedConversationMembers.length <= 1) {
+        this.groupConversationNameInput = '';
+      }
       return;
     }
 
@@ -840,6 +845,9 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     this.isLoadingFriends = true;
     this.createConversationError = '';
     this.selectedConversationMembers = [...preselectedUsernames];
+    if (this.selectedConversationMembers.length <= 1) {
+      this.groupConversationNameInput = '';
+    }
 
     try {
       const friends = await this.friendService.getFriends();
@@ -918,7 +926,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     }
   }
 
-  private async startNewConversationWith(memberUsernames: string[], passphrase: string): Promise<void> {
+  private async startNewConversationWith(memberUsernames: string[], passphrase: string, groupName: string = ''): Promise<void> {
     const uniqueMemberUsernames = Array.from(
       new Set(memberUsernames.map(username => username.trim()).filter(Boolean)),
     );
@@ -929,7 +937,8 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     }
 
     try {
-      const result = await this.conversationService.createConversation(uniqueMemberUsernames, passphrase);
+      const trimmedGroupName = uniqueMemberUsernames.length > 1 ? groupName.trim() : '';
+      const result = await this.conversationService.createConversation(uniqueMemberUsernames, passphrase, trimmedGroupName);
 
       this.ngZone.run(() => {
         this.conversationId = result.conversation_id;
@@ -941,7 +950,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
         this.errorMessage = '';
         this.createConversationError = '';
         this.isConnected = true;
-        this.addConversationToList(result.conversation_id, this.buildConversationName(uniqueMemberUsernames));
+        this.addConversationToList(result.conversation_id, this.buildConversationName(uniqueMemberUsernames, trimmedGroupName));
       });
 
       if (result.created) {
@@ -1279,7 +1288,11 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     }
   }
 
-  private buildConversationName(memberUsernames: string[]): string {
+  private buildConversationName(memberUsernames: string[], groupName: string = ''): string {
+    const normalizedGroupName = groupName.trim();
+    if (normalizedGroupName) {
+      return this.formatConversationName(normalizedGroupName);
+    }
     return this.formatConversationName(memberUsernames.join(', '));
   }
 
