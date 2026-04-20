@@ -20,6 +20,13 @@ func InitDB(path string) *sql.DB {
     execOrFatal(db, `PRAGMA busy_timeout = 5000;`) //timeout to wait before returning
 	execOrFatal(db, `PRAGMA foreign_keys = ON;`) // explicitly allow foreign keys
 
+    // execOrFatal(db, `
+    //     DROP TABLE messages;
+    //     DROP TABLE conversation_keys;
+    //     DROP TABLE conversation_members;
+    //     DROP TABLE conversations;
+    // `)
+
 	execOrFatal(db, `
         CREATE TABLE IF NOT EXISTS users (
             id TEXT PRIMARY KEY,
@@ -92,8 +99,6 @@ func InitDB(path string) *sql.DB {
             id TEXT PRIMARY KEY,
             created_at INTEGER,
             room_key_hash TEXT,
-            pending_room_key TEXT,
-            pending_room_key_recipient_id TEXT,
             message_lifetime INTEGER DEFAULT 0
         )
     `)

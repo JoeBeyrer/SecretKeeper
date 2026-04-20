@@ -211,59 +211,19 @@ func ClaimConversationRoomKey(db *sql.DB, conversationID, userID string) (string
 	}
 	defer tx.Rollback()
 
-	var groupRoomKey string
+	var roomKey string
 	err = tx.QueryRow(`
         SELECT room_key
         FROM conversation_pending_room_keys
         WHERE conversation_id = ? AND user_id = ?
-    `, conversationID, userID).Scan(&groupRoomKey)
-	if err == nil {
-		result, err := tx.Exec(`
-            DELETE FROM conversation_pending_room_keys
-            WHERE conversation_id = ? AND user_id = ?
-        `, conversationID, userID)
-		if err != nil {
-			return "", err
-		}
-
-		rowsAffected, err := result.RowsAffected()
-		if err != nil {
-			return "", err
-		}
-		if rowsAffected == 0 {
-			return "", sql.ErrNoRows
-		}
-
-		if err := tx.Commit(); err != nil {
-			return "", err
-		}
-		return groupRoomKey, nil
-	}
-	if err != sql.ErrNoRows {
-		return "", err
-	}
-
-	var roomKey sql.NullString
-	var recipientID sql.NullString
-	err = tx.QueryRow(`
-        SELECT pending_room_key, pending_room_key_recipient_id
-        FROM conversations
-        WHERE id = ?
-    `, conversationID).Scan(&roomKey, &recipientID)
+    `, conversationID, userID).Scan(&roomKey)
 	if err != nil {
-		return "", err
+			return "", err
 	}
-
-	if !roomKey.Valid || roomKey.String == "" || !recipientID.Valid || recipientID.String != userID {
-		return "", sql.ErrNoRows
-	}
-
 	result, err := tx.Exec(`
-        UPDATE conversations
-        SET pending_room_key = NULL,
-            pending_room_key_recipient_id = NULL
-        WHERE id = ? AND pending_room_key_recipient_id = ?
-    `, conversationID, userID)
+		DELETE FROM conversation_pending_room_keys
+		WHERE conversation_id = ? AND user_id = ?
+	`, conversationID, userID)
 	if err != nil {
 		return "", err
 	}
@@ -279,8 +239,7 @@ func ClaimConversationRoomKey(db *sql.DB, conversationID, userID string) (string
 	if err := tx.Commit(); err != nil {
 		return "", err
 	}
-
-	return roomKey.String, nil
+	return roomKey, nil
 }
 
 var BcryptCost = bcrypt.DefaultCost

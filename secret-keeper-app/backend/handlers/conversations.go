@@ -145,10 +145,8 @@ func CreateConversationHandler(db *sql.DB, hub *messaging.Hub) http.HandlerFunc 
             INSERT INTO conversations (
                 id,
                 created_at,
-                room_key_hash,
-                pending_room_key,
-                pending_room_key_recipient_id
-            ) VALUES (?, ?, ?, ?, ?)
+                room_key_hash
+            ) VALUES (?, ?, ?)
         `, convID, now, roomKeyHash, nil, nil)
 		if err != nil {
 			http.Error(w, "could not create conversation", http.StatusInternalServerError)
