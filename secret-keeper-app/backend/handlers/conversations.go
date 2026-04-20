@@ -141,16 +141,6 @@ func CreateConversationHandler(db *sql.DB, hub *messaging.Hub) http.HandlerFunc 
 		convID := uuid.New().String()
 		now := time.Now().Unix()
 
-		var pendingRoomKeyRecipientID any
-		if len(uniqueMembers) == 2 {
-			for _, id := range uniqueMembers {
-				if id != userID {
-					pendingRoomKeyRecipientID = id
-					break
-				}
-			}
-		}
-
 		_, err = db.Exec(`
             INSERT INTO conversations (
                 id,
@@ -159,7 +149,7 @@ func CreateConversationHandler(db *sql.DB, hub *messaging.Hub) http.HandlerFunc 
                 pending_room_key,
                 pending_room_key_recipient_id
             ) VALUES (?, ?, ?, ?, ?)
-        `, convID, now, roomKeyHash, req.RoomKey, pendingRoomKeyRecipientID)
+        `, convID, now, roomKeyHash, nil, nil)
 		if err != nil {
 			http.Error(w, "could not create conversation", http.StatusInternalServerError)
 			return
@@ -169,6 +159,19 @@ func CreateConversationHandler(db *sql.DB, hub *messaging.Hub) http.HandlerFunc 
 			_, err := db.Exec(`INSERT INTO conversation_members (conversation_id, user_id, joined_at) VALUES (?, ?, ?)`, convID, id, now)
 			if err != nil {
 				http.Error(w, "could not add member", http.StatusInternalServerError)
+				return
+			}
+
+			if id == userID {
+				continue
+			}
+
+			_, err = db.Exec(`
+                INSERT INTO conversation_pending_room_keys (conversation_id, user_id, room_key)
+                VALUES (?, ?, ?)
+            `, convID, id, req.RoomKey)
+			if err != nil {
+				http.Error(w, "could not store room key", http.StatusInternalServerError)
 				return
 			}
 		}

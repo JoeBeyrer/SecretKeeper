@@ -211,6 +211,38 @@ func ClaimConversationRoomKey(db *sql.DB, conversationID, userID string) (string
 	}
 	defer tx.Rollback()
 
+	var groupRoomKey string
+	err = tx.QueryRow(`
+        SELECT room_key
+        FROM conversation_pending_room_keys
+        WHERE conversation_id = ? AND user_id = ?
+    `, conversationID, userID).Scan(&groupRoomKey)
+	if err == nil {
+		result, err := tx.Exec(`
+            DELETE FROM conversation_pending_room_keys
+            WHERE conversation_id = ? AND user_id = ?
+        `, conversationID, userID)
+		if err != nil {
+			return "", err
+		}
+
+		rowsAffected, err := result.RowsAffected()
+		if err != nil {
+			return "", err
+		}
+		if rowsAffected == 0 {
+			return "", sql.ErrNoRows
+		}
+
+		if err := tx.Commit(); err != nil {
+			return "", err
+		}
+		return groupRoomKey, nil
+	}
+	if err != sql.ErrNoRows {
+		return "", err
+	}
+
 	var roomKey sql.NullString
 	var recipientID sql.NullString
 	err = tx.QueryRow(`
