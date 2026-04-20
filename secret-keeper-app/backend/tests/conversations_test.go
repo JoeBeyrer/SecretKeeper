@@ -155,6 +155,41 @@ func Test_get_conversations_handler(t *testing.T) {
 	}
 	t.Log("created conversation appears in list correctly")
 
+	// Add a third user, create a named group conversation, and verify the shared name is returned
+	body = `{"username":"carol","email":"carol@test.com","password":"password123"}`
+	req = httptest.NewRequest("POST", "/api/register", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w = httptest.NewRecorder()
+	handlers.RegisterHandler(db)(w, req)
+	db.Exec(`UPDATE users SET email_verified = 1 WHERE username = ?`, "carol")
+
+	body = `{"member_ids":["bob","carol"],"room_key":"groupkey","group_name":"Weekend Plans"}`
+	req = requestWithUserID("POST", "/api/conversations/create", body, aliceID)
+	w = httptest.NewRecorder()
+	handlers.CreateConversationHandler(db, messaging.NewHub())(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201 for named group creation, got %d: %s", w.Code, w.Body.String())
+	}
+
+	req = requestWithUserID("GET", "/api/conversations/get", "", aliceID)
+	w = httptest.NewRecorder()
+	handlers.GetConversationsHandler(db)(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 for named group get, got %d", w.Code)
+	}
+	var convSummaries []map[string]interface{}
+	json.NewDecoder(w.Body).Decode(&convSummaries)
+	var foundNamedGroup bool
+	for _, conv := range convSummaries {
+		if conv["name"] == "Weekend Plans" {
+			foundNamedGroup = true
+			break
+		}
+	}
+	if !foundNamedGroup {
+		t.Fatalf("expected named group conversation to appear in list, got %#v", convSummaries)
+	}
+
 	// Unauthorized
 	req = httptest.NewRequest("GET", "/api/conversations/get", nil)
 	w = httptest.NewRecorder()

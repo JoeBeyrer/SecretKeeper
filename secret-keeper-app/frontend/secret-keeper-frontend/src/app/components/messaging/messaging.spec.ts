@@ -191,6 +191,28 @@ describe('Messaging', () => {
     expect(component.roomKeyInput).toBe('generated-room-key');
   });
 
+  it('submitCreateConversation() should pass an optional group name for group chats', async () => {
+    component.modal = { type: 'create-room-key', memberUsernames: ['bob', 'carol'] };
+    component.groupConversationNameInput = 'Weekend Plans';
+    component.roomKeyInput = 'long-enough-room-key';
+    conversationServiceSpy.createConversation.mockResolvedValue({ conversation_id: 'conv-group', created: true });
+    cryptoServiceSpy.deriveConversationKey.mockResolvedValue({} as CryptoKey);
+
+    await component.submitCreateConversation();
+
+    expect(conversationServiceSpy.createConversation).toHaveBeenCalledWith(['bob', 'carol'], 'long-enough-room-key', 'Weekend Plans');
+  });
+
+  it('toggleConversationMember() should clear the group name when only one friend remains selected', () => {
+    component.selectedConversationMembers = ['bob', 'carol'];
+    component.groupConversationNameInput = 'Weekend Plans';
+
+    component.toggleConversationMember('carol');
+
+    expect(component.selectedConversationMembers).toEqual(['bob']);
+    expect(component.groupConversationNameInput).toBe('');
+  });
+
   it('submitCreateConversation() should set roomKeyError when the key is too short', async () => {
     component.modal = { type: 'create-room-key', memberUsernames: ['bob'] };
     component.roomKeyInput = 'short';
