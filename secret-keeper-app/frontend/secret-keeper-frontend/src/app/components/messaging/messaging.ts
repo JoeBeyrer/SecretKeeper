@@ -226,6 +226,10 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
       await this.ngZone.run(async () => {
         await this.refreshConversationList();
         if (incoming.conversation_id === this.conversationId) {
+          if (!this.conversations.some(conversation => conversation.id === this.conversationId)) {
+            this.resetActiveConversationState(this.conversationId);
+            return;
+          }
           this.cancelEditingMessage(false);
           await this.loadMessages(this.conversationId, false);
         }
@@ -926,6 +930,25 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     }
   }
 
+  async leaveConversation(): Promise<void> {
+    const convId = this.conversationId;
+    if (!convId) {
+      return;
+    }
+
+    try {
+      await this.conversationService.leaveConversation(convId);
+      this.ngZone.run(() => {
+        this.conversations = this.conversations.filter(conversation => conversation.id !== convId);
+        this.resetActiveConversationState(convId);
+        this.errorMessage = '';
+      });
+    } catch (e: any) {
+      console.error('[Messaging] Failed to leave conversation:', e);
+      this.errorMessage = e?.message || 'Failed to leave conversation.';
+    }
+  }
+
   private async startNewConversationWith(memberUsernames: string[], passphrase: string, groupName: string = ''): Promise<void> {
     const uniqueMemberUsernames = Array.from(
       new Set(memberUsernames.map(username => username.trim()).filter(Boolean)),
@@ -1244,6 +1267,38 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
       isImage: file.type.startsWith('image/'),
       isVideo: file.type.startsWith('video/'),
     };
+  }
+
+  private resetActiveConversationState(convId: string): void {
+    if (!convId) {
+      return;
+    }
+
+    this.conversationKeys.delete(convId);
+    if (this.conversationId !== convId) {
+      return;
+    }
+
+    this.releaseMessageResources(this.messages);
+    this.messages = [];
+    this.messageReactions = new Map();
+    this.pendingAttachments = [];
+    this.newMessage = '';
+    this.composerError = '';
+    this.settingsError = '';
+    this.roomKeyInput = '';
+    this.roomKeyError = '';
+    this.roomKeyCopied = false;
+    this.modal = { type: 'none' };
+    this.cancelEditingMessage(false);
+    this.openMessageMenuId = null;
+    this.reactionPickerMessageId = null;
+    this.activeConversationPictureUrl = '';
+    this.stopPictureRefresh();
+    this.conversationId = '';
+    this.isConnected = false;
+    this.messageLifetime = 0;
+    this.selectedMessageLifetime = 0;
   }
 
   private releaseMessageResources(messages: Message[]): void {

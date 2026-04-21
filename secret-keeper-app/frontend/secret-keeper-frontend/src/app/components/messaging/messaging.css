@@ -946,6 +946,29 @@ img {
 
 .chat-message-settings {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.leave-chat-trigger {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(255, 107, 107, 0.35);
+  border-radius: 999px;
+  background: rgba(255, 107, 107, 0.08);
+  color: #ff8a8a;
+  padding: 8px 14px;
+  font-family: var(--font-family-roboto);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.leave-chat-trigger:hover {
+  background: rgba(255, 107, 107, 0.14);
+  border-color: rgba(255, 107, 107, 0.55);
 }
 
 .settings-trigger {
