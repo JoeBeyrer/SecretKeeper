@@ -557,6 +557,22 @@ func LeaveConversationHandler(db *sql.DB, hub *messaging.Hub) http.HandlerFunc {
 				return
 			}
 		} else {
+			var leavingName string
+			if err := tx.QueryRow(`
+				SELECT COALESCE(NULLIF(p.display_name, ''), u.username)
+				FROM users u
+				LEFT JOIN user_profiles p ON p.user_id = u.id
+				WHERE u.id = ?
+			`, userID).Scan(&leavingName); err != nil {
+				http.Error(w, "could not load leaving user", http.StatusInternalServerError)
+				return
+			}
+
+			if err := database.SaveSystemMessageTx(tx, uuid.New().String(), convID, leavingName+" has left the conversation", time.Now().Unix()); err != nil {
+				http.Error(w, "could not record leave message", http.StatusInternalServerError)
+				return
+			}
+
 			queries := []string{
 				`DELETE FROM conversation_pending_room_keys WHERE conversation_id = ? AND user_id = ?`,
 				`DELETE FROM conversation_keys WHERE conversation_id = ? AND user_id = ?`,
