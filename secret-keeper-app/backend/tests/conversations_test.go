@@ -604,3 +604,201 @@ func Test_get_conversation_messages_handler_attachment_ciphertext(t *testing.T) 
 		t.Fatalf("expected ciphertext %q, got %v", richCiphertext, msgs[0]["Ciphertext"])
 	}
 }
+
+func Test_leave_two_person_conversation_handler(t *testing.T) {
+	db := database.InitDB(":memory:")
+	defer db.Close()
+
+	for _, u := range []struct{ name, email string }{
+		{"alice", "alice@test.com"},
+		{"bob", "bob@test.com"},
+	} {
+		body := `{"username":"` + u.name + `","email":"` + u.email + `","password":"password123"}`
+		req := httptest.NewRequest("POST", "/api/register", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		handlers.RegisterHandler(db)(w, req)
+		if w.Code != http.StatusCreated {
+			t.Fatalf("setup: register %s got %d", u.name, w.Code)
+		}
+		db.Exec(`UPDATE users SET email_verified = 1 WHERE username = ?`, u.name)
+	}
+
+	var aliceID, bobID string
+	db.QueryRow(`SELECT id FROM users WHERE username = 'alice'`).Scan(&aliceID)
+	db.QueryRow(`SELECT id FROM users WHERE username = 'bob'`).Scan(&bobID)
+
+	body := `{"member_ids":["bob"],"room_key":"supersecretkey"}`
+	req := requestWithUserID("POST", "/api/conversations/create", body, aliceID)
+	w := httptest.NewRecorder()
+	handlers.CreateConversationHandler(db, messaging.NewHub())(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201 for create, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp map[string]any
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode create response: %v", err)
+	}
+	convID := resp["conversation_id"].(string)
+
+	if err := database.SaveMessage(db, "msg-1", convID, aliceID, "ciphertext", 1700000000); err != nil {
+		t.Fatalf("SaveMessage: %v", err)
+	}
+	if _, err := db.Exec(`INSERT INTO conversation_keys (conversation_id, user_id, encrypted_key) VALUES (?, ?, ?)`, convID, aliceID, "alice-key"); err != nil {
+		t.Fatalf("insert alice conversation key: %v", err)
+	}
+	if _, err := db.Exec(`INSERT INTO conversation_keys (conversation_id, user_id, encrypted_key) VALUES (?, ?, ?)`, convID, bobID, "bob-key"); err != nil {
+		t.Fatalf("insert bob conversation key: %v", err)
+	}
+
+	req = requestWithUserID("POST", "/api/conversations/"+convID+"/leave", "", aliceID)
+	req.SetPathValue("id", convID)
+	w = httptest.NewRecorder()
+	handlers.LeaveConversationHandler(db, messaging.NewHub())(w, req)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("expected 204 for leave, got %d: %s", w.Code, w.Body.String())
+	}
+
+	checks := []struct {
+		query string
+		label string
+	}{
+		{`SELECT COUNT(*) FROM conversations WHERE id = ?`, "conversation"},
+		{`SELECT COUNT(*) FROM conversation_members WHERE conversation_id = ?`, "conversation members"},
+		{`SELECT COUNT(*) FROM messages WHERE conversation_id = ?`, "messages"},
+		{`SELECT COUNT(*) FROM conversation_pending_room_keys WHERE conversation_id = ?`, "pending room keys"},
+		{`SELECT COUNT(*) FROM conversation_keys WHERE conversation_id = ?`, "conversation keys"},
+	}
+	for _, check := range checks {
+		var count int
+		if err := db.QueryRow(check.query, convID).Scan(&count); err != nil {
+			t.Fatalf("count %s: %v", check.label, err)
+		}
+		if count != 0 {
+			t.Fatalf("expected %s cleanup for %s, got %d remaining row(s)", check.label, convID, count)
+		}
+	}
+}
+
+func Test_leave_group_conversation_handler(t *testing.T) {
+	db := database.InitDB(":memory:")
+	defer db.Close()
+
+	for _, u := range []struct{ name, email string }{
+		{"alice", "alice@test.com"},
+		{"bob", "bob@test.com"},
+		{"carol", "carol@test.com"},
+	} {
+		body := `{"username":"` + u.name + `","email":"` + u.email + `","password":"password123"}`
+		req := httptest.NewRequest("POST", "/api/register", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		handlers.RegisterHandler(db)(w, req)
+		if w.Code != http.StatusCreated {
+			t.Fatalf("setup: register %s got %d", u.name, w.Code)
+		}
+		db.Exec(`UPDATE users SET email_verified = 1 WHERE username = ?`, u.name)
+	}
+
+	var aliceID, bobID, carolID string
+	db.QueryRow(`SELECT id FROM users WHERE username = 'alice'`).Scan(&aliceID)
+	db.QueryRow(`SELECT id FROM users WHERE username = 'bob'`).Scan(&bobID)
+	db.QueryRow(`SELECT id FROM users WHERE username = 'carol'`).Scan(&carolID)
+
+	body := `{"member_ids":["bob","carol"],"room_key":"groupsecret","group_name":"Weekend Plans"}`
+	req := requestWithUserID("POST", "/api/conversations/create", body, aliceID)
+	w := httptest.NewRecorder()
+	handlers.CreateConversationHandler(db, messaging.NewHub())(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201 for create, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp map[string]any
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode create response: %v", err)
+	}
+	convID := resp["conversation_id"].(string)
+
+	if err := database.SaveMessage(db, "msg-group-1", convID, bobID, "ciphertext", 1700000000); err != nil {
+		t.Fatalf("SaveMessage: %v", err)
+	}
+	if _, err := db.Exec(`INSERT INTO conversation_keys (conversation_id, user_id, encrypted_key) VALUES (?, ?, ?)`, convID, aliceID, "alice-key"); err != nil {
+		t.Fatalf("insert alice conversation key: %v", err)
+	}
+	if _, err := db.Exec(`INSERT INTO conversation_keys (conversation_id, user_id, encrypted_key) VALUES (?, ?, ?)`, convID, bobID, "bob-key"); err != nil {
+		t.Fatalf("insert bob conversation key: %v", err)
+	}
+
+	req = requestWithUserID("POST", "/api/conversations/"+convID+"/leave", "", aliceID)
+	req.SetPathValue("id", convID)
+	w = httptest.NewRecorder()
+	handlers.LeaveConversationHandler(db, messaging.NewHub())(w, req)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("expected 204 for leave, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var conversationCount int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM conversations WHERE id = ?`, convID).Scan(&conversationCount); err != nil {
+		t.Fatalf("count conversation: %v", err)
+	}
+	if conversationCount != 1 {
+		t.Fatalf("expected group conversation to remain, got %d rows", conversationCount)
+	}
+
+	var aliceMembershipCount int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM conversation_members WHERE conversation_id = ? AND user_id = ?`, convID, aliceID).Scan(&aliceMembershipCount); err != nil {
+		t.Fatalf("count alice membership: %v", err)
+	}
+	if aliceMembershipCount != 0 {
+		t.Fatalf("expected alice to be removed from group conversation, got %d membership rows", aliceMembershipCount)
+	}
+
+	remainingMembers, err := database.GetConversationMembers(db, convID)
+	if err != nil {
+		t.Fatalf("GetConversationMembers: %v", err)
+	}
+	if len(remainingMembers) != 2 {
+		t.Fatalf("expected two remaining group members, got %d", len(remainingMembers))
+	}
+
+	var messageCount int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM messages WHERE conversation_id = ?`, convID).Scan(&messageCount); err != nil {
+		t.Fatalf("count messages: %v", err)
+	}
+	if messageCount != 1 {
+		t.Fatalf("expected group messages to remain, got %d rows", messageCount)
+	}
+
+	var aliceKeyCount int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM conversation_keys WHERE conversation_id = ? AND user_id = ?`, convID, aliceID).Scan(&aliceKeyCount); err != nil {
+		t.Fatalf("count alice conversation key: %v", err)
+	}
+	if aliceKeyCount != 0 {
+		t.Fatalf("expected alice conversation key to be removed, got %d rows", aliceKeyCount)
+	}
+
+	var bobKeyCount int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM conversation_keys WHERE conversation_id = ? AND user_id = ?`, convID, bobID).Scan(&bobKeyCount); err != nil {
+		t.Fatalf("count bob conversation key: %v", err)
+	}
+	if bobKeyCount != 1 {
+		t.Fatalf("expected remaining member conversation key to stay, got %d rows", bobKeyCount)
+	}
+
+	var bobPendingCount int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM conversation_pending_room_keys WHERE conversation_id = ? AND user_id = ?`, convID, bobID).Scan(&bobPendingCount); err != nil {
+		t.Fatalf("count bob pending room key: %v", err)
+	}
+	if bobPendingCount != 1 {
+		t.Fatalf("expected other members' pending room keys to remain, got %d rows", bobPendingCount)
+	}
+
+	var carolPendingCount int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM conversation_pending_room_keys WHERE conversation_id = ? AND user_id = ?`, convID, carolID).Scan(&carolPendingCount); err != nil {
+		t.Fatalf("count carol pending room key: %v", err)
+	}
+	if carolPendingCount != 1 {
+		t.Fatalf("expected other members' pending room keys to remain, got %d rows", carolPendingCount)
+	}
+}

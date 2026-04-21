@@ -60,6 +60,7 @@ describe('Messaging', () => {
       verifyRoomKey: vi.fn(),
       claimRoomKey: vi.fn(),
       setMessageLifetime: vi.fn().mockResolvedValue(undefined),
+      leaveConversation: vi.fn().mockResolvedValue(undefined),
       editMessage: vi.fn().mockResolvedValue(undefined),
       DeleteMessage: vi.fn().mockResolvedValue(undefined),
     };
@@ -211,6 +212,22 @@ describe('Messaging', () => {
 
     expect(component.selectedConversationMembers).toEqual(['bob']);
     expect(component.groupConversationNameInput).toBe('');
+  });
+
+  it('leaveConversation() should remove the active conversation and clear the chat state', async () => {
+    component.conversationId = 'conv-1';
+    component.isConnected = true;
+    component.messages = [{ id: 'msg-1', username: 'alice', time: 'Now', content: 'Hello', isMine: true, attachments: [], profilePictureUrl: '' }];
+    component.modal = { type: 'conversation-settings', convId: 'conv-1' };
+
+    await component.leaveConversation();
+
+    expect(conversationServiceSpy.leaveConversation).toHaveBeenCalledWith('conv-1');
+    expect(component.conversations).toEqual([]);
+    expect(component.conversationId).toBe('');
+    expect(component.isConnected).toBe(false);
+    expect(component.messages).toEqual([]);
+    expect(component.modal).toEqual({ type: 'none' });
   });
 
   it('submitCreateConversation() should set roomKeyError when the key is too short', async () => {
