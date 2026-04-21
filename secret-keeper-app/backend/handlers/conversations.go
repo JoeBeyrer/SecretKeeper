@@ -54,6 +54,14 @@ func notifyConversationMembers(db *sql.DB, hub *messaging.Hub, convID string) {
 		return
 	}
 
+	notifyConversationUsers(hub, members, convID)
+}
+
+func notifyConversationUsers(hub *messaging.Hub, userIDs []string, convID string) {
+	if hub == nil || convID == "" || len(userIDs) == 0 {
+		return
+	}
+
 	notification, err := json.Marshal(models.WSMessage{
 		Type:           "messages_updated",
 		ConversationID: convID,
@@ -63,9 +71,35 @@ func notifyConversationMembers(db *sql.DB, hub *messaging.Hub, convID string) {
 		return
 	}
 
-	for _, memberID := range members {
-		hub.SendToUser(memberID, notification)
+	seen := make(map[string]struct{}, len(userIDs))
+	for _, userID := range userIDs {
+		if userID == "" {
+			continue
+		}
+		if _, exists := seen[userID]; exists {
+			continue
+		}
+		seen[userID] = struct{}{}
+		hub.SendToUser(userID, notification)
 	}
+}
+
+func deleteConversationDataTx(tx *sql.Tx, convID string) error {
+	queries := []string{
+		`DELETE FROM conversation_pending_room_keys WHERE conversation_id = ?`,
+		`DELETE FROM conversation_keys WHERE conversation_id = ?`,
+		`DELETE FROM messages WHERE conversation_id = ?`,
+		`DELETE FROM conversation_members WHERE conversation_id = ?`,
+		`DELETE FROM conversations WHERE id = ?`,
+	}
+
+	for _, query := range queries {
+		if _, err := tx.Exec(query, convID); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func CreateConversationHandler(db *sql.DB, hub *messaging.Hub) http.HandlerFunc {
@@ -462,6 +496,90 @@ func ClaimConversationRoomKeyHandler(db *sql.DB) http.HandlerFunc {
 		json.NewEncoder(w).Encode(claimRoomKeyResp{RoomKey: roomKey})
 	}
 }
+
+func LeaveConversationHandler(db *sql.DB, hub *messaging.Hub) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := GetUserIDFromContext(r)
+		if !ok {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		convID := r.PathValue("id")
+		if convID == "" {
+			http.Error(w, "missing conversation id", http.StatusBadRequest)
+			return
+		}
+
+		if !database.IsUserInConversation(db, userID, convID) {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+
+		rows, err := db.Query(`
+			SELECT user_id
+			FROM conversation_members
+			WHERE conversation_id = ?
+		`, convID)
+		if err != nil {
+			http.Error(w, "could not load conversation members", http.StatusInternalServerError)
+			return
+		}
+
+		var members []string
+		for rows.Next() {
+			var memberID string
+			if err := rows.Scan(&memberID); err != nil {
+				rows.Close()
+				http.Error(w, "could not load conversation members", http.StatusInternalServerError)
+				return
+			}
+			members = append(members, memberID)
+		}
+		rows.Close()
+
+		if len(members) == 0 {
+			http.Error(w, "conversation not found", http.StatusNotFound)
+			return
+		}
+
+		tx, err := db.Begin()
+		if err != nil {
+			http.Error(w, "could not leave conversation", http.StatusInternalServerError)
+			return
+		}
+		defer tx.Rollback()
+
+		deleteEntireConversation := len(members) <= 2
+		if deleteEntireConversation {
+			if err := deleteConversationDataTx(tx, convID); err != nil {
+				http.Error(w, "could not delete conversation", http.StatusInternalServerError)
+				return
+			}
+		} else {
+			queries := []string{
+				`DELETE FROM conversation_pending_room_keys WHERE conversation_id = ? AND user_id = ?`,
+				`DELETE FROM conversation_keys WHERE conversation_id = ? AND user_id = ?`,
+				`DELETE FROM conversation_members WHERE conversation_id = ? AND user_id = ?`,
+			}
+			for _, query := range queries {
+				if _, err := tx.Exec(query, convID, userID); err != nil {
+					http.Error(w, "could not leave conversation", http.StatusInternalServerError)
+					return
+				}
+			}
+		}
+
+		if err := tx.Commit(); err != nil {
+			http.Error(w, "could not leave conversation", http.StatusInternalServerError)
+			return
+		}
+
+		notifyConversationUsers(hub, members, convID)
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
 
 func SetMessageLifetimeHandler(db *sql.DB, hub *messaging.Hub) http.HandlerFunc {
     return func(w http.ResponseWriter, r *http.Request) {
