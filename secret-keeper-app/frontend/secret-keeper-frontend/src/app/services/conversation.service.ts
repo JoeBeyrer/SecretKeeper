@@ -98,6 +98,18 @@ export class ConversationService {
     throw new Error(text || 'Failed to retrieve room key.');
   }
 
+  async leaveConversation(conversationId: string): Promise<void> {
+    const response = await fetch(`http://localhost:8080/api/conversations/${conversationId}/leave`, {
+      method: 'POST',
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(text || 'Failed to leave conversation.');
+    }
+  }
+
   async setMessageLifetime(conversationId: string, lifetime: number): Promise<void> {
     console.log('[Lifetime] calling API for', conversationId, 'with', lifetime);
     const response = await fetch(`http://localhost:8080/api/conversations/${conversationId}/lifetime`, {
