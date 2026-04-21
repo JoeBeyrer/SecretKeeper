@@ -217,7 +217,7 @@ describe('Messaging', () => {
   it('leaveConversation() should remove the active conversation and clear the chat state', async () => {
     component.conversationId = 'conv-1';
     component.isConnected = true;
-    component.messages = [{ id: 'msg-1', username: 'alice', time: 'Now', content: 'Hello', isMine: true, attachments: [], profilePictureUrl: '' }];
+    component.messages = [{ id: 'msg-1', username: 'alice', time: 'Now', content: 'Hello', isMine: true, isSystem: false, attachments: [], profilePictureUrl: '' }];
     component.modal = { type: 'conversation-settings', convId: 'conv-1' };
 
     await component.leaveConversation();
@@ -445,6 +445,7 @@ describe('Messaging', () => {
       time: 'Today, 1.00pm',
       content: 'original text',
       isMine: true,
+      isSystem: false,
       attachments: [],
       profilePictureUrl: '',
     });
@@ -466,6 +467,7 @@ describe('Messaging', () => {
       time: 'Today, 1.00pm',
       content: 'original text',
       isMine: true,
+      isSystem: false,
       attachments: [],
       profilePictureUrl: '',
     };

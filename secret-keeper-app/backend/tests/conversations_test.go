@@ -766,8 +766,26 @@ func Test_leave_group_conversation_handler(t *testing.T) {
 	if err := db.QueryRow(`SELECT COUNT(*) FROM messages WHERE conversation_id = ?`, convID).Scan(&messageCount); err != nil {
 		t.Fatalf("count messages: %v", err)
 	}
-	if messageCount != 1 {
-		t.Fatalf("expected group messages to remain, got %d rows", messageCount)
+	if messageCount != 2 {
+		t.Fatalf("expected group messages plus leave notice to remain, got %d rows", messageCount)
+	}
+
+	var leaveNotice string
+	var leaveSender sql.NullString
+	if err := db.QueryRow(`
+		SELECT ciphertext, sender_id
+		FROM messages
+		WHERE conversation_id = ?
+		ORDER BY created_at DESC, id DESC
+		LIMIT 1
+	`, convID).Scan(&leaveNotice, &leaveSender); err != nil {
+		t.Fatalf("load leave notice: %v", err)
+	}
+	if leaveNotice != "alice has left the conversation" {
+		t.Fatalf("expected leave notice message, got %q", leaveNotice)
+	}
+	if leaveSender.Valid {
+		t.Fatalf("expected leave notice to have no sender, got %q", leaveSender.String)
 	}
 
 	var aliceKeyCount int
