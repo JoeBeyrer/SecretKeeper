@@ -30,6 +30,7 @@ interface Message {
   time: string;
   content: string;
   isMine: boolean;
+  isSystem: boolean;
   attachments: MessageAttachment[];
   profilePictureUrl: string;
   expiresAt?: number;
@@ -226,6 +227,10 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
       await this.ngZone.run(async () => {
         await this.refreshConversationList();
         if (incoming.conversation_id === this.conversationId) {
+          if (!this.conversations.some(conversation => conversation.id === this.conversationId)) {
+            this.resetActiveConversationState(this.conversationId);
+            return;
+          }
           this.cancelEditingMessage(false);
           await this.loadMessages(this.conversationId, false);
         }
@@ -291,8 +296,9 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
             time: this.formatTime(new Date()),
             content: '🔒 Could not decrypt message',
             isMine: false,
+            isSystem: false,
             attachments: [],
-	    profilePictureUrl: incoming.profile_picture_url ?? '',
+            profilePictureUrl: incoming.profile_picture_url ?? '',
           });
           this.shouldScrollToBottom = true;
         });
@@ -441,6 +447,25 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     }
   }
 
+  async leaveConversation(): Promise<void> {
+    const convId = this.conversationId;
+    if (!convId) {
+      return;
+    }
+
+    try {
+      await this.conversationService.leaveConversation(convId);
+      this.ngZone.run(() => {
+        this.conversations = this.conversations.filter(conversation => conversation.id !== convId);
+        this.resetActiveConversationState(convId);
+        this.errorMessage = '';
+      });
+    } catch (e: any) {
+      console.error('[Messaging] Failed to leave conversation:', e);
+      this.errorMessage = e?.message || 'Failed to leave conversation.';
+    }
+  }
+
   async startNewConversation(): Promise<void> {
     await this.openCreateConversationMemberModal();
   }
@@ -536,6 +561,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
           time: this.formatTime(new Date()),
           content: text,
           isMine: true,
+          isSystem: false,
           attachments: [],
           profilePictureUrl: this.currentUserPictureUrl,
           // Estimate expiresAt locally so the expiry label appears immediately.
@@ -788,7 +814,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
   private startPictureRefresh(convId: string): void {
     this.stopPictureRefresh();
     this.pictureRefreshInterval = setInterval(async () => {
-      const otherMsg = this.messages.find(m => !m.isMine);
+      const otherMsg = this.messages.find(m => !m.isMine && !m.isSystem);
       if (!otherMsg) return;
       try {
         const res = await fetch(
@@ -1015,26 +1041,40 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
       const history = await this.conversationService.getMessages(convId);
       const decrypted: Message[] = await Promise.all(
         history.map(async (m: any) => {
+          const messageId = m.ID ?? m.id ?? '';
+          const senderID = m.SenderID ?? m.sender_id ?? '';
+          const username = m.DisplayName || m.Username || '';
+          const createdAt = this.formatTime(new Date(m.CreatedAt * 1000));
+
+          if (m.IsSystem || !senderID) {
+            return this.buildSystemMessage(
+              messageId,
+              createdAt,
+              typeof m.Ciphertext === 'string' ? m.Ciphertext : String(m.Ciphertext ?? ''),
+            );
+          }
+
           try {
             const content = await this.cryptoService.decryptMessage(m.Ciphertext, convKey);
             return this.buildMessageFromDecryptedContent(
-              m.ID ?? m.id ?? '',
-              m.DisplayName || m.Username,
-              this.formatTime(new Date(m.CreatedAt * 1000)),
-              m.Username === this.currentUsername,
+              messageId,
+              username,
+              createdAt,
+              (m.Username ?? '') === this.currentUsername,
               content,
-	      m.ProfilePictureURL ?? '',
+              m.ProfilePictureURL ?? '',
               m.ExpiresAt ?? undefined,
             );
           } catch {
             return {
-              id: m.ID ?? m.id ?? '',
-              username: m.DisplayName || m.Username,
-              time: this.formatTime(new Date(m.CreatedAt * 1000)),
+              id: messageId,
+              username,
+              time: createdAt,
               content: '🔒 Could not decrypt message',
-              isMine: m.Username === this.currentUsername,
+              isMine: (m.Username ?? '') === this.currentUsername,
+              isSystem: false,
               attachments: [],
-	      profilePictureUrl: m.ProfilePictureURL ?? '',
+              profilePictureUrl: m.ProfilePictureURL ?? '',
               expiresAt: m.ExpiresAt ?? undefined,
             };
           }
@@ -1067,7 +1107,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
         if (scroll) {
           this.shouldScrollToBottom = true;
         }
-        const otherMsg = decrypted.find(m => !m.isMine);
+        const otherMsg = decrypted.find(m => !m.isMine && !m.isSystem);
         this.activeConversationPictureUrl = otherMsg?.profilePictureUrl ?? '';
         this.startPictureRefresh(convId);
       });
@@ -1148,6 +1188,19 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     };
   }
 
+  private buildSystemMessage(id: string, time: string, content: string): Message {
+    return {
+      id,
+      username: '',
+      time,
+      content,
+      isMine: false,
+      isSystem: true,
+      attachments: [],
+      profilePictureUrl: '',
+    };
+  }
+
   private buildMessageFromDecryptedContent(id: string, username: string, time: string, isMine: boolean, plaintext: string, profilePictureUrl: string = '', expiresAt?: number): Message {
   const payload = this.tryParseRichMessagePayload(plaintext);
     if (!payload) {
@@ -1157,6 +1210,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
         time,
         content: plaintext,
         isMine,
+        isSystem: false,
         attachments: [],
         profilePictureUrl,
         expiresAt,
@@ -1169,6 +1223,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
       time,
       content: payload.text,
       isMine,
+      isSystem: false,
       attachments: payload.attachments.map(attachment => this.createMessageAttachmentFromPayload(attachment)),
       profilePictureUrl,
       expiresAt,
@@ -1182,6 +1237,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
       time,
       content: text,
       isMine,
+      isSystem: false,
       attachments: attachments.map(attachment => this.createMessageAttachmentFromFile(attachment.file)),
       profilePictureUrl: this.currentUserPictureUrl,
     };
@@ -1244,6 +1300,38 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
       isImage: file.type.startsWith('image/'),
       isVideo: file.type.startsWith('video/'),
     };
+  }
+
+  private resetActiveConversationState(convId: string): void {
+    if (!convId) {
+      return;
+    }
+
+    this.conversationKeys.delete(convId);
+    if (this.conversationId !== convId) {
+      return;
+    }
+
+    this.releaseMessageResources(this.messages);
+    this.messages = [];
+    this.messageReactions = new Map();
+    this.pendingAttachments = [];
+    this.newMessage = '';
+    this.composerError = '';
+    this.settingsError = '';
+    this.roomKeyInput = '';
+    this.roomKeyError = '';
+    this.roomKeyCopied = false;
+    this.modal = { type: 'none' };
+    this.cancelEditingMessage(false);
+    this.openMessageMenuId = null;
+    this.reactionPickerMessageId = null;
+    this.activeConversationPictureUrl = '';
+    this.stopPictureRefresh();
+    this.conversationId = '';
+    this.isConnected = false;
+    this.messageLifetime = 0;
+    this.selectedMessageLifetime = 0;
   }
 
   private releaseMessageResources(messages: Message[]): void {
