@@ -29,6 +29,10 @@ type editMessageReq struct {
 	Ciphertext string `json:"ciphertext"`
 }
 
+type updateGroupNameReq struct {
+	GroupName string `json:"group_name"`
+}
+
 var allowedMessageLifetimes = map[int]struct{}{
 	0:      {},
 	60:     {},
@@ -682,6 +686,94 @@ func LeaveConversationHandler(db *sql.DB, hub *messaging.Hub) http.HandlerFunc {
 		}
 
 		notifyConversationUsers(hub, members, convID)
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func UpdateGroupNameHandler(db *sql.DB, hub *messaging.Hub) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := GetUserIDFromContext(r)
+		if !ok {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		convID := r.PathValue("id")
+		if convID == "" {
+			http.Error(w, "missing conversation id", http.StatusBadRequest)
+			return
+		}
+
+		if !database.IsUserInConversation(db, userID, convID) {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+
+		var body updateGroupNameReq
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			http.Error(w, "invalid request", http.StatusBadRequest)
+			return
+		}
+
+		newGroupName := strings.TrimSpace(body.GroupName)
+		if newGroupName == "" {
+			http.Error(w, "group name is required", http.StatusBadRequest)
+			return
+		}
+
+		if len([]rune(newGroupName)) > 80 {
+			http.Error(w, "group name must be 80 characters or fewer", http.StatusBadRequest)
+			return
+		}
+
+		var memberCount int
+		if err := db.QueryRow(`
+			SELECT COUNT(*)
+			FROM conversation_members
+			WHERE conversation_id = ?
+		`, convID).Scan(&memberCount); err != nil {
+			http.Error(w, "could not load conversation members", http.StatusInternalServerError)
+			return
+		}
+		if memberCount <= 2 {
+			http.Error(w, "group name can only be changed for group conversations", http.StatusBadRequest)
+			return
+		}
+
+		var currentGroupName sql.NullString
+		if err := db.QueryRow(`SELECT group_name FROM conversations WHERE id = ?`, convID).Scan(&currentGroupName); err != nil {
+			http.Error(w, "conversation not found", http.StatusNotFound)
+			return
+		}
+		if strings.TrimSpace(currentGroupName.String) == newGroupName {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		tx, err := db.Begin()
+		if err != nil {
+			http.Error(w, "could not update group name", http.StatusInternalServerError)
+			return
+		}
+		defer tx.Rollback()
+
+		if _, err := tx.Exec(`UPDATE conversations SET group_name = ? WHERE id = ?`, newGroupName, convID); err != nil {
+			http.Error(w, "could not update group name", http.StatusInternalServerError)
+			return
+		}
+
+		changeMessage := `Group name changed to "` + newGroupName + `"`
+		if err := database.SaveSystemMessageTx(tx, uuid.New().String(), convID, changeMessage, time.Now().Unix()); err != nil {
+			http.Error(w, "could not record group name change", http.StatusInternalServerError)
+			return
+		}
+
+		if err := tx.Commit(); err != nil {
+			http.Error(w, "could not update group name", http.StatusInternalServerError)
+			return
+		}
+
+		notifyConversationMembers(db, hub, convID)
 		w.WriteHeader(http.StatusNoContent)
 	}
 }
