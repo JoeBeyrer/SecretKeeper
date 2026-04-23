@@ -134,6 +134,20 @@ export class ConversationService {
     }
   }
 
+  async removeConversationMembers(conversationId: string, memberIds: string[]): Promise<void> {
+    const response = await fetch(`http://localhost:8080/api/conversations/${conversationId}/members/remove`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ member_ids: memberIds }),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(text || 'Failed to remove conversation members.');
+    }
+  }
+
   async leaveConversation(conversationId: string): Promise<void> {
     const response = await fetch(`http://localhost:8080/api/conversations/${conversationId}/leave`, {
       method: 'POST',
