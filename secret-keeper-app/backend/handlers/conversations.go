@@ -231,11 +231,20 @@ func CreateConversationHandler(db *sql.DB, hub *messaging.Hub) http.HandlerFunc 
 }
 
 type ConversationSummary struct {
-    ID              string `json:"id"`
-    Name            string `json:"name"`
-    LastMessage     string `json:"last_message"`
-    LastMessageTime int64  `json:"last_message_time"`
-    MessageLifetime int `json:"message_lifetime"`
+	ID              string `json:"id"`
+	Name            string `json:"name"`
+	LastMessage     string `json:"last_message"`
+	LastMessageTime int64  `json:"last_message_time"`
+	MessageLifetime int    `json:"message_lifetime"`
+	MemberCount     int    `json:"member_count"`
+}
+
+type ConversationMemberSummary struct {
+	UserID            string `json:"user_id"`
+	Username          string `json:"username"`
+	DisplayName       string `json:"display_name"`
+	ProfilePictureURL string `json:"profile_picture_url"`
+	FriendshipStatus  string `json:"friendship_status"`
 }
 
 func GetConversationsHandler(db *sql.DB) http.HandlerFunc {
@@ -250,6 +259,11 @@ func GetConversationsHandler(db *sql.DB) http.HandlerFunc {
             SELECT
                 c.id,
                 c.message_lifetime,
+                (
+                    SELECT COUNT(*)
+                    FROM conversation_members cm_count
+                    WHERE cm_count.conversation_id = c.id
+                ) AS member_count,
                 COALESCE(
                     NULLIF(TRIM(c.group_name), ''),
                     (
@@ -293,7 +307,7 @@ func GetConversationsHandler(db *sql.DB) http.HandlerFunc {
             var name sql.NullString
             var lastMsg sql.NullString
             var lastTime sql.NullInt64
-            if err := rows.Scan(&s.ID, &s.MessageLifetime, &name, &lastMsg, &lastTime); err != nil {
+            if err := rows.Scan(&s.ID, &s.MessageLifetime, &s.MemberCount, &name, &lastMsg, &lastTime); err != nil {
                 continue
             }
             s.Name = name.String
@@ -312,6 +326,82 @@ func GetConversationsHandler(db *sql.DB) http.HandlerFunc {
         w.Header().Set("Content-Type", "application/json")
         json.NewEncoder(w).Encode(result)
     }
+}
+
+func GetConversationMembersHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := GetUserIDFromContext(r)
+		if !ok {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		convID := r.PathValue("id")
+		if convID == "" {
+			http.Error(w, "missing conversation id", http.StatusBadRequest)
+			return
+		}
+
+		if !database.IsUserInConversation(db, userID, convID) {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+
+		rows, err := db.Query(`
+            SELECT
+                u.id,
+                u.username,
+                COALESCE(NULLIF(p.display_name, ''), u.username) AS display_name,
+                COALESCE(p.profile_picture_url, '') AS profile_picture_url
+            FROM conversation_members cm
+            JOIN users u ON u.id = cm.user_id
+            LEFT JOIN user_profiles p ON p.user_id = u.id
+            WHERE cm.conversation_id = ?
+            ORDER BY CASE WHEN cm.user_id = ? THEN 0 ELSE 1 END,
+                     LOWER(COALESCE(NULLIF(p.display_name, ''), u.username)) ASC,
+                     LOWER(u.username) ASC
+        `, convID, userID)
+		if err != nil {
+			http.Error(w, "could not load conversation members", http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		members := []ConversationMemberSummary{}
+		for rows.Next() {
+			var member ConversationMemberSummary
+			if err := rows.Scan(&member.UserID, &member.Username, &member.DisplayName, &member.ProfilePictureURL); err != nil {
+				http.Error(w, "could not load conversation members", http.StatusInternalServerError)
+				return
+			}
+
+			if member.UserID == userID {
+				member.FriendshipStatus = "self"
+			} else {
+				exists, accepted, direction, err := database.FriendshipExists(db, userID, member.UserID)
+				if err != nil {
+					http.Error(w, "could not load friendship status", http.StatusInternalServerError)
+					return
+				}
+
+				switch {
+				case accepted:
+					member.FriendshipStatus = "friend"
+				case exists && direction == "outgoing":
+					member.FriendshipStatus = "pending_outgoing"
+				case exists && direction == "incoming":
+					member.FriendshipStatus = "pending_incoming"
+				default:
+					member.FriendshipStatus = "none"
+				}
+			}
+
+			members = append(members, member)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(members)
+	}
 }
 
 func GetConversationMessagesHandler(db *sql.DB) http.HandlerFunc {

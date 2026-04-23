@@ -183,6 +183,9 @@ func Test_get_conversations_handler(t *testing.T) {
 	for _, conv := range convSummaries {
 		if conv["name"] == "Weekend Plans" {
 			foundNamedGroup = true
+			if memberCount, ok := conv["member_count"].(float64); !ok || int(memberCount) != 3 {
+				t.Fatalf("expected named group member_count=3, got %#v", conv["member_count"])
+			}
 			break
 		}
 	}
@@ -198,6 +201,88 @@ func Test_get_conversations_handler(t *testing.T) {
 		t.Fatalf("expected 401, got %d", w.Code)
 	}
 	t.Log("unauthenticated get-conversations correctly returned 401")
+}
+
+func Test_get_conversation_members_handler(t *testing.T) {
+	db := database.InitDB(":memory:")
+	defer db.Close()
+
+	for _, u := range []struct{ name, email string }{
+		{"alice", "alice@test.com"},
+		{"bob", "bob@test.com"},
+		{"carol", "carol@test.com"},
+	} {
+		body := `{"username":"` + u.name + `","email":"` + u.email + `","password":"password123"}`
+		req := httptest.NewRequest("POST", "/api/register", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		handlers.RegisterHandler(db)(w, req)
+		db.Exec(`UPDATE users SET email_verified = 1 WHERE username = ?`, u.name)
+	}
+
+	var aliceID, bobID string
+	db.QueryRow(`SELECT id FROM users WHERE username = 'alice'`).Scan(&aliceID)
+	db.QueryRow(`SELECT id FROM users WHERE username = 'bob'`).Scan(&bobID)
+
+	if err := database.SendFriendRequest(db, aliceID, bobID); err != nil {
+		t.Fatalf("setup: send friend request: %v", err)
+	}
+	if err := database.AcceptFriendRequest(db, bobID, aliceID); err != nil {
+		t.Fatalf("setup: accept friend request: %v", err)
+	}
+
+	body := `{"member_ids":["bob","carol"],"room_key":"groupkey","group_name":"Weekend Plans"}`
+	req := requestWithUserID("POST", "/api/conversations/create", body, aliceID)
+	w := httptest.NewRecorder()
+	handlers.CreateConversationHandler(db, messaging.NewHub())(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("setup: failed to create conversation: %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp map[string]interface{}
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("setup: decode conversation response: %v", err)
+	}
+	convID := resp["conversation_id"].(string)
+
+	req = requestWithUserID("GET", "/api/conversations/"+convID+"/members", "", aliceID)
+	req.SetPathValue("id", convID)
+	w = httptest.NewRecorder()
+	handlers.GetConversationMembersHandler(db)(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 from get members, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var members []map[string]interface{}
+	if err := json.NewDecoder(w.Body).Decode(&members); err != nil {
+		t.Fatalf("decode members response: %v", err)
+	}
+	if len(members) != 3 {
+		t.Fatalf("expected 3 members, got %d", len(members))
+	}
+
+	statuses := map[string]string{}
+	for _, member := range members {
+		statuses[member["username"].(string)] = member["friendship_status"].(string)
+	}
+
+	if statuses["alice"] != "self" {
+		t.Fatalf("expected alice friendship_status=self, got %q", statuses["alice"])
+	}
+	if statuses["bob"] != "friend" {
+		t.Fatalf("expected bob friendship_status=friend, got %q", statuses["bob"])
+	}
+	if statuses["carol"] != "none" {
+		t.Fatalf("expected carol friendship_status=none, got %q", statuses["carol"])
+	}
+
+	req = requestWithUserID("GET", "/api/conversations/"+convID+"/members", "", "not-in-group")
+	req.SetPathValue("id", convID)
+	w = httptest.NewRecorder()
+	handlers.GetConversationMembersHandler(db)(w, req)
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 for non-member, got %d", w.Code)
+	}
 }
 
 func Test_get_conversation_messages_handler(t *testing.T) {
@@ -358,10 +443,9 @@ func Test_claim_group_conversation_room_key_handler(t *testing.T) {
 		db.Exec(`UPDATE users SET email_verified = 1 WHERE username = ?`, u.name)
 	}
 
-	var aliceID, bobID, carolID string
+	var aliceID, bobID string
 	db.QueryRow(`SELECT id FROM users WHERE username = 'alice'`).Scan(&aliceID)
 	db.QueryRow(`SELECT id FROM users WHERE username = 'bob'`).Scan(&bobID)
-	db.QueryRow(`SELECT id FROM users WHERE username = 'carol'`).Scan(&carolID)
 
 	body := `{"member_ids":["bob","carol"],"room_key":"shared-group-room-key"}`
 	req := requestWithUserID("POST", "/api/conversations/create", body, aliceID)
@@ -417,10 +501,9 @@ func Test_claim_conversation_room_key_handler(t *testing.T) {
 		db.Exec(`UPDATE users SET email_verified = 1 WHERE username = ?`, u.name)
 	}
 
-	var aliceID, bobID, carolID string
+	var aliceID, bobID string
 	db.QueryRow(`SELECT id FROM users WHERE username = 'alice'`).Scan(&aliceID)
 	db.QueryRow(`SELECT id FROM users WHERE username = 'bob'`).Scan(&bobID)
-	db.QueryRow(`SELECT id FROM users WHERE username = 'carol'`).Scan(&carolID)
 
 	// Alice creates conversation with bob
 	body := `{"member_ids":["bob"],"room_key":"the-real-room-key"}`
@@ -466,7 +549,6 @@ func Test_claim_conversation_room_key_handler(t *testing.T) {
 	}
 	t.Log("non-member correctly returned 403")
 }
-
 
 func Test_edit_message_handler(t *testing.T) {
 	db := database.InitDB(":memory:")
@@ -701,10 +783,9 @@ func Test_leave_group_conversation_handler(t *testing.T) {
 		db.Exec(`UPDATE users SET email_verified = 1 WHERE username = ?`, u.name)
 	}
 
-	var aliceID, bobID, carolID string
+	var aliceID, bobID string
 	db.QueryRow(`SELECT id FROM users WHERE username = 'alice'`).Scan(&aliceID)
 	db.QueryRow(`SELECT id FROM users WHERE username = 'bob'`).Scan(&bobID)
-	db.QueryRow(`SELECT id FROM users WHERE username = 'carol'`).Scan(&carolID)
 
 	body := `{"member_ids":["bob","carol"],"room_key":"groupsecret","group_name":"Weekend Plans"}`
 	req := requestWithUserID("POST", "/api/conversations/create", body, aliceID)
