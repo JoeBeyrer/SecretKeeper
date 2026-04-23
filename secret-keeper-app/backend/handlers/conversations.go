@@ -33,6 +33,10 @@ type updateGroupNameReq struct {
 	GroupName string `json:"group_name"`
 }
 
+type removeConversationMembersReq struct {
+	MemberIDs []string `json:"member_ids"`
+}
+
 var allowedMessageLifetimes = map[int]struct{}{
 	0:      {},
 	60:     {},
@@ -678,6 +682,13 @@ func LeaveConversationHandler(db *sql.DB, hub *messaging.Hub) http.HandlerFunc {
 					return
 				}
 			}
+
+			if len(members)-1 <= 2 {
+				if _, err := tx.Exec(`UPDATE conversations SET group_name = '' WHERE id = ?`, convID); err != nil {
+					http.Error(w, "could not update conversation", http.StatusInternalServerError)
+					return
+				}
+			}
 		}
 
 		if err := tx.Commit(); err != nil {
@@ -777,6 +788,154 @@ func UpdateGroupNameHandler(db *sql.DB, hub *messaging.Hub) http.HandlerFunc {
 		w.WriteHeader(http.StatusNoContent)
 	}
 }
+
+
+func RemoveConversationMembersHandler(db *sql.DB, hub *messaging.Hub) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := GetUserIDFromContext(r)
+		if !ok {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		convID := r.PathValue("id")
+		if convID == "" {
+			http.Error(w, "missing conversation id", http.StatusBadRequest)
+			return
+		}
+
+		if !database.IsUserInConversation(db, userID, convID) {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+
+		var body removeConversationMembersReq
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			http.Error(w, "invalid request", http.StatusBadRequest)
+			return
+		}
+
+		seen := map[string]struct{}{}
+		targetIDs := make([]string, 0, len(body.MemberIDs))
+		for _, rawID := range body.MemberIDs {
+			targetID := strings.TrimSpace(rawID)
+			if targetID == "" {
+				continue
+			}
+			if _, exists := seen[targetID]; exists {
+				continue
+			}
+			seen[targetID] = struct{}{}
+			targetIDs = append(targetIDs, targetID)
+		}
+
+		if len(targetIDs) == 0 {
+			http.Error(w, "at least one member is required", http.StatusBadRequest)
+			return
+		}
+
+		membersBefore, err := database.GetConversationMembers(db, convID)
+		if err != nil {
+			http.Error(w, "could not load conversation members", http.StatusInternalServerError)
+			return
+		}
+		if len(membersBefore) <= 2 {
+			http.Error(w, "members can only be removed from group conversations", http.StatusBadRequest)
+			return
+		}
+
+		tx, err := db.Begin()
+		if err != nil {
+			http.Error(w, "could not update conversation", http.StatusInternalServerError)
+			return
+		}
+		defer tx.Rollback()
+
+		var actorName string
+		if err := tx.QueryRow(`
+			SELECT COALESCE(NULLIF(p.display_name, ''), u.username)
+			FROM users u
+			LEFT JOIN user_profiles p ON p.user_id = u.id
+			WHERE u.id = ?
+		`, userID).Scan(&actorName); err != nil {
+			http.Error(w, "could not load acting user", http.StatusInternalServerError)
+			return
+		}
+
+		type removalTarget struct {
+			UserID string
+			Name   string
+		}
+		targets := make([]removalTarget, 0, len(targetIDs))
+		for _, targetID := range targetIDs {
+			if targetID == userID {
+				http.Error(w, "use leave conversation to remove yourself", http.StatusBadRequest)
+				return
+			}
+
+			var targetName string
+			err := tx.QueryRow(`
+				SELECT COALESCE(NULLIF(p.display_name, ''), u.username)
+				FROM conversation_members cm
+				JOIN users u ON u.id = cm.user_id
+				LEFT JOIN user_profiles p ON p.user_id = u.id
+				WHERE cm.conversation_id = ? AND cm.user_id = ?
+			`, convID, targetID).Scan(&targetName)
+			if err == sql.ErrNoRows {
+				http.Error(w, "member not found in conversation", http.StatusBadRequest)
+				return
+			}
+			if err != nil {
+				http.Error(w, "could not load conversation members", http.StatusInternalServerError)
+				return
+			}
+
+			targets = append(targets, removalTarget{UserID: targetID, Name: targetName})
+		}
+
+		remainingMembers := len(membersBefore) - len(targets)
+		if remainingMembers < 2 {
+			http.Error(w, "group conversations must keep at least two members", http.StatusBadRequest)
+			return
+		}
+
+		now := time.Now().Unix()
+		for _, target := range targets {
+			if err := database.SaveSystemMessageTx(tx, uuid.New().String(), convID, actorName+" removed "+target.Name+" from the conversation", now); err != nil {
+				http.Error(w, "could not record member removal", http.StatusInternalServerError)
+				return
+			}
+
+			queries := []string{
+				`DELETE FROM conversation_pending_room_keys WHERE conversation_id = ? AND user_id = ?`,
+				`DELETE FROM conversation_keys WHERE conversation_id = ? AND user_id = ?`,
+				`DELETE FROM conversation_members WHERE conversation_id = ? AND user_id = ?`,
+			}
+			for _, query := range queries {
+				if _, err := tx.Exec(query, convID, target.UserID); err != nil {
+					http.Error(w, "could not remove member", http.StatusInternalServerError)
+					return
+				}
+			}
+		}
+
+		if remainingMembers <= 2 {
+			if _, err := tx.Exec(`UPDATE conversations SET group_name = '' WHERE id = ?`, convID); err != nil {
+				http.Error(w, "could not update conversation", http.StatusInternalServerError)
+				return
+			}
+		}
+
+		if err := tx.Commit(); err != nil {
+			http.Error(w, "could not update conversation", http.StatusInternalServerError)
+			return
+		}
+
+		notifyConversationUsers(hub, membersBefore, convID)
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
 
 
 func SetMessageLifetimeHandler(db *sql.DB, hub *messaging.Hub) http.HandlerFunc {
