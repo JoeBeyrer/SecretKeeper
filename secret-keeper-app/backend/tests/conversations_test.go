@@ -363,6 +363,124 @@ func Test_update_group_name_handler(t *testing.T) {
 	}
 }
 
+func Test_remove_conversation_members_handler(t *testing.T) {
+	db := database.InitDB(":memory:")
+	defer db.Close()
+
+	for _, u := range []struct{ name, email string }{
+		{"alice", "alice@test.com"},
+		{"bob", "bob@test.com"},
+		{"carol", "carol@test.com"},
+	} {
+		body := `{"username":"` + u.name + `","email":"` + u.email + `","password":"password123"}`
+		req := httptest.NewRequest("POST", "/api/register", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		handlers.RegisterHandler(db)(w, req)
+		if w.Code != http.StatusCreated {
+			t.Fatalf("setup: register %s got %d", u.name, w.Code)
+		}
+		db.Exec(`UPDATE users SET email_verified = 1 WHERE username = ?`, u.name)
+	}
+
+	var aliceID, bobID, carolID string
+	db.QueryRow(`SELECT id FROM users WHERE username = 'alice'`).Scan(&aliceID)
+	db.QueryRow(`SELECT id FROM users WHERE username = 'bob'`).Scan(&bobID)
+	db.QueryRow(`SELECT id FROM users WHERE username = 'carol'`).Scan(&carolID)
+
+	body := `{"member_ids":["bob","carol"],"room_key":"groupsecret","group_name":"Weekend Plans"}`
+	req := requestWithUserID("POST", "/api/conversations/create", body, aliceID)
+	w := httptest.NewRecorder()
+	handlers.CreateConversationHandler(db, messaging.NewHub())(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201 for create, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp map[string]any
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode create response: %v", err)
+	}
+	convID := resp["conversation_id"].(string)
+
+	if _, err := db.Exec(`INSERT INTO conversation_keys (conversation_id, user_id, encrypted_key) VALUES (?, ?, ?)`, convID, bobID, "bob-key"); err != nil {
+		t.Fatalf("insert bob conversation key: %v", err)
+	}
+	if _, err := db.Exec(`INSERT INTO conversation_keys (conversation_id, user_id, encrypted_key) VALUES (?, ?, ?)`, convID, carolID, "carol-key"); err != nil {
+		t.Fatalf("insert carol conversation key: %v", err)
+	}
+
+	req = requestWithUserID("PATCH", "/api/conversations/"+convID+"/members/remove", `{"member_ids":["`+carolID+`"]}`, aliceID)
+	req.SetPathValue("id", convID)
+	w = httptest.NewRecorder()
+	handlers.RemoveConversationMembersHandler(db, messaging.NewHub())(w, req)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("expected 204 for member removal, got %d: %s", w.Code, w.Body.String())
+	}
+
+	remainingMembers, err := database.GetConversationMembers(db, convID)
+	if err != nil {
+		t.Fatalf("GetConversationMembers: %v", err)
+	}
+	if len(remainingMembers) != 2 {
+		t.Fatalf("expected two remaining members after removal, got %d", len(remainingMembers))
+	}
+	for _, memberID := range remainingMembers {
+		if memberID == carolID {
+			t.Fatalf("expected carol to be removed from the conversation")
+		}
+	}
+
+	var groupName string
+	if err := db.QueryRow(`SELECT COALESCE(group_name, '') FROM conversations WHERE id = ?`, convID).Scan(&groupName); err != nil {
+		t.Fatalf("load group name: %v", err)
+	}
+	if groupName != "" {
+		t.Fatalf("expected group name to clear when only two members remain, got %q", groupName)
+	}
+
+	var removalNotice string
+	var senderID sql.NullString
+	if err := db.QueryRow(`
+		SELECT ciphertext, sender_id
+		FROM messages
+		WHERE conversation_id = ?
+		ORDER BY created_at DESC, id DESC
+		LIMIT 1
+	`, convID).Scan(&removalNotice, &senderID); err != nil {
+		t.Fatalf("load removal notice: %v", err)
+	}
+	if removalNotice != "alice removed carol from the conversation" {
+		t.Fatalf("expected removal notice, got %q", removalNotice)
+	}
+	if senderID.Valid {
+		t.Fatalf("expected removal notice to be a system message, got sender %q", senderID.String)
+	}
+
+	var carolMembershipCount int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM conversation_members WHERE conversation_id = ? AND user_id = ?`, convID, carolID).Scan(&carolMembershipCount); err != nil {
+		t.Fatalf("count carol membership: %v", err)
+	}
+	if carolMembershipCount != 0 {
+		t.Fatalf("expected carol membership to be removed, got %d rows", carolMembershipCount)
+	}
+
+	var carolKeyCount int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM conversation_keys WHERE conversation_id = ? AND user_id = ?`, convID, carolID).Scan(&carolKeyCount); err != nil {
+		t.Fatalf("count carol conversation key: %v", err)
+	}
+	if carolKeyCount != 0 {
+		t.Fatalf("expected carol conversation key to be removed, got %d rows", carolKeyCount)
+	}
+
+	var bobKeyCount int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM conversation_keys WHERE conversation_id = ? AND user_id = ?`, convID, bobID).Scan(&bobKeyCount); err != nil {
+		t.Fatalf("count bob conversation key: %v", err)
+	}
+	if bobKeyCount != 1 {
+		t.Fatalf("expected bob conversation key to remain, got %d rows", bobKeyCount)
+	}
+}
+
 func Test_get_conversation_messages_handler(t *testing.T) {
 	db := database.InitDB(":memory:")
 	defer db.Close()
@@ -945,6 +1063,14 @@ func Test_leave_group_conversation_handler(t *testing.T) {
 	}
 	if leaveSender.Valid {
 		t.Fatalf("expected leave notice to have no sender, got %q", leaveSender.String)
+	}
+
+	var remainingGroupName string
+	if err := db.QueryRow(`SELECT COALESCE(group_name, '') FROM conversations WHERE id = ?`, convID).Scan(&remainingGroupName); err != nil {
+		t.Fatalf("load remaining group name: %v", err)
+	}
+	if remainingGroupName != "" {
+		t.Fatalf("expected group name to clear when only two members remain, got %q", remainingGroupName)
 	}
 
 	var aliceKeyCount int

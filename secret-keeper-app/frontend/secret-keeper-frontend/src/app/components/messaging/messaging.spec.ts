@@ -57,10 +57,12 @@ describe('Messaging', () => {
       getConversations: vi.fn().mockResolvedValue(mockConversations),
       createConversation: vi.fn(),
       getMessages: vi.fn().mockResolvedValue([]),
+      getConversationMembers: vi.fn().mockResolvedValue([]),
       verifyRoomKey: vi.fn(),
       claimRoomKey: vi.fn(),
       setMessageLifetime: vi.fn().mockResolvedValue(undefined),
       updateGroupName: vi.fn().mockResolvedValue(undefined),
+      removeConversationMembers: vi.fn().mockResolvedValue(undefined),
       leaveConversation: vi.fn().mockResolvedValue(undefined),
       editMessage: vi.fn().mockResolvedValue(undefined),
       DeleteMessage: vi.fn().mockResolvedValue(undefined),
@@ -243,6 +245,36 @@ describe('Messaging', () => {
     expect(component.modal).toEqual({ type: 'none' });
   });
 
+
+  it('saveConversationSettings() should remove staged members when settings are saved', async () => {
+    component.conversations = [
+      {
+        id: 'conv-group',
+        name: 'Weekend Plans',
+        fullName: 'Weekend Plans',
+        lastMessage: '',
+        lastMessageTime: '',
+        messageLifetime: 1440,
+        memberCount: 3,
+      },
+    ];
+    component.conversationId = 'conv-group';
+    component.messageLifetime = 1440;
+    component.selectedMessageLifetime = 1440;
+    component.editedGroupName = 'Weekend Plans';
+    component.pendingRemovedMemberIds = ['user-2'];
+    component.modal = { type: 'conversation-settings', convId: 'conv-group' };
+    conversationServiceSpy.getConversations.mockResolvedValue([
+      { id: 'conv-group', name: 'bob', last_message: '', last_message_time: 1700000000, message_lifetime: 1440, member_count: 2 },
+    ]);
+    conversationServiceSpy.getMessages.mockResolvedValue([]);
+
+    await component.saveConversationSettings();
+
+    expect(conversationServiceSpy.removeConversationMembers).toHaveBeenCalledWith('conv-group', ['user-2']);
+    expect(component.modal).toEqual({ type: 'none' });
+  });
+
   it('leaveConversation() should remove the active conversation and clear the chat state', async () => {
     component.conversationId = 'conv-1';
     component.isConnected = true;
@@ -403,7 +435,7 @@ describe('Messaging', () => {
   });
 
   it('getActiveConversationName() should return name of current conversation', () => {
-    component.conversations = [{ id: 'conv-1', name: 'Bob', lastMessage: '', lastMessageTime: '' }];
+    component.conversations = [{ id: 'conv-1', name: 'Bob', lastMessage: '', lastMessageTime: '', memberCount: 2, fullName: '' }];
     component.conversationId = 'conv-1';
     expect(component.getActiveConversationName()).toBe('Bob');
   });
@@ -449,7 +481,7 @@ describe('Messaging', () => {
     const refreshConversationListSpy = vi.spyOn(component as any, 'refreshConversationList').mockResolvedValue(undefined);
 
     component.conversationId = 'conv-1';
-    component.conversations = [{ id: 'conv-1', name: 'Bob', lastMessage: '', lastMessageTime: '', messageLifetime: 1440 }];
+    component.conversations = [{ id: 'conv-1', name: 'Bob', lastMessage: '', lastMessageTime: '', messageLifetime: 1440, memberCount: 2, fullName: ''  }];
     component.modal = { type: 'conversation-settings', convId: 'conv-1' };
     component.selectedMessageLifetime = 60;
 
