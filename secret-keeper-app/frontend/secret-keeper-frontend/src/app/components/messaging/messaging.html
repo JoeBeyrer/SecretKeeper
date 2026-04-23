@@ -158,7 +158,7 @@
                 <p class="friend-picker-empty">Loading group members...</p>
               } @else {
                 @for (member of conversationMembers; track member.userId) {
-                  <div class="manage-member-row">
+                  <div class="manage-member-row" [class.manage-member-row-pending]="isConversationMemberMarkedForRemoval(member.userId)">
                     <div class="manage-member-profile">
                       @if (member.profilePictureUrl) {
                         <img class="manage-member-avatar avatar-img" [src]="member.profilePictureUrl" [alt]="member.username" />
@@ -176,20 +176,30 @@
                     <div class="manage-member-actions">
                       @if (member.friendshipStatus === 'self') {
                         <span class="manage-member-chip">You</span>
-                      } @else if (member.friendshipStatus === 'friend') {
-                        <span class="manage-member-chip manage-member-chip-friend">Friends</span>
-                      } @else if (member.friendshipStatus === 'pending_outgoing') {
-                        <span class="manage-member-chip">Request sent</span>
-                      } @else if (member.friendshipStatus === 'pending_incoming') {
-                        <span class="manage-member-chip">Respond in Friends</span>
                       } @else {
+                        @if (member.friendshipStatus === 'friend') {
+                          <span class="manage-member-chip manage-member-chip-friend">Friends</span>
+                        } @else if (member.friendshipStatus === 'pending_outgoing') {
+                          <span class="manage-member-chip">Request sent</span>
+                        } @else if (member.friendshipStatus === 'pending_incoming') {
+                          <span class="manage-member-chip">Respond in Friends</span>
+                        } @else {
+                          <button
+                            class="manage-member-button"
+                            type="button"
+                            (click)="sendFriendRequestToConversationMember(member)"
+                            [disabled]="isManagingMemberAction(member.username) || isConversationMemberMarkedForRemoval(member.userId)"
+                          >
+                            {{ isManagingMemberAction(member.username) ? '...' : 'Add Friend' }}
+                          </button>
+                        }
+
                         <button
-                          class="manage-member-button"
+                          class="manage-member-button manage-member-button-danger"
                           type="button"
-                          (click)="sendFriendRequestToConversationMember(member)"
-                          [disabled]="isManagingMemberAction(member.username)"
+                          (click)="togglePendingConversationMemberRemoval(member)"
                         >
-                          {{ isManagingMemberAction(member.username) ? '...' : 'Add Friend' }}
+                          {{ isConversationMemberMarkedForRemoval(member.userId) ? 'Undo' : 'Remove' }}
                         </button>
                       }
                     </div>

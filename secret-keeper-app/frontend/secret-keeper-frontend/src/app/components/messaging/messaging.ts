@@ -133,6 +133,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
   conversationMembers: ConversationMember[] = [];
   isLoadingConversationMembers: boolean = false;
   memberActionInProgress: Record<string, boolean> = {};
+  pendingRemovedMemberIds: string[] = [];
   manageError: string = '';
   messageLifetime: number = 0;
   selectedMessageLifetime: number = 0;
@@ -425,6 +426,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     this.isLoadingConversationMembers = false;
     this.conversationMembers = [];
     this.memberActionInProgress = {};
+    this.pendingRemovedMemberIds = [];
     this.createConversationError = '';
     this.selectedConversationMembers = [];
     this.groupConversationNameInput = '';
@@ -446,6 +448,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     this.settingsError = '';
     this.manageError = '';
     this.memberActionInProgress = {};
+    this.pendingRemovedMemberIds = [];
     this.modal = { type: 'conversation-settings', convId: this.conversationId };
 
     if (!this.isActiveConversationGroup()) {
@@ -488,10 +491,19 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     const conv = this.conversations.find(c => c.id === this.conversationId);
     const nextGroupName = this.editedGroupName.trim();
     const currentGroupName = (conv?.fullName ?? '').trim();
-    const shouldRenameGroup = this.isActiveConversationGroup() && nextGroupName !== currentGroupName;
+    const currentMemberCount = conv?.memberCount ?? this.conversationMembers.length;
+    const membersToRemove = [...this.pendingRemovedMemberIds];
+    const remainingMembersAfterRemoval = Math.max(currentMemberCount - membersToRemove.length, 0);
+    const shouldRemoveMembers = membersToRemove.length > 0;
+    const shouldRenameGroup = this.isActiveConversationGroup() && remainingMembersAfterRemoval > 2 && nextGroupName !== currentGroupName;
     const shouldUpdateLifetime = this.selectedMessageLifetime !== this.messageLifetime;
 
-    if (this.isActiveConversationGroup() && !nextGroupName) {
+    if (shouldRemoveMembers && remainingMembersAfterRemoval < 2) {
+      this.settingsError = 'A conversation must keep at least two members.';
+      return;
+    }
+
+    if (this.isActiveConversationGroup() && remainingMembersAfterRemoval > 2 && !nextGroupName) {
       this.settingsError = 'Group name is required.';
       return;
     }
@@ -502,6 +514,13 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
         this.messageLifetime = this.selectedMessageLifetime;
         if (conv) {
           conv.messageLifetime = this.selectedMessageLifetime;
+        }
+      }
+
+      if (shouldRemoveMembers) {
+        await this.conversationService.removeConversationMembers(this.conversationId, membersToRemove);
+        if (conv) {
+          conv.memberCount = remainingMembersAfterRemoval;
         }
       }
 
@@ -517,8 +536,9 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
       this.settingsError = '';
       this.manageError = '';
       this.editedGroupName = '';
+      this.pendingRemovedMemberIds = [];
 
-      if (shouldRenameGroup || shouldUpdateLifetime) {
+      if (shouldRenameGroup || shouldUpdateLifetime || shouldRemoveMembers) {
         await Promise.all([
           this.refreshConversationList(),
           this.loadMessages(this.conversationId),
@@ -900,12 +920,38 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     return !!this.memberActionInProgress[username];
   }
 
+  isConversationMemberMarkedForRemoval(userId: string): boolean {
+    return this.pendingRemovedMemberIds.includes(userId);
+  }
+
+  togglePendingConversationMemberRemoval(member: ConversationMember): void {
+    if (member.friendshipStatus === 'self') {
+      return;
+    }
+
+    this.settingsError = '';
+    this.manageError = '';
+
+    if (this.isConversationMemberMarkedForRemoval(member.userId)) {
+      this.pendingRemovedMemberIds = this.pendingRemovedMemberIds.filter(userId => userId !== member.userId);
+      return;
+    }
+
+    const currentMemberCount = this.conversationMembers.length || (this.conversations.find(c => c.id === this.conversationId)?.memberCount ?? 0);
+    if (currentMemberCount - this.pendingRemovedMemberIds.length - 1 < 2) {
+      this.manageError = 'A conversation must keep at least two members.';
+      return;
+    }
+
+    this.pendingRemovedMemberIds = [...this.pendingRemovedMemberIds, member.userId];
+  }
+
   getConversationMemberLabel(member: ConversationMember): string {
     return member.displayName || member.username;
   }
 
   async sendFriendRequestToConversationMember(member: ConversationMember): Promise<void> {
-    if (member.friendshipStatus !== 'none') {
+    if (member.friendshipStatus !== 'none' || this.isConversationMemberMarkedForRemoval(member.userId)) {
       return;
     }
 

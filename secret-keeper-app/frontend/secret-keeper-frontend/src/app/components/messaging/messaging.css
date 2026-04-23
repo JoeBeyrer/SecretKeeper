@@ -1019,6 +1019,12 @@ img {
   background: #1a1e24;
 }
 
+
+.manage-member-row-pending {
+  opacity: 0.72;
+  border: 1px solid rgba(255, 107, 107, 0.28);
+}
+
 .manage-member-profile {
   min-width: 0;
   display: flex;
@@ -1072,6 +1078,7 @@ img {
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  gap: 8px;
   flex-shrink: 0;
 }
 
@@ -1116,6 +1123,16 @@ img {
 .manage-member-button:disabled {
   cursor: default;
   opacity: 0.7;
+}
+
+
+.manage-member-button-danger {
+  background: rgba(255, 107, 107, 0.16);
+  color: #ffb1b1;
+}
+
+.manage-member-button-danger:hover:not(:disabled) {
+  background: rgba(255, 107, 107, 0.28);
 }
 
 .manage-danger-zone {
