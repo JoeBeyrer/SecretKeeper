@@ -4,7 +4,7 @@ import { Router, ActivatedRoute } from '@angular/router';
 import { Subscription } from 'rxjs';
 
 import { MessagingService } from '../../services/messaging.service';
-import { ConversationService } from '../../services/conversation.service';
+import { ConversationService, ConversationMemberSummary } from '../../services/conversation.service';
 import { AuthService } from '../../services/auth.service';
 import { CryptoService } from '../../services/crypto.service';
 import { FriendService, FriendEntry } from '../../services/friend.service';
@@ -42,6 +42,15 @@ interface Conversation {
   lastMessage: string;
   lastMessageTime: string;
   messageLifetime?: number;
+  memberCount: number;
+}
+
+interface ConversationMember {
+  userId: string;
+  username: string;
+  displayName: string;
+  profilePictureUrl: string;
+  friendshipStatus: ConversationMemberSummary['friendship_status'];
 }
 
 interface LifetimeOption {
@@ -120,6 +129,10 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
   currentUserPictureUrl: string = '';
   activeConversationPictureUrl: string = '';
   conversations: Conversation[] = [];
+  conversationMembers: ConversationMember[] = [];
+  isLoadingConversationMembers: boolean = false;
+  memberActionInProgress: Record<string, boolean> = {};
+  manageError: string = '';
   messageLifetime: number = 0;
   selectedMessageLifetime: number = 0;
   settingsError: string = '';
@@ -329,6 +342,9 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     this.composerError = '';
     this.errorMessage = '';
     this.settingsError = '';
+    this.manageError = '';
+    this.conversationMembers = [];
+    this.memberActionInProgress = {};
     this.cancelEditingMessage(false);
     this.openMessageMenuId = null;
     this.activeConversationPictureUrl = '';
@@ -403,6 +419,10 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     this.roomKeyInput = '';
     this.roomKeyError = '';
     this.settingsError = '';
+    this.manageError = '';
+    this.isLoadingConversationMembers = false;
+    this.conversationMembers = [];
+    this.memberActionInProgress = {};
     this.createConversationError = '';
     this.selectedConversationMembers = [];
     this.groupConversationNameInput = '';
@@ -415,12 +435,45 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     setTimeout(() => this.roomKeyCopied = false, 2000);
   }
 
-  openConversationSettings(): void {
+  async openConversationSettings(): Promise<void> {
     if (!this.conversationId) return;
 
     this.selectedMessageLifetime = this.messageLifetime;
     this.settingsError = '';
+    this.manageError = '';
+    this.memberActionInProgress = {};
     this.modal = { type: 'conversation-settings', convId: this.conversationId };
+
+    if (!this.isActiveConversationGroup()) {
+      this.conversationMembers = [];
+      this.isLoadingConversationMembers = false;
+      return;
+    }
+
+    this.isLoadingConversationMembers = true;
+    this.conversationMembers = [];
+
+    try {
+      const members = await this.conversationService.getConversationMembers(this.conversationId);
+      this.ngZone.run(() => {
+        this.conversationMembers = members.map(member => ({
+          userId: member.user_id,
+          username: member.username,
+          displayName: member.display_name || member.username,
+          profilePictureUrl: member.profile_picture_url || '',
+          friendshipStatus: member.friendship_status,
+        }));
+      });
+    } catch (e: any) {
+      console.error('[Messaging] Failed to load conversation members:', e);
+      this.ngZone.run(() => {
+        this.manageError = e?.message || 'Failed to load group members.';
+      });
+    } finally {
+      this.ngZone.run(() => {
+        this.isLoadingConversationMembers = false;
+      });
+    }
   }
 
   async saveConversationSettings(): Promise<void> {
@@ -809,6 +862,39 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     return conv ? conv.name : this.conversationId.substring(0, 8);
   }
 
+  isActiveConversationGroup(): boolean {
+    return (this.conversations.find(c => c.id === this.conversationId)?.memberCount ?? 0) > 2;
+  }
+
+  isManagingMemberAction(username: string): boolean {
+    return !!this.memberActionInProgress[username];
+  }
+
+  getConversationMemberLabel(member: ConversationMember): string {
+    return member.displayName || member.username;
+  }
+
+  async sendFriendRequestToConversationMember(member: ConversationMember): Promise<void> {
+    if (member.friendshipStatus !== 'none') {
+      return;
+    }
+
+    this.memberActionInProgress = { ...this.memberActionInProgress, [member.username]: true };
+    this.manageError = '';
+
+    try {
+      await this.friendService.sendFriendRequest(member.username);
+      member.friendshipStatus = 'pending_outgoing';
+    } catch (e: any) {
+      console.error('[Messaging] Failed to send friend request from manage modal:', e);
+      this.manageError = e?.message || 'Failed to send friend request.';
+    } finally {
+      const next = { ...this.memberActionInProgress };
+      delete next[member.username];
+      this.memberActionInProgress = next;
+    }
+  }
+
   private pictureRefreshInterval: ReturnType<typeof setInterval> | null = null;
 
   private startPictureRefresh(convId: string): void {
@@ -909,6 +995,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
             ? this.formatTimeShort(new Date(c.last_message_time * 1000))
             : '',
           messageLifetime: c.message_lifetime ?? 0,
+          memberCount: c.member_count ?? 2,
         }));
 
         const activeConversation = this.conversations.find(c => c.id === this.conversationId);
@@ -976,7 +1063,11 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
         this.errorMessage = '';
         this.createConversationError = '';
         this.isConnected = true;
-        this.addConversationToList(result.conversation_id, this.buildConversationName(uniqueMemberUsernames, trimmedGroupName));
+        this.addConversationToList(
+          result.conversation_id,
+          this.buildConversationName(uniqueMemberUsernames, trimmedGroupName),
+          uniqueMemberUsernames.length + 1,
+        );
       });
 
       if (result.created) {
@@ -1319,6 +1410,10 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     this.newMessage = '';
     this.composerError = '';
     this.settingsError = '';
+    this.manageError = '';
+    this.isLoadingConversationMembers = false;
+    this.conversationMembers = [];
+    this.memberActionInProgress = {};
     this.roomKeyInput = '';
     this.roomKeyError = '';
     this.roomKeyCopied = false;
@@ -1364,9 +1459,16 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   }
 
-  private addConversationToList(id: string, name: string): void {
+  private addConversationToList(id: string, name: string, memberCount: number = 2): void {
     if (this.conversations.find(c => c.id === id)) return;
-    this.conversations.unshift({ id, name: this.formatConversationName(name), lastMessage: '', lastMessageTime: '', messageLifetime: 0 });
+    this.conversations.unshift({
+      id,
+      name: this.formatConversationName(name),
+      lastMessage: '',
+      lastMessageTime: '',
+      messageLifetime: 0,
+      memberCount,
+    });
   }
 
   private updateConversationName(convId: string, displayName: string): void {

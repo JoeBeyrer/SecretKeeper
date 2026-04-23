@@ -130,10 +130,64 @@
 
   @if (modal.type === 'conversation-settings') {
     <div class="modal-backdrop">
-      <div class="modal">
-        <div class="modal-icon">⏳</div>
-        <h2 class="modal-title">Conversation Settings</h2>
-        <p class="modal-subtitle">Choose how long messages stay visible in this conversation. The selected policy applies to both members, updates existing messages, and future messages follow the same rule.</p>
+      <div class="modal modal-manage" [class.modal-manage-group]="isActiveConversationGroup()">
+        <div class="modal-icon">{{ isActiveConversationGroup() ? '👥' : '⏳' }}</div>
+        <h2 class="modal-title">{{ isActiveConversationGroup() ? 'Manage Group' : 'Conversation Settings' }}</h2>
+
+        @if (isActiveConversationGroup()) {
+          <div class="manage-section">
+            <div class="manage-section-header">
+              <span class="manage-section-title">Members</span>
+              <span class="manage-section-meta">{{ conversationMembers.length || 0 }} total</span>
+            </div>
+
+            <div class="manage-member-list">
+              @if (isLoadingConversationMembers) {
+                <p class="friend-picker-empty">Loading group members...</p>
+              } @else {
+                @for (member of conversationMembers; track member.userId) {
+                  <div class="manage-member-row">
+                    <div class="manage-member-profile">
+                      @if (member.profilePictureUrl) {
+                        <img class="manage-member-avatar avatar-img" [src]="member.profilePictureUrl" [alt]="member.username" />
+                      } @else {
+                        <div class="manage-member-avatar manage-member-avatar-fallback">
+                          {{ getConversationMemberLabel(member).charAt(0).toUpperCase() }}
+                        </div>
+                      }
+                      <div class="manage-member-copy">
+                        <span class="manage-member-name">{{ getConversationMemberLabel(member) }}</span>
+                        <span class="manage-member-username">&#64;{{ member.username }}</span>
+                      </div>
+                    </div>
+
+                    <div class="manage-member-actions">
+                      @if (member.friendshipStatus === 'self') {
+                        <span class="manage-member-chip">You</span>
+                      } @else if (member.friendshipStatus === 'friend') {
+                        <span class="manage-member-chip manage-member-chip-friend">Friends</span>
+                      } @else if (member.friendshipStatus === 'pending_outgoing') {
+                        <span class="manage-member-chip">Request sent</span>
+                      } @else if (member.friendshipStatus === 'pending_incoming') {
+                        <span class="manage-member-chip">Respond in Friends</span>
+                      } @else {
+                        <button
+                          class="manage-member-button"
+                          type="button"
+                          (click)="sendFriendRequestToConversationMember(member)"
+                          [disabled]="isManagingMemberAction(member.username)"
+                        >
+                          {{ isManagingMemberAction(member.username) ? '...' : 'Add Friend' }}
+                        </button>
+                      }
+                    </div>
+                  </div>
+                }
+              }
+            </div>
+          </div>
+        }
+
         <div class="settings-field">
           <label class="settings-label" for="message-lifetime-select">Message expiry</label>
           <select
@@ -146,9 +200,20 @@
             }
           </select>
         </div>
+
+        @if (manageError) {
+          <p class="modal-error">{{ manageError }}</p>
+        }
         @if (settingsError) {
           <p class="modal-error">{{ settingsError }}</p>
         }
+
+        @if (isActiveConversationGroup()) {
+          <div class="manage-danger-zone">
+            <button class="leave-chat-trigger manage-leave-button" type="button" (click)="leaveConversation()">Leave Group</button>
+          </div>
+        }
+
         <div class="modal-actions">
           <button class="btn-secondary" (click)="closeModal()">Cancel</button>
           <button class="btn-primary" (click)="saveConversationSettings()">Save Settings</button>
@@ -252,14 +317,26 @@
             <p class="encrypted-badge">🔐 End-to-end encrypted</p>
           </div>
           <div class="chat-message-settings">
-            <button class="leave-chat-trigger" type="button" (click)="leaveConversation()">Leave Chat</button>
-            <button class="settings-trigger" type="button" (click)="openConversationSettings()">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <circle cx="12" cy="12" r="3"></circle>
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-              </svg>
-              <span>Message expiry: {{ getMessageLifetimeLabel() }}</span>
-            </button>
+            @if (isActiveConversationGroup()) {
+              <button class="settings-trigger" type="button" (click)="openConversationSettings()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="9" cy="7" r="4"></circle>
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                </svg>
+                <span>Manage Group</span>
+              </button>
+            } @else {
+              <button class="leave-chat-trigger" type="button" (click)="leaveConversation()">Leave Chat</button>
+              <button class="settings-trigger" type="button" (click)="openConversationSettings()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="3"></circle>
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                </svg>
+                <span>Message expiry: {{ getMessageLifetimeLabel() }}</span>
+              </button>
+            }
           </div>
         </div>
 
