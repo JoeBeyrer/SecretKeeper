@@ -16,6 +16,7 @@ type MessageRow struct {
     Ciphertext string
     CreatedAt int64
     ExpiresAt *int64
+	IsSystem bool
     Reactions []ReactionRow
 }
 
@@ -40,6 +41,23 @@ func SaveMessage(db *sql.DB, id, convID, senderID, ciphertext string, createdAt 
         VALUES (?, ?, ?, ?, ?, ?)
     `, id, convID, senderID, ciphertext, createdAt, expiresAt)
     return err
+}
+
+func SaveSystemMessageTx(tx *sql.Tx, id, convID, plaintext string, createdAt int64) error {
+	var messageLifetime int64
+	tx.QueryRow(`SELECT message_lifetime FROM conversations WHERE id = ?`, convID).Scan(&messageLifetime)
+
+	var expiresAt *int64
+	if messageLifetime > 0 {
+		t := createdAt + (messageLifetime * 60)
+		expiresAt = &t
+	}
+
+	_, err := tx.Exec(`
+        INSERT INTO messages (id, conversation_id, sender_id, ciphertext, created_at, expires_at)
+        VALUES (?, ?, NULL, ?, ?, ?)
+    `, id, convID, plaintext, createdAt, expiresAt)
+	return err
 }
 
 func IsUserInConversation(db *sql.DB, userID, conversationID string) bool {
@@ -104,38 +122,59 @@ func GetConversationMembers(db *sql.DB, conversationID string) ([]string, error)
 
 func GetMessagesByConversation(db *sql.DB, conversationID string, limit int) ([]MessageRow, error) {
 	now := time.Now().Unix()
-    rows, err := db.Query(`
-        SELECT
-            m.id,
-            m.sender_id,
-            u.username,
-            COALESCE(p.display_name, u.username) AS display_name,
-            COALESCE(p.profile_picture_url, ''),
-            m.ciphertext,
-            m.created_at,
-            m.expires_at
-        FROM messages m
-        JOIN users u ON u.id = m.sender_id
-        LEFT JOIN user_profiles p ON p.user_id = m.sender_id
-        WHERE m.conversation_id = ?
-          AND (m.expires_at IS NULL OR m.expires_at > ?)
-        ORDER BY m.created_at ASC
-        LIMIT ?
-    `, conversationID, now, limit)
-    if err != nil {
-        return nil, err
-    }
-    defer rows.Close()
+	rows, err := db.Query(`
+		SELECT
+			m.id,
+			m.sender_id,
+			COALESCE(u.username, ''),
+			COALESCE(NULLIF(p.display_name, ''), u.username, ''),
+			COALESCE(p.profile_picture_url, ''),
+			m.ciphertext,
+			m.created_at,
+			m.expires_at,
+			CASE WHEN m.sender_id IS NULL THEN 1 ELSE 0 END AS is_system
+		FROM messages m
+		LEFT JOIN users u ON u.id = m.sender_id
+		LEFT JOIN user_profiles p ON p.user_id = m.sender_id
+		WHERE m.conversation_id = ?
+		  AND (m.expires_at IS NULL OR m.expires_at > ?)
+		ORDER BY m.created_at ASC
+		LIMIT ?
+	`, conversationID, now, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
 
-    var result []MessageRow
-    for rows.Next() {
-        var msg MessageRow
-        if err := rows.Scan(&msg.ID, &msg.SenderID, &msg.Username, &msg.DisplayName, &msg.ProfilePictureURL, &msg.Ciphertext, &msg.CreatedAt, &msg.ExpiresAt); err != nil {
-            return nil, err
-        }
-        result = append(result, msg)
-    }
-    return result, nil
+	var result []MessageRow
+	for rows.Next() {
+		var msg MessageRow
+		var senderID sql.NullString
+		var username sql.NullString
+		var displayName sql.NullString
+		var profilePictureURL sql.NullString
+		var isSystem int
+		if err := rows.Scan(
+			&msg.ID,
+			&senderID,
+			&username,
+			&displayName,
+			&profilePictureURL,
+			&msg.Ciphertext,
+			&msg.CreatedAt,
+			&msg.ExpiresAt,
+			&isSystem,
+		); err != nil {
+			return nil, err
+		}
+		msg.SenderID = senderID.String
+		msg.Username = username.String
+		msg.DisplayName = displayName.String
+		msg.ProfilePictureURL = profilePictureURL.String
+		msg.IsSystem = isSystem == 1
+		result = append(result, msg)
+	}
+	return result, nil
 }
 
 func UpdateMessage(db *sql.DB, messageID, senderID, ciphertext string) (string, error) {
@@ -211,27 +250,19 @@ func ClaimConversationRoomKey(db *sql.DB, conversationID, userID string) (string
 	}
 	defer tx.Rollback()
 
-	var roomKey sql.NullString
-	var recipientID sql.NullString
+	var roomKey string
 	err = tx.QueryRow(`
-        SELECT pending_room_key, pending_room_key_recipient_id
-        FROM conversations
-        WHERE id = ?
-    `, conversationID).Scan(&roomKey, &recipientID)
+        SELECT room_key
+        FROM conversation_pending_room_keys
+        WHERE conversation_id = ? AND user_id = ?
+    `, conversationID, userID).Scan(&roomKey)
 	if err != nil {
-		return "", err
+			return "", err
 	}
-
-	if !roomKey.Valid || roomKey.String == "" || !recipientID.Valid || recipientID.String != userID {
-		return "", sql.ErrNoRows
-	}
-
 	result, err := tx.Exec(`
-        UPDATE conversations
-        SET pending_room_key = NULL,
-            pending_room_key_recipient_id = NULL
-        WHERE id = ? AND pending_room_key_recipient_id = ?
-    `, conversationID, userID)
+		DELETE FROM conversation_pending_room_keys
+		WHERE conversation_id = ? AND user_id = ?
+	`, conversationID, userID)
 	if err != nil {
 		return "", err
 	}
@@ -247,8 +278,7 @@ func ClaimConversationRoomKey(db *sql.DB, conversationID, userID string) (string
 	if err := tx.Commit(); err != nil {
 		return "", err
 	}
-
-	return roomKey.String, nil
+	return roomKey, nil
 }
 
 var BcryptCost = bcrypt.DefaultCost

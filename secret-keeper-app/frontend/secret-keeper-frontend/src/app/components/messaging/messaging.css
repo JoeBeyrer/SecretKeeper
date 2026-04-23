@@ -400,6 +400,14 @@ img {
   gap: 8px;
 }
 
+.sidebar-action.single-action {
+  width: 100%;
+}
+
+.sidebar-create-button {
+  width: 100%;
+}
+
 .chat-header {
   display: flex;
   align-items: center;
@@ -431,6 +439,24 @@ img {
 
 .message-row.theirs {
   justify-content: flex-start;
+}
+
+.system-message-row {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.system-message-pill {
+  margin: 0;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(59, 68, 80, 0.45);
+  color: #7c7c7c;
+  font-family: var(--font-family-roboto);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: center;
 }
 
 /* column that stacks bubble + reaction bar */
@@ -692,6 +718,15 @@ img {
   box-shadow: 0 8px 32px rgba(0,0,0,0.5);
 }
 
+.modal-manage {
+  max-height: min(90vh, 820px);
+  overflow-y: auto;
+}
+
+.modal-manage-group {
+  width: 560px;
+}
+
 .modal-icon {
   font-size: 40px;
 }
@@ -712,6 +747,80 @@ img {
   text-align: center;
   margin: 0;
   line-height: 1.5;
+}
+
+.modal-members {
+  width: 100%;
+  color: #fff;
+  font-family: var(--font-family-roboto);
+  font-size: 13px;
+  text-align: left;
+}
+
+.friend-picker-list {
+  width: 100%;
+  max-height: 260px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-right: 4px;
+}
+
+.friend-picker-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #1a1e24;
+  color: #fff;
+  cursor: pointer;
+}
+
+.friend-picker-item input {
+  width: 16px;
+  height: 16px;
+  accent-color: #34c9eb;
+}
+
+.friend-picker-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.friend-picker-username {
+  font-family: var(--font-family-roboto);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.friend-picker-display-name,
+.friend-picker-empty {
+  font-family: var(--font-family-roboto);
+  font-size: 13px;
+  color: #999;
+}
+
+.friend-picker-name {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.friend-picker-name-label {
+  font-family: var(--font-family-roboto);
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.friend-picker-empty {
+  text-align: center;
+  padding: 20px 0;
 }
 
 .room-key-display {
@@ -862,8 +971,210 @@ img {
   border-color: #34c9eb;
 }
 
+.manage-section {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.manage-section-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.manage-section-title {
+  font-family: var(--font-family-roboto);
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.manage-section-meta {
+  font-family: var(--font-family-roboto);
+  font-size: 12px;
+  color: #999;
+}
+
+.manage-member-list {
+  width: 100%;
+  max-height: 280px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.manage-member-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #1a1e24;
+}
+
+
+.manage-member-row-pending {
+  opacity: 0.72;
+  border: 1px solid rgba(255, 107, 107, 0.28);
+}
+
+.manage-member-profile {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.manage-member-avatar {
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.manage-member-avatar-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #3b4450;
+  color: #fff;
+  font-family: var(--font-family-roboto);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.manage-member-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.manage-member-name {
+  font-family: var(--font-family-roboto);
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.manage-member-username {
+  font-family: var(--font-family-roboto);
+  font-size: 12px;
+  color: #999;
+}
+
+.manage-member-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.manage-member-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.08);
+  color: #d9dee7;
+  padding: 8px 12px;
+  font-family: var(--font-family-roboto);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.manage-member-chip-friend {
+  border-color: rgba(52, 201, 235, 0.25);
+  background: rgba(52, 201, 235, 0.12);
+  color: #7ee4ff;
+}
+
+.manage-member-button {
+  border: none;
+  border-radius: 999px;
+  background: #1a702b;
+  color: #fff;
+  padding: 9px 14px;
+  font-family: var(--font-family-roboto);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s, opacity 0.2s;
+}
+
+.manage-member-button:hover:not(:disabled) {
+  background: #23983d;
+}
+
+.manage-member-button:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+
+.manage-member-button-danger {
+  background: rgba(255, 107, 107, 0.16);
+  color: #ffb1b1;
+}
+
+.manage-member-button-danger:hover:not(:disabled) {
+  background: rgba(255, 107, 107, 0.28);
+}
+
+.manage-danger-zone {
+  width: 100%;
+  display: flex;
+  justify-content: flex-start;
+  gap: 12px;
+}
+
+.manage-leave-button {
+  width: auto;
+}
+
+.manage-add-members-button {
+  width: auto;
+}
+
 .chat-message-settings {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.leave-chat-trigger {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(255, 107, 107, 0.35);
+  border-radius: 999px;
+  background: rgba(255, 107, 107, 0.08);
+  color: #ff8a8a;
+  padding: 8px 14px;
+  font-family: var(--font-family-roboto);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.leave-chat-trigger:hover {
+  background: rgba(255, 107, 107, 0.14);
+  border-color: rgba(255, 107, 107, 0.55);
 }
 
 .settings-trigger {
