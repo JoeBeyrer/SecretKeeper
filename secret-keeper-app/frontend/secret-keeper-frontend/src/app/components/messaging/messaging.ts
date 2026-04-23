@@ -39,6 +39,7 @@ interface Message {
 interface Conversation {
   id: string;
   name: string;
+  fullName: string;
   lastMessage: string;
   lastMessageTime: string;
   messageLifetime?: number;
@@ -136,6 +137,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
   messageLifetime: number = 0;
   selectedMessageLifetime: number = 0;
   settingsError: string = '';
+  editedGroupName: string = '';
   openMessageMenuId: string | null = null;
   editingMessageId: string | null = null;
   editDraft: string = '';
@@ -426,6 +428,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     this.createConversationError = '';
     this.selectedConversationMembers = [];
     this.groupConversationNameInput = '';
+    this.editedGroupName = '';
   }
 
   copyRoomKey(): void {
@@ -439,6 +442,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     if (!this.conversationId) return;
 
     this.selectedMessageLifetime = this.messageLifetime;
+    this.editedGroupName = this.conversations.find(c => c.id === this.conversationId)?.fullName ?? '';
     this.settingsError = '';
     this.manageError = '';
     this.memberActionInProgress = {};
@@ -481,19 +485,45 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
       return;
     }
 
+    const conv = this.conversations.find(c => c.id === this.conversationId);
+    const nextGroupName = this.editedGroupName.trim();
+    const currentGroupName = (conv?.fullName ?? '').trim();
+    const shouldRenameGroup = this.isActiveConversationGroup() && nextGroupName !== currentGroupName;
+    const shouldUpdateLifetime = this.selectedMessageLifetime !== this.messageLifetime;
+
+    if (this.isActiveConversationGroup() && !nextGroupName) {
+      this.settingsError = 'Group name is required.';
+      return;
+    }
+
     try {
-      await this.conversationService.setMessageLifetime(this.conversationId, this.selectedMessageLifetime);
-      this.messageLifetime = this.selectedMessageLifetime;
-      const conv = this.conversations.find(c => c.id === this.conversationId);
-      if (conv) {
-        conv.messageLifetime = this.selectedMessageLifetime;
+      if (shouldUpdateLifetime) {
+        await this.conversationService.setMessageLifetime(this.conversationId, this.selectedMessageLifetime);
+        this.messageLifetime = this.selectedMessageLifetime;
+        if (conv) {
+          conv.messageLifetime = this.selectedMessageLifetime;
+        }
       }
+
+      if (shouldRenameGroup) {
+        await this.conversationService.updateGroupName(this.conversationId, nextGroupName);
+        if (conv) {
+          conv.fullName = nextGroupName;
+          conv.name = this.formatConversationName(nextGroupName);
+        }
+      }
+
       this.modal = { type: 'none' };
       this.settingsError = '';
-      await Promise.all([
-        this.refreshConversationList(),
-        this.loadMessages(this.conversationId),
-      ]);
+      this.manageError = '';
+      this.editedGroupName = '';
+
+      if (shouldRenameGroup || shouldUpdateLifetime) {
+        await Promise.all([
+          this.refreshConversationList(),
+          this.loadMessages(this.conversationId),
+        ]);
+      }
     } catch (e: any) {
       console.error('[Messaging] Failed to save conversation settings:', e);
       this.settingsError = e?.message || 'Failed to update conversation settings.';
@@ -859,7 +889,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
 
   getActiveConversationName(): string {
     const conv = this.conversations.find(c => c.id === this.conversationId);
-    return conv ? conv.name : this.conversationId.substring(0, 8);
+    return conv ? (conv.fullName || conv.name) : this.conversationId.substring(0, 8);
   }
 
   isActiveConversationGroup(): boolean {
@@ -990,6 +1020,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
         this.conversations = convs.map(c => ({
           id: c.id,
           name: this.formatConversationName(c.name),
+          fullName: c.name,
           lastMessage: c.last_message ? '🔒 Encrypted message' : '',
           lastMessageTime: c.last_message_time
             ? this.formatTimeShort(new Date(c.last_message_time * 1000))
@@ -1427,6 +1458,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     this.isConnected = false;
     this.messageLifetime = 0;
     this.selectedMessageLifetime = 0;
+    this.editedGroupName = '';
   }
 
   private releaseMessageResources(messages: Message[]): void {
@@ -1466,6 +1498,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
       name: this.formatConversationName(name),
       lastMessage: '',
       lastMessageTime: '',
+      fullName: name,
       messageLifetime: 0,
       memberCount,
     });
@@ -1474,6 +1507,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
   private updateConversationName(convId: string, displayName: string): void {
     const conv = this.conversations.find(c => c.id === convId);
     if (conv && conv.name === convId.substring(0, 8)) {
+      conv.fullName = displayName;
       conv.name = this.formatConversationName(displayName);
     }
   }
@@ -1481,9 +1515,9 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
   private buildConversationName(memberUsernames: string[], groupName: string = ''): string {
     const normalizedGroupName = groupName.trim();
     if (normalizedGroupName) {
-      return this.formatConversationName(normalizedGroupName);
+      return normalizedGroupName;
     }
-    return this.formatConversationName(memberUsernames.join(', '));
+    return memberUsernames.join(', ');
   }
 
   private formatConversationName(name: string): string {

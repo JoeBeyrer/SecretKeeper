@@ -135,6 +135,18 @@
         <h2 class="modal-title">{{ isActiveConversationGroup() ? 'Manage Group' : 'Conversation Settings' }}</h2>
 
         @if (isActiveConversationGroup()) {
+          <div class="settings-field">
+            <label class="settings-label" for="group-name-input">Group name</label>
+            <input
+              id="group-name-input"
+              class="modal-input"
+              type="text"
+              maxlength="80"
+              placeholder="Enter group name"
+              [(ngModel)]="editedGroupName"
+            />
+          </div>
+
           <div class="manage-section">
             <div class="manage-section-header">
               <span class="manage-section-title">Members</span>
