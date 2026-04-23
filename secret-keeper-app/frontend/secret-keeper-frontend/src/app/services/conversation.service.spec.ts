@@ -149,6 +149,22 @@ describe('ConversationService', () => {
     });
   });
 
+  describe('addConversationMembers()', () => {
+    it('should PATCH /conversations/:id/members/add with member_ids and room_key', async () => {
+      fetchSpy = vi.spyOn(window, 'fetch').mockResolvedValue(new Response('', { status: 204 }));
+      await service.addConversationMembers('conv-1', ['carol', 'dave'], 'group-room-key');
+      const [url, opts] = fetchSpy.mock.calls[0] as [string, RequestInit];
+      expect(url).toContain('/conversations/conv-1/members/add');
+      expect(opts.method).toBe('PATCH');
+      expect(JSON.parse(opts.body as string)).toEqual({ member_ids: ['carol', 'dave'], room_key: 'group-room-key' });
+    });
+
+    it('should throw on error', async () => {
+      vi.spyOn(window, 'fetch').mockResolvedValue(new Response('error', { status: 500 }));
+      await expect(service.addConversationMembers('conv-1', ['carol'], 'group-room-key')).rejects.toThrow();
+    });
+  });
+
   describe('leaveConversation()', () => {
     it('should POST /conversations/:id/leave', async () => {
       fetchSpy = vi.spyOn(window, 'fetch').mockResolvedValue(new Response('', { status: 204 }));

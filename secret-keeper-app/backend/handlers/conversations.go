@@ -37,6 +37,11 @@ type removeConversationMembersReq struct {
 	MemberIDs []string `json:"member_ids"`
 }
 
+type addConversationMembersReq struct {
+	MemberIDs []string `json:"member_ids"`
+	RoomKey   string   `json:"room_key"`
+}
+
 var allowedMessageLifetimes = map[int]struct{}{
 	0:      {},
 	60:     {},
@@ -935,6 +940,184 @@ func RemoveConversationMembersHandler(db *sql.DB, hub *messaging.Hub) http.Handl
 		w.WriteHeader(http.StatusNoContent)
 	}
 }
+
+
+func AddConversationMembersHandler(db *sql.DB, hub *messaging.Hub) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := GetUserIDFromContext(r)
+		if !ok {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		convID := r.PathValue("id")
+		if convID == "" {
+			http.Error(w, "missing conversation id", http.StatusBadRequest)
+			return
+		}
+
+		if !database.IsUserInConversation(db, userID, convID) {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+
+		var body addConversationMembersReq
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			http.Error(w, "invalid request", http.StatusBadRequest)
+			return
+		}
+		if strings.TrimSpace(body.RoomKey) == "" {
+			http.Error(w, "missing room key", http.StatusBadRequest)
+			return
+		}
+
+		membersBefore, err := database.GetConversationMembers(db, convID)
+		if err != nil {
+			http.Error(w, "could not load conversation members", http.StatusInternalServerError)
+			return
+		}
+		if len(membersBefore) <= 2 {
+			http.Error(w, "members can only be added to group conversations", http.StatusBadRequest)
+			return
+		}
+
+		roomKeyOK, err := database.VerifyConversationRoomKey(db, convID, body.RoomKey)
+		if err == sql.ErrNoRows {
+			http.Error(w, "room key verifier not set", http.StatusNotFound)
+			return
+		}
+		if err != nil {
+			http.Error(w, "could not verify room key", http.StatusInternalServerError)
+			return
+		}
+		if !roomKeyOK {
+			http.Error(w, "incorrect room key", http.StatusUnauthorized)
+			return
+		}
+
+		seenUsernames := map[string]struct{}{}
+		targetUsernames := make([]string, 0, len(body.MemberIDs))
+		for _, rawUsername := range body.MemberIDs {
+			username := strings.TrimSpace(rawUsername)
+			if username == "" {
+				continue
+			}
+			if _, exists := seenUsernames[username]; exists {
+				continue
+			}
+			seenUsernames[username] = struct{}{}
+			targetUsernames = append(targetUsernames, username)
+		}
+		if len(targetUsernames) == 0 {
+			http.Error(w, "at least one member is required", http.StatusBadRequest)
+			return
+		}
+
+		existingMembers := map[string]struct{}{}
+		for _, memberID := range membersBefore {
+			existingMembers[memberID] = struct{}{}
+		}
+
+		tx, err := db.Begin()
+		if err != nil {
+			http.Error(w, "could not update conversation", http.StatusInternalServerError)
+			return
+		}
+		defer tx.Rollback()
+
+		var actorName string
+		if err := tx.QueryRow(`
+			SELECT COALESCE(NULLIF(p.display_name, ''), u.username)
+			FROM users u
+			LEFT JOIN user_profiles p ON p.user_id = u.id
+			WHERE u.id = ?
+		`, userID).Scan(&actorName); err != nil {
+			http.Error(w, "could not load acting user", http.StatusInternalServerError)
+			return
+		}
+
+		type additionTarget struct {
+			UserID   string
+			Name     string
+			Username string
+		}
+		targets := make([]additionTarget, 0, len(targetUsernames))
+		for _, username := range targetUsernames {
+			var target additionTarget
+			err := tx.QueryRow(`
+				SELECT
+					u.id,
+					COALESCE(NULLIF(p.display_name, ''), u.username),
+					u.username
+				FROM users u
+				LEFT JOIN user_profiles p ON p.user_id = u.id
+				WHERE u.username = ?
+			`, username).Scan(&target.UserID, &target.Name, &target.Username)
+			if err == sql.ErrNoRows {
+				http.Error(w, "user not found: "+username, http.StatusBadRequest)
+				return
+			}
+			if err != nil {
+				http.Error(w, "could not load user", http.StatusInternalServerError)
+				return
+			}
+
+			if target.UserID == userID {
+				http.Error(w, "you cannot add yourself to the conversation", http.StatusBadRequest)
+				return
+			}
+			if _, exists := existingMembers[target.UserID]; exists {
+				http.Error(w, "user is already in the conversation", http.StatusBadRequest)
+				return
+			}
+
+			exists, accepted, _, err := database.FriendshipExists(db, userID, target.UserID)
+			if err != nil {
+				http.Error(w, "could not verify friendship", http.StatusInternalServerError)
+				return
+			}
+			if !exists || !accepted {
+				http.Error(w, "you can only add accepted friends", http.StatusBadRequest)
+				return
+			}
+
+			targets = append(targets, target)
+		}
+
+		now := time.Now().Unix()
+		addedUserIDs := make([]string, 0, len(targets))
+		for _, target := range targets {
+			if _, err := tx.Exec(`INSERT INTO conversation_members (conversation_id, user_id, joined_at) VALUES (?, ?, ?)`, convID, target.UserID, now); err != nil {
+				http.Error(w, "could not add member", http.StatusInternalServerError)
+				return
+			}
+
+			if _, err := tx.Exec(`
+				INSERT INTO conversation_pending_room_keys (conversation_id, user_id, room_key)
+				VALUES (?, ?, ?)
+			`, convID, target.UserID, body.RoomKey); err != nil {
+				http.Error(w, "could not store room key", http.StatusInternalServerError)
+				return
+			}
+
+			if err := database.SaveSystemMessageTx(tx, uuid.New().String(), convID, actorName+" added "+target.Name+" to the conversation", now); err != nil {
+				http.Error(w, "could not record member addition", http.StatusInternalServerError)
+				return
+			}
+
+			addedUserIDs = append(addedUserIDs, target.UserID)
+		}
+
+		if err := tx.Commit(); err != nil {
+			http.Error(w, "could not update conversation", http.StatusInternalServerError)
+			return
+		}
+
+		notifyConversationUsers(hub, append(membersBefore, addedUserIDs...), convID)
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
 
 
 

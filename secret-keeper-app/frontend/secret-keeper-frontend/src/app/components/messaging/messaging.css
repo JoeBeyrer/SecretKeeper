@@ -1139,9 +1139,14 @@ img {
   width: 100%;
   display: flex;
   justify-content: flex-start;
+  gap: 12px;
 }
 
 .manage-leave-button {
+  width: auto;
+}
+
+.manage-add-members-button {
   width: auto;
 }
 

@@ -286,6 +286,100 @@ func Test_get_conversation_members_handler(t *testing.T) {
 	}
 }
 
+func Test_add_group_conversation_members_handler(t *testing.T) {
+	db := database.InitDB(":memory:")
+	defer db.Close()
+
+	for _, u := range []struct{ name, email string }{
+		{"alice", "alice@test.com"},
+		{"bob", "bob@test.com"},
+		{"carol", "carol@test.com"},
+		{"dave", "dave@test.com"},
+	} {
+		body := `{"username":"` + u.name + `","email":"` + u.email + `","password":"password123"}`
+		req := httptest.NewRequest("POST", "/api/register", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		handlers.RegisterHandler(db)(w, req)
+		if w.Code != http.StatusCreated {
+			t.Fatalf("setup: register %s got %d", u.name, w.Code)
+		}
+		db.Exec(`UPDATE users SET email_verified = 1 WHERE username = ?`, u.name)
+	}
+
+	var aliceID, carolID string
+	db.QueryRow(`SELECT id FROM users WHERE username = 'alice'`).Scan(&aliceID)
+	db.QueryRow(`SELECT id FROM users WHERE username = 'carol'`).Scan(&carolID)
+
+	if err := database.SendFriendRequest(db, aliceID, carolID); err != nil {
+		t.Fatalf("setup: send friend request: %v", err)
+	}
+	if err := database.AcceptFriendRequest(db, carolID, aliceID); err != nil {
+		t.Fatalf("setup: accept friend request: %v", err)
+	}
+
+	body := `{"member_ids":["bob","dave"],"room_key":"groupsecret","group_name":"Weekend Plans"}`
+	req := requestWithUserID("POST", "/api/conversations/create", body, aliceID)
+	w := httptest.NewRecorder()
+	handlers.CreateConversationHandler(db, messaging.NewHub())(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("setup: failed to create group conversation: %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp map[string]any
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode create response: %v", err)
+	}
+	convID := resp["conversation_id"].(string)
+
+	body = `{"member_ids":["carol"],"room_key":"groupsecret"}`
+	req = requestWithUserID("PATCH", "/api/conversations/"+convID+"/members/add", body, aliceID)
+	req.SetPathValue("id", convID)
+	w = httptest.NewRecorder()
+	handlers.AddConversationMembersHandler(db, messaging.NewHub())(w, req)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("expected 204 when adding members, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var memberCount int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM conversation_members WHERE conversation_id = ?`, convID).Scan(&memberCount); err != nil {
+		t.Fatalf("count conversation members: %v", err)
+	}
+	if memberCount != 4 {
+		t.Fatalf("expected 4 conversation members after add, got %d", memberCount)
+	}
+
+	var carolMembershipCount int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM conversation_members WHERE conversation_id = ? AND user_id = ?`, convID, carolID).Scan(&carolMembershipCount); err != nil {
+		t.Fatalf("count added member membership: %v", err)
+	}
+	if carolMembershipCount != 1 {
+		t.Fatalf("expected carol to be added to the conversation, got %d membership rows", carolMembershipCount)
+	}
+
+	var pendingRoomKey string
+	if err := db.QueryRow(`SELECT room_key FROM conversation_pending_room_keys WHERE conversation_id = ? AND user_id = ?`, convID, carolID).Scan(&pendingRoomKey); err != nil {
+		t.Fatalf("load pending room key: %v", err)
+	}
+	if pendingRoomKey != "groupsecret" {
+		t.Fatalf("expected added member pending room key to be stored, got %q", pendingRoomKey)
+	}
+
+	var latestSystemMessage string
+	if err := db.QueryRow(`
+		SELECT ciphertext
+		FROM messages
+		WHERE conversation_id = ?
+		ORDER BY created_at DESC, id DESC
+		LIMIT 1
+	`, convID).Scan(&latestSystemMessage); err != nil {
+		t.Fatalf("load latest system message: %v", err)
+	}
+	if latestSystemMessage != "alice added carol to the conversation" {
+		t.Fatalf("expected add-member system message, got %q", latestSystemMessage)
+	}
+}
+
 func Test_update_group_name_handler(t *testing.T) {
 	db := database.InitDB(":memory:")
 	defer db.Close()

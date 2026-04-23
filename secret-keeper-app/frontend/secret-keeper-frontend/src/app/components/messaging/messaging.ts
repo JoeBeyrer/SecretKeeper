@@ -124,6 +124,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
   isLoadingFriends: boolean = false;
   createConversationError: string = '';
   groupConversationNameInput: string = '';
+  memberPickerMode: 'create' | 'add' = 'create';
 
   currentUsername: string = '';
   currentDisplayName: string = '';
@@ -155,6 +156,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
   messageReactions = new Map<string, Map<string, ReactionUser[]>>();
 
   conversationKeys = new Map<string, CryptoKey>();
+  conversationPassphrases = new Map<string, string>();
 
   private messageSub: Subscription | null = null;
   private routeQuerySub: Subscription | null = null;
@@ -406,6 +408,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
       }
 
       this.conversationKeys.set(convId, key);
+      this.conversationPassphrases.set(convId, passphrase);
       this.conversationId = convId;
       this.isConnected = true;
       this.modal = { type: 'none' };
@@ -430,6 +433,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     this.createConversationError = '';
     this.selectedConversationMembers = [];
     this.groupConversationNameInput = '';
+    this.memberPickerMode = 'create';
     this.editedGroupName = '';
   }
 
@@ -573,6 +577,14 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     await this.openCreateConversationMemberModal();
   }
 
+  async openAddConversationMembersModal(): Promise<void> {
+    if (!this.conversationId || !this.isActiveConversationGroup()) {
+      return;
+    }
+
+    await this.openCreateConversationMemberModal([], 'add');
+  }
+
   toggleConversationMember(username: string): void {
     const normalizedUsername = username.trim();
     if (!normalizedUsername) {
@@ -595,6 +607,11 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
   continueCreateConversation(): void {
     if (this.selectedConversationMembers.length === 0) {
       this.createConversationError = 'Please select at least one friend.';
+      return;
+    }
+
+    if (this.memberPickerMode === 'add') {
+      void this.addSelectedConversationMembers();
       return;
     }
 
@@ -971,6 +988,46 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     }
   }
 
+  private async addSelectedConversationMembers(): Promise<void> {
+    if (!this.conversationId) {
+      return;
+    }
+
+    const roomKey = this.conversationPassphrases.get(this.conversationId)?.trim();
+    if (!roomKey) {
+      this.createConversationError = 'Open the group chat with its room key before adding new members.';
+      return;
+    }
+
+    const memberUsernames = Array.from(
+      new Set(this.selectedConversationMembers.map(username => username.trim()).filter(Boolean)),
+    );
+
+    if (memberUsernames.length === 0) {
+      this.createConversationError = 'Please select at least one friend.';
+      return;
+    }
+
+    try {
+      await this.conversationService.addConversationMembers(this.conversationId, memberUsernames, roomKey);
+
+      this.modal = { type: 'none' };
+      this.createConversationError = '';
+      this.manageError = '';
+      this.settingsError = '';
+      this.selectedConversationMembers = [];
+
+      await Promise.all([
+        this.refreshConversationList(),
+        this.openConversationSettings(),
+        this.loadMessages(this.conversationId),
+      ]);
+    } catch (e: any) {
+      console.error('[Messaging] Failed to add members to conversation:', e);
+      this.createConversationError = e?.message || 'Failed to add conversation members.';
+    }
+  }
+
   private pictureRefreshInterval: ReturnType<typeof setInterval> | null = null;
 
   private startPictureRefresh(convId: string): void {
@@ -1013,6 +1070,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
   }
 
   private openCreateConversationModal(memberUsernames: string[]): void {
+    this.memberPickerMode = 'create';
     this.modal = { type: 'create-room-key', memberUsernames: [...memberUsernames] };
     this.roomKeyInput = this.cryptoService.generateRoomKey();
     this.roomKeyError = '';
@@ -1028,7 +1086,8 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     });
   }
 
-  private async openCreateConversationMemberModal(preselectedUsernames: string[] = []): Promise<void> {
+  private async openCreateConversationMemberModal(preselectedUsernames: string[] = [], mode: 'create' | 'add' = 'create'): Promise<void> {
+    this.memberPickerMode = mode;
     this.modal = { type: 'select-conversation-members' };
     this.isLoadingFriends = true;
     this.createConversationError = '';
@@ -1040,8 +1099,13 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     try {
       const friends = await this.friendService.getFriends();
       this.ngZone.run(() => {
+        const existingConversationMembers = mode === 'add'
+          ? new Set(this.conversationMembers.map(member => member.username))
+          : new Set<string>();
+
         this.availableFriends = friends
           .filter(friend => friend.accepted)
+          .filter(friend => !existingConversationMembers.has(friend.username))
           .sort((a, b) => a.username.localeCompare(b.username));
 
         const validFriendUsernames = new Set(this.availableFriends.map(friend => friend.username));
@@ -1091,6 +1155,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
       const roomKey = await this.conversationService.claimRoomKey(convId);
       const key = await this.cryptoService.deriveConversationKey(roomKey, convId);
       this.conversationKeys.set(convId, key);
+      this.conversationPassphrases.set(convId, roomKey);
 
       this.ngZone.run(() => {
         this.conversationId = convId;
@@ -1150,6 +1215,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
       if (result.created) {
         const key = await this.cryptoService.deriveConversationKey(passphrase, result.conversation_id);
         this.conversationKeys.set(result.conversation_id, key);
+        this.conversationPassphrases.set(result.conversation_id, passphrase);
 
         this.ngZone.run(() => {
           this.modal = { type: 'show-room-key', convId: result.conversation_id, key: passphrase };
@@ -1475,7 +1541,8 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
       return;
     }
 
-    this.conversationKeys.delete(convId);
+		this.conversationKeys.delete(convId);
+		this.conversationPassphrases.delete(convId);
     if (this.conversationId !== convId) {
       return;
     }

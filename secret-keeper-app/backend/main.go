@@ -70,6 +70,7 @@ func main() {
     mux.Handle("/api/conversations/{id}/members", auth(http.HandlerFunc(handlers.GetConversationMembersHandler(db))))
     mux.Handle("/api/conversations/{id}/group-name", auth(http.HandlerFunc(handlers.UpdateGroupNameHandler(db, hub))))
     mux.Handle("/api/conversations/{id}/members/remove", auth(http.HandlerFunc(handlers.RemoveConversationMembersHandler(db, hub))))
+    mux.Handle("/api/conversations/{id}/members/add", auth(http.HandlerFunc(handlers.AddConversationMembersHandler(db, hub))))
     
     // FRIENDS ROUTES
   	mux.Handle("/api/friends", auth(http.HandlerFunc(handlers.GetFriendsHandler(db))))
