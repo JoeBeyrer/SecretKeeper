@@ -120,6 +120,20 @@ export class ConversationService {
     throw new Error(text || 'Failed to retrieve room key.');
   }
 
+  async updateGroupName(conversationId: string, groupName: string): Promise<void> {
+    const response = await fetch(`http://localhost:8080/api/conversations/${conversationId}/group-name`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ group_name: groupName }),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(text || 'Failed to update group name.');
+    }
+  }
+
   async leaveConversation(conversationId: string): Promise<void> {
     const response = await fetch(`http://localhost:8080/api/conversations/${conversationId}/leave`, {
       method: 'POST',
