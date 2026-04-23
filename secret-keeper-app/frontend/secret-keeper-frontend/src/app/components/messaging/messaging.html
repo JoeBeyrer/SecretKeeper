@@ -5,8 +5,12 @@
     <div class="modal-backdrop">
       <div class="modal">
         <div class="modal-icon">👥</div>
-        <h2 class="modal-title">Create Conversation</h2>
-        <p class="modal-subtitle">Choose the friends you want to include in this conversation.</p>
+        <h2 class="modal-title">{{ memberPickerMode === 'add' ? 'Add Members' : 'Create Conversation' }}</h2>
+        <p class="modal-subtitle">
+          {{ memberPickerMode === 'add'
+            ? 'Choose one or more friends to add to this group chat.'
+            : 'Choose the friends you want to include in this conversation.' }}
+        </p>
 
         <div class="friend-picker-list">
           @if (isLoadingFriends) {
@@ -31,7 +35,7 @@
             }
           }
         </div>
-        @if (selectedConversationMembers.length > 1) {
+        @if (memberPickerMode === 'create' && selectedConversationMembers.length > 1) {
           <div class="friend-picker-name">
             <label class="friend-picker-name-label" for="group-conversation-name">Group chat name (optional)</label>
             <input
@@ -51,7 +55,7 @@
 
         <div class="modal-actions">
           <button class="btn-secondary" (click)="closeModal()">Cancel</button>
-          <button class="btn-primary" (click)="continueCreateConversation()">Continue</button>
+          <button class="btn-primary" (click)="continueCreateConversation()">{{ memberPickerMode === 'add' ? 'Add Members' : 'Continue' }}</button>
         </div>
       </div>
     </div>
@@ -232,6 +236,7 @@
 
         @if (isActiveConversationGroup()) {
           <div class="manage-danger-zone">
+            <button class="btn-secondary manage-add-members-button" type="button" (click)="openAddConversationMembersModal()">Add Members</button>
             <button class="leave-chat-trigger manage-leave-button" type="button" (click)="leaveConversation()">Leave Group</button>
           </div>
         }

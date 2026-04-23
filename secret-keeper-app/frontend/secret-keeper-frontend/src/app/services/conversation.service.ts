@@ -148,6 +148,20 @@ export class ConversationService {
     }
   }
 
+  async addConversationMembers(conversationId: string, memberIds: string[], roomKey: string): Promise<void> {
+    const response = await fetch(`http://localhost:8080/api/conversations/${conversationId}/members/add`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ member_ids: memberIds, room_key: roomKey }),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(text || 'Failed to add conversation members.');
+    }
+  }
+
   async leaveConversation(conversationId: string): Promise<void> {
     const response = await fetch(`http://localhost:8080/api/conversations/${conversationId}/leave`, {
       method: 'POST',
