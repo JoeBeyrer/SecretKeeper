@@ -33,7 +33,7 @@ describe('Messaging', () => {
   };
 
   const mockConversations = [
-    { id: 'conv-1', name: 'bob', last_message: 'encrypted', last_message_time: 1700000000, message_lifetime: 1440 },
+    { id: 'conv-1', name: 'bob', last_message: 'encrypted', last_message_time: 1700000000, message_lifetime: 1440, member_count: 2 },
   ];
 
   const mockFriends = [
@@ -60,6 +60,7 @@ describe('Messaging', () => {
       verifyRoomKey: vi.fn(),
       claimRoomKey: vi.fn(),
       setMessageLifetime: vi.fn().mockResolvedValue(undefined),
+      updateGroupName: vi.fn().mockResolvedValue(undefined),
       leaveConversation: vi.fn().mockResolvedValue(undefined),
       editMessage: vi.fn().mockResolvedValue(undefined),
       DeleteMessage: vi.fn().mockResolvedValue(undefined),
@@ -212,6 +213,34 @@ describe('Messaging', () => {
 
     expect(component.selectedConversationMembers).toEqual(['bob']);
     expect(component.groupConversationNameInput).toBe('');
+  });
+
+  it('saveConversationSettings() should rename the group and refresh messages', async () => {
+    component.conversations = [
+      {
+        id: 'conv-group',
+        name: 'Weekend Plans',
+        fullName: 'Weekend Plans',
+        lastMessage: '',
+        lastMessageTime: '',
+        messageLifetime: 1440,
+        memberCount: 3,
+      },
+    ];
+    component.conversationId = 'conv-group';
+    component.messageLifetime = 1440;
+    component.selectedMessageLifetime = 1440;
+    component.editedGroupName = 'Road Trip Crew';
+    component.modal = { type: 'conversation-settings', convId: 'conv-group' };
+    conversationServiceSpy.getConversations.mockResolvedValue([
+      { id: 'conv-group', name: 'Road Trip Crew', last_message: '', last_message_time: 1700000000, message_lifetime: 1440, member_count: 3 },
+    ]);
+    conversationServiceSpy.getMessages.mockResolvedValue([]);
+
+    await component.saveConversationSettings();
+
+    expect(conversationServiceSpy.updateGroupName).toHaveBeenCalledWith('conv-group', 'Road Trip Crew');
+    expect(component.modal).toEqual({ type: 'none' });
   });
 
   it('leaveConversation() should remove the active conversation and clear the chat state', async () => {

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -282,6 +283,83 @@ func Test_get_conversation_members_handler(t *testing.T) {
 	handlers.GetConversationMembersHandler(db)(w, req)
 	if w.Code != http.StatusForbidden {
 		t.Fatalf("expected 403 for non-member, got %d", w.Code)
+	}
+}
+
+func Test_update_group_name_handler(t *testing.T) {
+	db := database.InitDB(":memory:")
+	defer db.Close()
+
+	for _, u := range []struct{ name, email string }{
+		{"alice", "alice@test.com"},
+		{"bob", "bob@test.com"},
+		{"carol", "carol@test.com"},
+	} {
+		body := `{"username":"` + u.name + `","email":"` + u.email + `","password":"password123"}`
+		req := httptest.NewRequest("POST", "/api/register", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		handlers.RegisterHandler(db)(w, req)
+		db.Exec(`UPDATE users SET email_verified = 1 WHERE username = ?`, u.name)
+	}
+
+	var aliceID string
+	db.QueryRow(`SELECT id FROM users WHERE username = 'alice'`).Scan(&aliceID)
+
+	body := `{"member_ids":["bob","carol"],"room_key":"groupkey","group_name":"Weekend Plans"}`
+	req := requestWithUserID("POST", "/api/conversations/create", body, aliceID)
+	w := httptest.NewRecorder()
+	handlers.CreateConversationHandler(db, messaging.NewHub())(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("setup: failed to create conversation: %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp map[string]interface{}
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("setup: decode conversation response: %v", err)
+	}
+	convID := resp["conversation_id"].(string)
+
+	req = requestWithUserID("PATCH", "/api/conversations/"+convID+"/group-name", `{"group_name":"Road Trip Crew"}`, aliceID)
+	req.SetPathValue("id", convID)
+	w = httptest.NewRecorder()
+	handlers.UpdateGroupNameHandler(db, messaging.NewHub())(w, req)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("expected 204 for group name update, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var groupName string
+	if err := db.QueryRow(`SELECT group_name FROM conversations WHERE id = ?`, convID).Scan(&groupName); err != nil {
+		t.Fatalf("load updated group name: %v", err)
+	}
+	if groupName != "Road Trip Crew" {
+		t.Fatalf("expected updated group name, got %q", groupName)
+	}
+
+	var notice string
+	var senderID sql.NullString
+	if err := db.QueryRow(`
+		SELECT ciphertext, sender_id
+		FROM messages
+		WHERE conversation_id = ?
+		ORDER BY created_at DESC, id DESC
+		LIMIT 1
+	`, convID).Scan(&notice, &senderID); err != nil {
+		t.Fatalf("load rename notice: %v", err)
+	}
+	if notice != `Group name changed to "Road Trip Crew"` {
+		t.Fatalf("expected rename notice, got %q", notice)
+	}
+	if senderID.Valid {
+		t.Fatalf("expected rename notice to be a system message, got sender %q", senderID.String)
+	}
+
+	req = requestWithUserID("PATCH", "/api/conversations/"+convID+"/group-name", `{"group_name":"   "}`, aliceID)
+	req.SetPathValue("id", convID)
+	w = httptest.NewRecorder()
+	handlers.UpdateGroupNameHandler(db, messaging.NewHub())(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for blank group name, got %d", w.Code)
 	}
 }
 
