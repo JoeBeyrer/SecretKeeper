@@ -11,6 +11,15 @@ export interface ConversationSummary {
   last_message: string;
   last_message_time: number;
   message_lifetime?: number;
+  member_count?: number;
+}
+
+export interface ConversationMemberSummary {
+  user_id: string;
+  username: string;
+  display_name: string;
+  profile_picture_url: string;
+  friendship_status: 'self' | 'friend' | 'pending_outgoing' | 'pending_incoming' | 'none';
 }
 
 @Injectable({
@@ -41,6 +50,19 @@ export class ConversationService {
     if (!response.ok) {
       const text = await response.text();
       throw new Error(`Failed to load conversations: ${text}`);
+    }
+
+    return response.json();
+  }
+
+  async getConversationMembers(conversationId: string): Promise<ConversationMemberSummary[]> {
+    const response = await fetch(`http://localhost:8080/api/conversations/${conversationId}/members`, {
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Failed to load conversation members: ${text}`);
     }
 
     return response.json();
