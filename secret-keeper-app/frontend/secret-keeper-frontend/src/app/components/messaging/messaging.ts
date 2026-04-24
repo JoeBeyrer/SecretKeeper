@@ -174,7 +174,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     private conversationService: ConversationService,
     private authService: AuthService,
     private cryptoService: CryptoService,
-    private friendService: FriendService,
+    public friendService: FriendService,
   ) {}
 
   async ngOnInit(): Promise<void> {
@@ -186,6 +186,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     this.currentUsername = user.username;
     this.currentDisplayName = user.display_name || user.username;
     this.currentUserPictureUrl = user.profile_picture_url || '';
+    this.friendService.refreshPendingCount();
 
     this.routeQuerySub = this.route.queryParamMap.subscribe(params => {
       const chatWith = params.get('chatWith')?.trim();

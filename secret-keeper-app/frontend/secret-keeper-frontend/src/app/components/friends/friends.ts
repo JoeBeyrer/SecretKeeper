@@ -40,7 +40,7 @@ export class Friends implements OnInit {
   private blockedIds: Set<string> = new Set();
 
   constructor(
-    private friendService: FriendService,
+    public friendService: FriendService,
     private authService: AuthService,
     private router: Router,
     private cdr: ChangeDetectorRef,
@@ -87,6 +87,8 @@ export class Friends implements OnInit {
       ]);
       this.friends = friends ?? [];
       this.pendingRequests = requests ?? [];
+      const incoming = (requests ?? []).filter(r => r.direction === 'incoming');
+      this.friendService.pendingCount.set(incoming.length);
     } catch (e: any) {
       this.errorMessage = e.message || 'Failed to load friends.';
     } finally {

@@ -195,3 +195,25 @@ body.light-mode .settings-trigger {
   border-color: rgba(52, 201, 235, 0.35);
   background: rgba(52, 201, 235, 0.06);
 }
+
+/* ── Nav badge ──────────────────────────────────────────────────────────── */
+.nav-icon-btn {
+  position: relative;
+}
+
+.nav-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 99px;
+  background: #e8445a;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  pointer-events: none;
+}

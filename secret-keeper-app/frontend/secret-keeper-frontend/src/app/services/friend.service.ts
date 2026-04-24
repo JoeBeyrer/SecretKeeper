@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, signal } from '@angular/core';
 
 export interface FriendEntry {
   user_id: string;
@@ -21,6 +21,18 @@ export interface UserSearchResult {
 })
 export class FriendService {
   private base = 'http://localhost:8080/api';
+
+  readonly pendingCount = signal(0);
+
+  async refreshPendingCount(): Promise<void> {
+    try {
+      const requests = await this.getPendingRequests();
+      const incoming = (requests ?? []).filter(r => r.direction === 'incoming');
+      this.pendingCount.set(incoming.length);
+    } catch {
+      // silently ignore — badge just won't update
+    }
+  }
 
   async getFriends(): Promise<FriendEntry[]> {
     const res = await fetch(`${this.base}/friends`, { credentials: 'include' });
