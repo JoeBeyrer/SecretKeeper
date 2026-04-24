@@ -93,7 +93,7 @@
         }
         @for (f of friends; track f.user_id) {
           <div class="friend-row">
-            <div class="avatar">{{ displayName(f)[0].toUpperCase() }}</div>
+            <div class="avatar" [style.background]="avatarBg(f.username)" style="color:#fff">{{ displayName(f)[0].toUpperCase() }}</div>
             <div class="friend-info">
               <span class="friend-name">{{ displayName(f) }}</span>
               <span class="friend-sub">&#64;{{ f.username }}</span>
@@ -126,7 +126,7 @@
           <p class="section-label">Incoming</p>
           @for (f of incomingRequests; track f.user_id) {
             <div class="friend-row">
-              <div class="avatar incoming">{{ displayName(f)[0].toUpperCase() }}</div>
+              <div class="avatar incoming" [style.background]="avatarBg(f.username)" style="color:#fff">{{ displayName(f)[0].toUpperCase() }}</div>
               <div class="friend-info">
                 <span class="friend-name">{{ displayName(f) }}</span>
                 <span class="friend-sub">&#64;{{ f.username }}</span>
@@ -151,7 +151,7 @@
           <p class="section-label">Sent</p>
           @for (f of outgoingRequests; track f.user_id) {
             <div class="friend-row">
-              <div class="avatar outgoing">{{ displayName(f)[0].toUpperCase() }}</div>
+              <div class="avatar outgoing" [style.background]="avatarBg(f.username)" style="color:#fff">{{ displayName(f)[0].toUpperCase() }}</div>
               <div class="friend-info">
                 <span class="friend-name">{{ displayName(f) }}</span>
                 <span class="friend-sub">&#64;{{ f.username }}</span>
@@ -234,7 +234,7 @@
             <div class="search-results">
               @for (r of searchResults; track r.user_id) {
                 <div class="friend-row">
-                  <div class="avatar">{{ (r.display_name || r.username)[0].toUpperCase() }}</div>
+                  <div class="avatar" [style.background]="avatarBg(r.username)" style="color:#fff">{{ (r.display_name || r.username)[0].toUpperCase() }}</div>
                   <div class="friend-info">
                     <span class="friend-name">{{ r.display_name || r.username }}</span>
                     <span class="friend-sub">&#64;{{ r.username }}</span>

@@ -71,7 +71,7 @@
               @if (profile?.profile_picture_url) {
                 <img [src]="profile!.profile_picture_url" alt="Profile picture" class="avatar-img" />
               } @else {
-                <div class="avatar-placeholder">{{ profile?.username?.charAt(0)?.toUpperCase() }}</div>
+                <div class="avatar-placeholder" [style.background]="avatarBg(profile?.username || '')" style="color:#fff">{{ profile?.username?.charAt(0)?.toUpperCase() }}</div>
               }
             </div>
             <div class="avatar-controls">
@@ -123,6 +123,9 @@
                 class="field-input field-textarea"
                 rows="3"
               ></textarea>
+              <span class="char-count" [class.near-limit]="(profileForm.get('bio')?.value?.length || 0) >= 180">
+                {{ profileForm.get('bio')?.value?.length || 0 }} / 200
+              </span>
             </div>
 
             @if (errorMessage) {
