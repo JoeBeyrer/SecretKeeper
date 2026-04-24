@@ -3,41 +3,57 @@
 /* ── Theme CSS Variables ──────────────────────────────────────────────────── */
 :root {
   /* Dark mode (default) */
-  --bg-app: #1a1e24;
-  --bg-panel: #303742;
-  --bg-input: #3b4450;
-  --bg-elevated: #222830;
-  --text-1: #ffffff;
-  --text-2: #999999;
-  --text-3: #aab0ba;
-  --border: rgba(180, 171, 171, 0.4);
+  --bg-app: #07090f;
+  --bg-panel: #0d1321;
+  --bg-elevated: #111827;
+  --bg-input: #162035;
+  --bg-hover: #1a2640;
+  --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.13);
   --accent: #34c9eb;
+  --accent-dim: rgba(52, 201, 235, 0.12);
   --accent-hover: #2ab5d4;
-  --danger: #ff6b6b;
-  --success: #5cc878;
+  --accent-glow: rgba(52, 201, 235, 0.25);
+  --danger: #f87171;
+  --danger-dim: rgba(248, 113, 113, 0.1);
+  --success: #4ade80;
+  --success-dim: rgba(74, 222, 128, 0.1);
+  --text-1: #eef2f8;
+  --text-2: #5d7a96;
+  --text-3: #3d5570;
   --sent-bg: #34c9eb;
-  --sent-text: #1a1e24;
-  --received-bg: #3b4450;
-  --received-text: #ffffff;
+  --sent-text: #07090f;
+  --received-bg: #162035;
+  --received-text: #eef2f8;
+  --shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --shadow-sm: 0 2px 12px rgba(0, 0, 0, 0.35);
 }
 
 body.light-mode {
-  --bg-app: #eef0f5;
+  --bg-app: #edf1f7;
   --bg-panel: #ffffff;
-  --bg-input: #f0f2f5;
-  --bg-elevated: #e4e7ec;
-  --text-1: #1a1e24;
-  --text-2: #6b7280;
-  --text-3: #4b5563;
-  --border: rgba(0, 0, 0, 0.09);
+  --bg-elevated: #f5f7fb;
+  --bg-input: #edf1f7;
+  --bg-hover: #e4eaf4;
+  --border: rgba(0, 0, 0, 0.07);
+  --border-strong: rgba(0, 0, 0, 0.13);
   --accent: #34c9eb;
+  --accent-dim: rgba(52, 201, 235, 0.12);
   --accent-hover: #2ab5d4;
+  --accent-glow: rgba(52, 201, 235, 0.25);
   --danger: #ef4444;
+  --danger-dim: rgba(239, 68, 68, 0.1);
   --success: #22c55e;
+  --success-dim: rgba(34, 197, 94, 0.1);
+  --text-1: #0d1321;
+  --text-2: #6b7280;
+  --text-3: #9ca3af;
   --sent-bg: #34c9eb;
-  --sent-text: #1a1e24;
-  --received-bg: #f0f2f5;
-  --received-text: #1a1e24;
+  --sent-text: #0d1321;
+  --received-bg: #edf1f7;
+  --received-text: #0d1321;
+  --shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  --shadow-sm: 0 2px 12px rgba(0, 0, 0, 0.08);
 }
 
 /* ── Base ─────────────────────────────────────────────────────────────────── */
@@ -46,8 +62,16 @@ body {
   padding: 0;
   background-color: var(--bg-app);
   color: var(--text-1);
-  font-family: Helvetica, Arial, sans-serif;
-  transition: background-color 0.2s, color 0.2s;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  transition: background-color 0.25s, color 0.25s;
+}
+
+/* ── Scrollbars ───────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 99px;
 }
 
 /* ── Messaging: Light Mode Overrides ─────────────────────────────────────────
@@ -56,11 +80,10 @@ body {
    prevent `body.light-mode { }` from matching the real <body> element.
    ────────────────────────────────────────────────────────────────────────── */
 body.light-mode {
-  /* Override the messaging-component's :root variables */
-  --text-rgb-48-48-48: #1a1e24;
+  --text-rgb-48-48-48: #0d1321;
   --text-rgb-124-124-124: #6b7280;
   --text-rgb-112-112-112: #6b7280;
-  --text-white: #1a1e24;
+  --text-white: #0d1321;
 }
 
 body.light-mode .macbook-pro-16-1-1,
@@ -73,7 +96,7 @@ body.light-mode .rectangle-4-5,
 body.light-mode .rectangle-6-6,
 body.light-mode .modal {
   background-color: var(--bg-panel);
-  box-shadow: 0 4px 5px 2px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--shadow);
 }
 
 body.light-mode .rectangle-9-13 {
@@ -130,7 +153,6 @@ body.light-mode .message-bubble.received {
   background-color: var(--received-bg);
 }
 
-/* Text inside received bubbles */
 body.light-mode .message-bubble.received .text-38 span,
 body.light-mode .message-bubble.received .text-25 span,
 body.light-mode .message-bubble.received .text-26 span,
@@ -139,11 +161,11 @@ body.light-mode .message-bubble.received .text-35 span {
 }
 
 body.light-mode .conversation-item:hover {
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--bg-hover);
 }
 
 body.light-mode .conversation-item.active {
-  background: rgba(52, 201, 235, 0.08);
+  background: var(--accent-dim);
 }
 
 body.light-mode .attachment-trigger {
@@ -166,7 +188,7 @@ body.light-mode .message-input-bar {
 }
 
 body.light-mode .conversation-item {
-  border-color: var(--border);
+  border-color: transparent;
 }
 
 body.light-mode .settings-trigger {
