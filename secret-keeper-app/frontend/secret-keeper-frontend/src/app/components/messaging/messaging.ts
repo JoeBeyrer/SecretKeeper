@@ -116,7 +116,11 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
   get filteredMessages(): Message[] {
     const q = this.msgSearchQuery.trim().toLowerCase();
     if (!q) return this.messages;
-    return this.messages.filter(m => m.content.toLowerCase().includes(q));
+    return this.messages.filter(m => {
+      if (m.content?.toLowerCase().includes(q)) return true;
+      if (m.attachments?.some((a: MessageAttachment) => a.fileName?.toLowerCase().includes(q))) return true;
+      return false;
+    });
   }
 
   newMessage: string = '';
@@ -932,14 +936,6 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
 
   goTo(page: string): void {
     this.router.navigate(['/' + page]);
-  }
-
-  avatarBg(name: string): string {
-    let hash = 0;
-    for (let i = 0; i < name.length; i++) {
-      hash = name.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    return `hsl(${Math.abs(hash) % 360}, 55%, 38%)`;
   }
 
   getActiveConversationName(): string {
