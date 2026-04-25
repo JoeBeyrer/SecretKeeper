@@ -71,7 +71,7 @@
               @if (profile?.profile_picture_url) {
                 <img [src]="profile!.profile_picture_url" alt="Profile picture" class="avatar-img" />
               } @else {
-                <div class="avatar-placeholder" [style.background]="avatarBg(profile?.username || '')" style="color:#fff">{{ profile?.username?.charAt(0)?.toUpperCase() }}</div>
+                <div class="avatar-placeholder" [style.background]="friendService.avatarBg(profile?.username || '')" style="color:#fff">{{ profile?.username?.charAt(0)?.toUpperCase() }}</div>
               }
             </div>
             <div class="avatar-controls">
