@@ -3,6 +3,7 @@ import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angula
 import { ActivatedRoute, Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { ThemeService } from '../../services/theme.service';
+import { FriendService } from '../../services/friend.service';
 
 interface ProfileData {
   username: string;
@@ -37,6 +38,7 @@ export class Profile implements OnInit {
     private router: Router,
     private route: ActivatedRoute,
     public themeService: ThemeService,
+    public friendService: FriendService,
   ) {
     this.profileForm = this.fb.group({
       display_name: ['', [Validators.maxLength(50)]],
@@ -53,6 +55,7 @@ export class Profile implements OnInit {
 
   ngOnInit(): void {
     this.loadProfile();
+    this.friendService.refreshPendingCount();
     this.route.queryParams.subscribe(params => {
       if (params['email_updated'] === 'true') {
         this.accountSuccessMessage = 'Email address updated successfully.';

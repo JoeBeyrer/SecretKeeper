@@ -110,6 +110,19 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
   ];
 
   messages: Message[] = [];
+  msgSearchQuery: string = '';
+  msgSearchActive: boolean = false;
+
+  get filteredMessages(): Message[] {
+    const q = this.msgSearchQuery.trim().toLowerCase();
+    if (!q) return this.messages;
+    return this.messages.filter(m => {
+      if (m.content?.toLowerCase().includes(q)) return true;
+      if (m.attachments?.some((a: MessageAttachment) => a.fileName?.toLowerCase().includes(q))) return true;
+      return false;
+    });
+  }
+
   newMessage: string = '';
   errorMessage: string = '';
   composerError: string = '';
@@ -174,7 +187,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     private conversationService: ConversationService,
     private authService: AuthService,
     private cryptoService: CryptoService,
-    private friendService: FriendService,
+    public friendService: FriendService,
   ) {}
 
   async ngOnInit(): Promise<void> {
@@ -186,6 +199,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     this.currentUsername = user.username;
     this.currentDisplayName = user.display_name || user.username;
     this.currentUserPictureUrl = user.profile_picture_url || '';
+    this.friendService.refreshPendingCount();
 
     this.routeQuerySub = this.route.queryParamMap.subscribe(params => {
       const chatWith = params.get('chatWith')?.trim();
