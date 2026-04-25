@@ -1,4 +1,4 @@
-import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef, HostListener } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 
@@ -143,16 +143,15 @@ export class Friends implements OnInit {
     return this.incomingRequests.length;
   }
 
-  displayName(f: FriendEntry): string {
-    return f.display_name || f.username;
+  @HostListener('document:keydown.escape')
+  onEscape(): void {
+    if (this.confirmDialog) {
+      this.dismissConfirm();
+    }
   }
 
-  avatarBg(name: string): string {
-    let hash = 0;
-    for (let i = 0; i < name.length; i++) {
-      hash = name.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    return `hsl(${Math.abs(hash) % 360}, 55%, 38%)`;
+  displayName(f: FriendEntry): string {
+    return f.display_name || f.username;
   }
 
   // ── Friend actions ─────────────────────────────────────────────────────────
