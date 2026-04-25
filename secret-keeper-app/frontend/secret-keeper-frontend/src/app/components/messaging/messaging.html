@@ -437,7 +437,7 @@
                       </div>
                     </div>
                   } @else if (msg.content) {
-                    <p class="text-38" [class.text-white]="msg.isMine"><span [class.text-white]="msg.isMine" [class.text-rgb-48-48-48]="!msg.isMine">{{ msg.content }}</span></p>
+                    <p class="text-38" [class.text-white]="msg.isMine"><span [class.text-white]="msg.isMine" [class.text-rgb-48-48-48]="!msg.isMine" [innerHTML]="highlight(msg.content)"></span></p>
                   }
                   @if (msg.attachments.length > 0) {
                     <div class="message-attachments">

@@ -734,3 +734,10 @@
   color: var(--text-3);
   white-space: nowrap;
 }
+
+.msg-highlight {
+  background: rgba(52, 201, 235, 0.35);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+}

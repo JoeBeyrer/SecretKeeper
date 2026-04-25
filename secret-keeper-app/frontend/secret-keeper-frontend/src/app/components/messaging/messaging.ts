@@ -1,4 +1,5 @@
 import { Component, NgZone, OnInit, OnDestroy, ViewChild, ElementRef, AfterViewChecked, ChangeDetectorRef, HostListener } from '@angular/core';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
 import { Subscription } from 'rxjs';
@@ -188,7 +189,17 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     private authService: AuthService,
     private cryptoService: CryptoService,
     public friendService: FriendService,
+    private sanitizer: DomSanitizer,
   ) {}
+
+  highlight(text: string): SafeHtml {
+    const q = this.msgSearchQuery.trim();
+    if (!q) return text;
+    const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const safe = text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const highlighted = safe.replace(new RegExp(escaped, 'gi'), m => `<mark class="msg-highlight">${m}</mark>`);
+    return this.sanitizer.bypassSecurityTrustHtml(highlighted);
+  }
 
   async ngOnInit(): Promise<void> {
     const user = await this.authService.reloadCurrentUser();
