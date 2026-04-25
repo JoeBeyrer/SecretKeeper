@@ -688,3 +688,49 @@
 
 .message-content-col { display: flex; flex-direction: column; gap: 4px; min-width: 0; max-width: 68%; }
 .message-content-col.mine { align-items: flex-end; }
+
+/* ── Message search ──────────────────────────────────────────────────────── */
+.search-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 120ms, color 120ms;
+}
+.search-toggle-btn:hover,
+.search-toggle-btn.active { background: var(--accent-dim); color: var(--accent); }
+
+.msg-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border);
+  color: var(--text-2);
+  flex-shrink: 0;
+}
+
+.msg-search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-1);
+  font-size: 13px;
+  font-family: inherit;
+}
+.msg-search-input::placeholder { color: var(--text-3); }
+
+.msg-search-count {
+  font-size: 11px;
+  color: var(--text-3);
+  white-space: nowrap;
+}

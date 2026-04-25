@@ -110,6 +110,15 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
   ];
 
   messages: Message[] = [];
+  msgSearchQuery: string = '';
+  msgSearchActive: boolean = false;
+
+  get filteredMessages(): Message[] {
+    const q = this.msgSearchQuery.trim().toLowerCase();
+    if (!q) return this.messages;
+    return this.messages.filter(m => m.content.toLowerCase().includes(q));
+  }
+
   newMessage: string = '';
   errorMessage: string = '';
   composerError: string = '';

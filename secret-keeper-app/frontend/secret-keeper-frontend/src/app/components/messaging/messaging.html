@@ -252,18 +252,18 @@
   <!-- Nav bar -->
   <div class="rectangle-6-6">
     <div class="nav-icons">
-      <button class="nav-icon-btn active" (click)="goTo('messaging')">
+      <button class="nav-icon-btn active" data-tooltip="Messages" (click)="goTo('messaging')">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
         </svg>
       </button>
-      <button class="nav-icon-btn" (click)="goTo('profile')">
+      <button class="nav-icon-btn" data-tooltip="Settings" (click)="goTo('profile')">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="3"/>
           <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
         </svg>
       </button>
-      <button class="nav-icon-btn" (click)="goTo('friends')">
+      <button class="nav-icon-btn" data-tooltip="Friends" (click)="goTo('friends')">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
           <circle cx="9" cy="7" r="4"/>
@@ -346,6 +346,11 @@
             <p class="text-26"><span class="text-rgb-48-48-48">{{ getActiveConversationName() }}</span></p>
             <p class="encrypted-badge">🔐 End-to-end encrypted</p>
           </div>
+          <button class="search-toggle-btn" (click)="msgSearchActive = !msgSearchActive; msgSearchQuery = ''" [class.active]="msgSearchActive" title="Search messages">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+          </button>
           <div class="chat-message-settings">
             @if (isActiveConversationGroup()) {
               <button class="settings-trigger" type="button" (click)="openConversationSettings()">
@@ -370,8 +375,27 @@
           </div>
         </div>
 
+        @if (msgSearchActive) {
+          <div class="msg-search-bar">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input
+              class="msg-search-input"
+              type="text"
+              [(ngModel)]="msgSearchQuery"
+              placeholder="Search messages…"
+              autocomplete="off"
+              autofocus
+            />
+            @if (msgSearchQuery) {
+              <span class="msg-search-count">{{ filteredMessages.length }} result{{ filteredMessages.length === 1 ? '' : 's' }}</span>
+            }
+          </div>
+        }
+
         <div class="messages-area" #messagesArea>
-          @for (msg of messages; track $index) {
+          @for (msg of filteredMessages; track $index) {
             @if (msg.isSystem) {
               <div class="system-message-row">
                 <p class="system-message-pill">{{ msg.content }}</p>
