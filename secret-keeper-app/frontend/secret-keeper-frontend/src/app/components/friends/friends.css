@@ -355,3 +355,65 @@
 
 .field-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
 .field-input::placeholder { color: var(--text-2); }
+
+/* ── Confirmation dialog ─────────────────────────────────────────────────── */
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  backdrop-filter: blur(2px);
+}
+
+.confirm-box {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  padding: 24px;
+  width: 320px;
+  box-shadow: var(--shadow);
+}
+
+.confirm-msg {
+  color: var(--text-1);
+  font-size: 14px;
+  margin: 0 0 20px;
+  line-height: 1.5;
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.confirm-cancel {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.confirm-cancel:hover { background: var(--bg-hover); color: var(--text-1); }
+
+.confirm-ok {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: none;
+  background: #e8445a;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.confirm-ok:hover { background: #d63550; }

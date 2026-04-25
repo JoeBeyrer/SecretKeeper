@@ -3,18 +3,18 @@
   <!-- Nav rail -->
   <div class="nav-rail">
     <div class="nav-icons">
-      <button class="nav-icon-btn" (click)="goTo('messaging')">
+      <button class="nav-icon-btn" data-tooltip="Messages" (click)="goTo('messaging')">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
         </svg>
       </button>
-      <button class="nav-icon-btn" (click)="goTo('profile')">
+      <button class="nav-icon-btn" data-tooltip="Settings" (click)="goTo('profile')">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="3"/>
           <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
         </svg>
       </button>
-      <button class="nav-icon-btn active" (click)="goTo('friends')">
+      <button class="nav-icon-btn active" data-tooltip="Friends" (click)="goTo('friends')">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
           <circle cx="9" cy="7" r="4"/>
@@ -106,12 +106,12 @@
               >{{ isActing(f.username) ? '...' : 'Message' }}</button>
               <button
                 class="action-btn danger"
-                (click)="remove(f)"
+                (click)="confirmRemove(f)"
                 [disabled]="isActing(f.username)"
               >{{ isActing(f.username) ? '...' : 'Remove' }}</button>
               <button
                 class="action-btn block-btn"
-                (click)="block(f)"
+                (click)="confirmBlock(f)"
                 [disabled]="isActing(f.username)"
               >{{ isActing(f.username) ? '...' : 'Block' }}</button>
             </div>
@@ -248,7 +248,7 @@
                       >{{ isActing(r.username) ? '…' : 'Add Friend' }}</button>
                       <button
                         class="action-btn block-btn"
-                        (click)="blockFromSearch(r)"
+                        (click)="confirmBlockFromSearch(r)"
                         [disabled]="isActing(r.username)"
                       >Block</button>
                     } @else if (r.status === 'friend') {
@@ -261,14 +261,14 @@
                       >{{ isActing(r.username) ? '…' : 'Cancel' }}</button>
                       <button
                         class="action-btn block-btn"
-                        (click)="blockFromSearch(r)"
+                        (click)="confirmBlockFromSearch(r)"
                         [disabled]="isActing(r.username)"
                       >Block</button>
                     } @else if (r.status === 'pending_incoming') {
                       <button class="action-btn accept" (click)="setTab('requests')">Respond</button>
                       <button
                         class="action-btn block-btn"
-                        (click)="blockFromSearch(r)"
+                        (click)="confirmBlockFromSearch(r)"
                         [disabled]="isActing(r.username)"
                       >Block</button>
                     } @else if (r.status === 'blocked') {
@@ -288,5 +288,18 @@
 
     </div>
   </div>
+
+  <!-- Confirmation dialog -->
+  @if (confirmDialog) {
+    <div class="confirm-overlay" (click)="dismissConfirm()">
+      <div class="confirm-box" (click)="$event.stopPropagation()">
+        <p class="confirm-msg">{{ confirmDialog.message }}</p>
+        <div class="confirm-actions">
+          <button class="confirm-cancel" (click)="dismissConfirm()">Cancel</button>
+          <button class="confirm-ok" (click)="runConfirm()">Confirm</button>
+        </div>
+      </div>
+    </div>
+  }
 
 </div>

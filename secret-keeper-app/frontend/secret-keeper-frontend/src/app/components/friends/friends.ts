@@ -39,6 +39,26 @@ export class Friends implements OnInit {
 
   private blockedIds: Set<string> = new Set();
 
+  // Confirmation dialog
+  confirmDialog: { message: string; onConfirm: () => void } | null = null;
+
+  private confirm(message: string, onConfirm: () => void): void {
+    this.confirmDialog = { message, onConfirm };
+    this.cdr.detectChanges();
+  }
+
+  dismissConfirm(): void {
+    this.confirmDialog = null;
+    this.cdr.detectChanges();
+  }
+
+  runConfirm(): void {
+    const action = this.confirmDialog?.onConfirm;
+    this.confirmDialog = null;
+    this.cdr.detectChanges();
+    action?.();
+  }
+
   constructor(
     public friendService: FriendService,
     private authService: AuthService,
@@ -200,6 +220,10 @@ export class Friends implements OnInit {
     }
   }
 
+  confirmRemove(f: FriendEntry): void {
+    this.confirm(`Remove ${this.displayName(f)} as a friend?`, () => this.remove(f));
+  }
+
   async remove(f: FriendEntry): Promise<void> {
     this.actionInProgress = { ...this.actionInProgress, [f.username]: true };
     this.clearMessages();
@@ -214,6 +238,10 @@ export class Friends implements OnInit {
       this.actionInProgress = u;
       this.cdr.detectChanges();
     }
+  }
+
+  confirmBlock(f: FriendEntry): void {
+    this.confirm(`Block ${this.displayName(f)}? They won't be able to message you.`, () => this.block(f));
   }
 
   async block(f: FriendEntry): Promise<void> {
@@ -287,6 +315,10 @@ export class Friends implements OnInit {
       this.actionInProgress = u;
       this.cdr.detectChanges();
     }
+  }
+
+  confirmBlockFromSearch(result: UserSearchResult): void {
+    this.confirm(`Block ${result.display_name || result.username}?`, () => this.blockFromSearch(result));
   }
 
   async blockFromSearch(result: UserSearchResult): Promise<void> {
