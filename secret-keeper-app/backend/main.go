@@ -55,7 +55,7 @@ func main() {
     mux.Handle("/api/profile/update", auth(http.HandlerFunc(handlers.UpdateProfileHandler(db, hub))))
     mux.Handle("/api/profile/picture", auth(http.HandlerFunc(handlers.UploadProfilePictureHandler(db, hub))))
     mux.Handle("/api/profile/by-username/{username}", auth(http.HandlerFunc(handlers.GetProfileByUsernameHandler(db))))
-    mux.Handle("/api/account", auth(http.HandlerFunc(handlers.UpdateAccountHandler(db))))
+    mux.Handle("/api/account", auth(http.HandlerFunc(handlers.UpdateAccountHandler(db, hub))))
 
     // CONVERSATION ROUTES
     mux.Handle("/api/conversations/create", auth(http.HandlerFunc(handlers.CreateConversationHandler(db, hub))))
