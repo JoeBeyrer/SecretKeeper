@@ -12,6 +12,8 @@ export interface ConversationSummary {
   last_message_time: number;
   message_lifetime?: number;
   member_count?: number;
+  profile_picture_url?: string;
+  other_username?: string;
 }
 
 export interface ConversationMemberSummary {
