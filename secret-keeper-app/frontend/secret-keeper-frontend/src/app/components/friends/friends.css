@@ -232,6 +232,9 @@
 .avatar.incoming { background: var(--accent-dim); color: var(--accent); }
 .avatar.outgoing { background: rgba(251, 191, 36, 0.12); color: #fbbf24; }
 
+.avatar-img { object-fit: cover; flex-shrink: 0; }
+.nav-avatar { width: 28px; height: 28px; border-radius: 50%; }
+
 .friend-info { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
 
 .friend-name { font-size: 14px; font-weight: 700; color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
