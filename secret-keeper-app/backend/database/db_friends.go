@@ -74,7 +74,8 @@ func GetFriends(db *sql.DB, userID string) ([]models.FriendEntry, error) {
 		SELECT
 			CASE WHEN requester_id = ? THEN addressee_id ELSE requester_id END AS friend_id,
 			u.username,
-			COALESCE(p.display_name, '') AS display_name
+			COALESCE(p.display_name, '') AS display_name,
+			COALESCE(p.profile_picture_url, '') AS profile_picture_url
 		FROM friendships f
 		JOIN users u ON u.id = CASE WHEN f.requester_id = ? THEN f.addressee_id ELSE f.requester_id END
 		LEFT JOIN user_profiles p ON p.user_id = u.id
@@ -89,7 +90,7 @@ func GetFriends(db *sql.DB, userID string) ([]models.FriendEntry, error) {
 	var friends []models.FriendEntry
 	for rows.Next() {
 		var f models.FriendEntry
-		if err := rows.Scan(&f.UserID, &f.Username, &f.DisplayName); err != nil {
+		if err := rows.Scan(&f.UserID, &f.Username, &f.DisplayName, &f.ProfilePictureURL); err != nil {
 			return nil, err
 		}
 		f.Accepted = true
@@ -106,6 +107,7 @@ func GetPendingRequests(db *sql.DB, userID string) ([]models.FriendEntry, error)
 			CASE WHEN requester_id = ? THEN addressee_id ELSE requester_id END AS other_id,
 			u.username,
 			COALESCE(p.display_name, '') AS display_name,
+			COALESCE(p.profile_picture_url, '') AS profile_picture_url,
 			CASE WHEN requester_id = ? THEN 'outgoing' ELSE 'incoming' END AS direction
 		FROM friendships f
 		JOIN users u ON u.id = CASE WHEN f.requester_id = ? THEN f.addressee_id ELSE f.requester_id END
@@ -121,7 +123,7 @@ func GetPendingRequests(db *sql.DB, userID string) ([]models.FriendEntry, error)
 	var requests []models.FriendEntry
 	for rows.Next() {
 		var f models.FriendEntry
-		if err := rows.Scan(&f.UserID, &f.Username, &f.DisplayName, &f.Direction); err != nil {
+		if err := rows.Scan(&f.UserID, &f.Username, &f.DisplayName, &f.ProfilePictureURL, &f.Direction); err != nil {
 			return nil, err
 		}
 		f.Accepted = false
@@ -165,6 +167,28 @@ func GetUserIDByUsername(db *sql.DB, username string) (string, error) {
 	return id, err
 }
 
+// GetFriendIDs returns the IDs of all accepted friends for the given user.
+func GetFriendIDs(db *sql.DB, userID string) ([]string, error) {
+	rows, err := db.Query(`
+		SELECT CASE WHEN requester_id = ? THEN addressee_id ELSE requester_id END
+		FROM friendships
+		WHERE (requester_id = ? OR addressee_id = ?) AND accepted = 1
+	`, userID, userID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, nil
+}
+
 // SearchUsers returns up to 20 verified users whose username OR display name
 // contains the query string (case-insensitive partial match), excluding only
 // the caller. Each result carries the current friendship status with the caller.
@@ -176,6 +200,7 @@ func SearchUsers(db *sql.DB, callerID, query string) ([]models.UserSearchResult,
 			u.id,
 			u.username,
 			COALESCE(p.display_name, '') AS display_name,
+			COALESCE(p.profile_picture_url, '') AS profile_picture_url,
 			CASE
 				WHEN f.id IS NULL                  THEN 'none'
 				WHEN f.accepted = 1                THEN 'friend'
@@ -202,7 +227,7 @@ func SearchUsers(db *sql.DB, callerID, query string) ([]models.UserSearchResult,
 	var results []models.UserSearchResult
 	for rows.Next() {
 		var r models.UserSearchResult
-		if err := rows.Scan(&r.UserID, &r.Username, &r.DisplayName, &r.Status); err != nil {
+		if err := rows.Scan(&r.UserID, &r.Username, &r.DisplayName, &r.ProfilePictureURL, &r.Status); err != nil {
 			return nil, err
 		}
 		results = append(results, r)
