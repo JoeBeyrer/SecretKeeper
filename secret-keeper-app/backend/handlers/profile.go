@@ -133,28 +133,7 @@ func UpdateProfileHandler(db *sql.DB, hub *messaging.Hub) http.HandlerFunc {
         displayName, _ := database.GetDisplayNameByID(db, userID)
         username, _ := database.GetUsernameByID(db, userID)
         pictureURL, _ := database.GetProfilePictureURLByID(db, userID)
-        event, err := json.Marshal(models.WSMessage{
-            Type:              "profile_updated",
-            UserID:            userID,
-            Username:          username,
-            DisplayName:       displayName,
-            ProfilePictureURL: pictureURL,
-        })
-        if err == nil {
-            // Notify the user's own other open tabs as well.
-            hub.SendToUser(userID, event)
-            notified := map[string]bool{userID: true}
-            convIDs, _ := database.GetConversationIDsForUser(db, userID)
-            for _, convID := range convIDs {
-                members, _ := database.GetConversationMembers(db, convID)
-                for _, memberID := range members {
-                    if !notified[memberID] {
-                        notified[memberID] = true
-                        hub.SendToUser(memberID, event)
-                    }
-                }
-            }
-        }
+        broadcastProfileUpdate(db, hub, userID, username, displayName, pictureURL)
     }
 }
 
@@ -225,27 +204,44 @@ func UploadProfilePictureHandler(db *sql.DB, hub *messaging.Hub) http.HandlerFun
 
         username, _ := database.GetUsernameByID(db, userID)
         displayName, _ := database.GetDisplayNameByID(db, userID)
-        event, err := json.Marshal(models.WSMessage{
-            Type:              "profile_updated",
-            UserID:            userID,
-            Username:          username,
-            DisplayName:       displayName,
-            ProfilePictureURL: dataURL,
-        })
-        if err == nil {
-            // Notify the user's own other open tabs as well.
-            hub.SendToUser(userID, event)
-            notified := map[string]bool{userID: true}
-            convIDs, _ := database.GetConversationIDsForUser(db, userID)
-            for _, convID := range convIDs {
-                members, _ := database.GetConversationMembers(db, convID)
-                for _, memberID := range members {
-                    if !notified[memberID] {
-                        notified[memberID] = true
-                        hub.SendToUser(memberID, event)
-                    }
-                }
+        broadcastProfileUpdate(db, hub, userID, username, displayName, dataURL)
+    }
+}
+
+// broadcastProfileUpdate sends a profile_updated WS event to the user themselves,
+// all members of their conversations, and all of their accepted friends.
+func broadcastProfileUpdate(db *sql.DB, hub *messaging.Hub, userID, username, displayName, pictureURL string) {
+    event, err := json.Marshal(models.WSMessage{
+        Type:              "profile_updated",
+        UserID:            userID,
+        Username:          username,
+        DisplayName:       displayName,
+        ProfilePictureURL: pictureURL,
+    })
+    if err != nil {
+        return
+    }
+
+    notified := map[string]bool{userID: true}
+    hub.SendToUser(userID, event)
+
+    convIDs, _ := database.GetConversationIDsForUser(db, userID)
+    for _, convID := range convIDs {
+        members, _ := database.GetConversationMembers(db, convID)
+        for _, memberID := range members {
+            if !notified[memberID] {
+                notified[memberID] = true
+                hub.SendToUser(memberID, event)
             }
+        }
+    }
+
+    // Also notify accepted friends who may not share a conversation.
+    friendIDs, _ := database.GetFriendIDs(db, userID)
+    for _, friendID := range friendIDs {
+        if !notified[friendID] {
+            notified[friendID] = true
+            hub.SendToUser(friendID, event)
         }
     }
 }
@@ -257,7 +253,9 @@ type updateAccountReq struct {
     NewPassword string `json:"new_password"`
 }
 
-func UpdateAccountHandler(db *sql.DB) http.HandlerFunc {
+// UpdateAccountHandler now accepts hub so that a username change can broadcast
+// profile_updated — keeping every conversation sidebar and friends list in sync.
+func UpdateAccountHandler(db *sql.DB, hub *messaging.Hub) http.HandlerFunc {
     return func(w http.ResponseWriter, r *http.Request) {
         if r.Method != http.MethodPut {
             http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -293,6 +291,7 @@ func UpdateAccountHandler(db *sql.DB) http.HandlerFunc {
             }
         }
 
+        usernameChanged := false
         if req.NewUsername != "" {
             if len(req.NewUsername) < 3 {
                 http.Error(w, "username must be at least 3 characters", http.StatusBadRequest)
@@ -303,6 +302,7 @@ func UpdateAccountHandler(db *sql.DB) http.HandlerFunc {
                 http.Error(w, "username already taken", http.StatusConflict)
                 return
             }
+            usernameChanged = true
         }
 
         // Email change — send verification to new address instead of updating directly.
@@ -361,6 +361,15 @@ func UpdateAccountHandler(db *sql.DB) http.HandlerFunc {
             w.Write([]byte(`{"message":"Account updated. Check your new email address to confirm the email change."}`))
         } else {
             w.Write([]byte(`{"message":"Account updated successfully."}`))
+        }
+
+        // Broadcast profile_updated so all conversation sidebars and friends lists
+        // immediately show the new username without requiring a page refresh.
+        if usernameChanged && hub != nil {
+            newUsername, _ := database.GetUsernameByID(db, userID)
+            displayName, _ := database.GetDisplayNameByID(db, userID)
+            pictureURL, _ := database.GetProfilePictureURLByID(db, userID)
+            broadcastProfileUpdate(db, hub, userID, newUsername, displayName, pictureURL)
         }
     }
 }
@@ -439,7 +448,7 @@ func GetProfileByUsernameHandler(db *sql.DB) http.HandlerFunc {
             http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
             return
         }
-        _, ok := GetUserIDFromContext(r)
+        callerID, ok := GetUserIDFromContext(r)
         if !ok {
             http.Error(w, "unauthorized", http.StatusUnauthorized)
             return
@@ -449,20 +458,33 @@ func GetProfileByUsernameHandler(db *sql.DB) http.HandlerFunc {
             http.Error(w, "missing username", http.StatusBadRequest)
             return
         }
-        var profilePictureURL string
+
+        var targetID, displayName, bio, profilePictureURL string
         err := db.QueryRow(`
-            SELECT COALESCE(up.profile_picture_url, '')
+            SELECT u.id, COALESCE(up.display_name, ''), COALESCE(up.bio, ''), COALESCE(up.profile_picture_url, '')
             FROM users u
             LEFT JOIN user_profiles up ON up.user_id = u.id
             WHERE u.username = ?
-        `, username).Scan(&profilePictureURL)
+        `, username).Scan(&targetID, &displayName, &bio, &profilePictureURL)
         if err != nil {
             http.Error(w, "user not found", http.StatusNotFound)
             return
         }
+
+        // Check if the caller and target are accepted friends.
+        isFriend := false
+        exists, accepted, _, _ := database.FriendshipExists(db, callerID, targetID)
+        if exists && accepted {
+            isFriend = true
+        }
+
         w.Header().Set("Content-Type", "application/json")
-        json.NewEncoder(w).Encode(map[string]string{
+        json.NewEncoder(w).Encode(map[string]any{
+            "username":            username,
+            "display_name":        displayName,
+            "bio":                 bio,
             "profile_picture_url": profilePictureURL,
+            "is_friend":           isFriend,
         })
     }
 }
