@@ -165,9 +165,9 @@
                   <div class="manage-member-row" [class.manage-member-row-pending]="isConversationMemberMarkedForRemoval(member.userId)">
                     <div class="manage-member-profile">
                       @if (member.profilePictureUrl) {
-                        <img class="manage-member-avatar avatar-img" [src]="member.profilePictureUrl" [alt]="member.username" />
+                        <img class="manage-member-avatar avatar-img" [src]="member.profilePictureUrl" [alt]="member.username" [style.cursor]="member.friendshipStatus !== 'self' ? 'pointer' : 'default'" (click)="member.friendshipStatus !== 'self' && openProfile(member.username)" />
                       } @else {
-                        <div class="manage-member-avatar manage-member-avatar-fallback" [style.background]="friendService.avatarBg(member.username)" style="color:#fff">
+                        <div class="manage-member-avatar manage-member-avatar-fallback" [style.background]="friendService.avatarBg(member.username)" [style.color]="'#fff'" [style.cursor]="member.friendshipStatus !== 'self' ? 'pointer' : 'default'" (click)="member.friendshipStatus !== 'self' && openProfile(member.username)">
                           {{ getConversationMemberLabel(member).charAt(0).toUpperCase() }}
                         </div>
                       }
@@ -292,8 +292,8 @@
             [class.locked]="!conversationKeys.has(conv.id)"
             (click)="selectConversation(conv.id)"
           >
-            @if (activeConversationPictureUrl && conv.id === conversationId) {
-              <img class="ellipse-1-7 avatar-img" [src]="activeConversationPictureUrl" [alt]="conv.name" />
+            @if (conv.pictureUrl) {
+              <img class="ellipse-1-7 avatar-img" [src]="conv.pictureUrl" [alt]="conv.name" />
             } @else {
               <svg class="ellipse-1-7" viewBox="0 0 48 48">
                 <circle cx="24" cy="24" r="24" [attr.fill]="friendService.avatarBg(conv.name)"/>
@@ -335,9 +335,9 @@
       @if (isConnected && conversationId && conversationKeys.has(conversationId)) {
         <div class="chat-header">
           @if (activeConversationPictureUrl) {
-            <img class="ellipse-2-12 avatar-img header-avatar" [src]="activeConversationPictureUrl" [alt]="getActiveConversationName()" />
+            <img class="ellipse-2-12 avatar-img header-avatar" [src]="activeConversationPictureUrl" [alt]="getActiveConversationName()" [style.cursor]="!isActiveConversationGroup() ? 'pointer' : 'default'" (click)="!isActiveConversationGroup() && openProfile(getActiveConversationOtherUsername())" />
           } @else {
-            <svg class="ellipse-2-12" viewBox="0 0 52 52">
+            <svg class="ellipse-2-12" viewBox="0 0 52 52" [style.cursor]="!isActiveConversationGroup() ? 'pointer' : 'default'" (click)="!isActiveConversationGroup() && openProfile(getActiveConversationOtherUsername())">
               <circle cx="26" cy="26" r="24" [attr.fill]="friendService.avatarBg(getActiveConversationName())"/>
               <text x="26" y="34" text-anchor="middle" font-size="22" font-weight="700" fill="#fff">{{ getActiveConversationName().charAt(0).toUpperCase() }}</text>
             </svg>
@@ -404,9 +404,9 @@
               <div class="message-row" [class.mine]="msg.isMine" [class.theirs]="!msg.isMine">
                 @if (!msg.isMine) {
                   @if (msg.profilePictureUrl) {
-                    <img class="ellipse-12-51 avatar-img" [src]="msg.profilePictureUrl" [alt]="msg.username" />
+                    <img class="ellipse-12-51 avatar-img" [src]="msg.profilePictureUrl" [alt]="msg.username" style="cursor:pointer" (click)="openProfile(msg.loginName)" />
                   } @else {
-                    <svg class="ellipse-12-51" viewBox="0 0 36 36">
+                    <svg class="ellipse-12-51" viewBox="0 0 36 36" style="cursor:pointer" (click)="openProfile(msg.loginName)">
                       <circle cx="18" cy="18" r="18" [attr.fill]="friendService.avatarBg(msg.username)"/>
                       <text x="18" y="26" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">{{ msg.username.charAt(0).toUpperCase() }}</text>
                     </svg>
@@ -636,4 +636,29 @@
       }
     </div>
   </div>
+
+  <!-- Profile viewer modal -->
+  @if (profileModal) {
+    <div class="modal-overlay" (click)="closeProfile()">
+      <div class="modal" style="max-width:320px;text-align:center;padding:28px 24px" (click)="$event.stopPropagation()">
+        @if (profileModal.profile_picture_url) {
+          <img class="avatar-img" [src]="profileModal.profile_picture_url" [alt]="profileModal.username" style="width:72px;height:72px;margin:0 auto 12px;display:block" />
+        } @else {
+          <svg viewBox="0 0 52 52" style="width:72px;height:72px;margin:0 auto 12px;display:block">
+            <circle cx="26" cy="26" r="26" [attr.fill]="friendService.avatarBg(profileModal.username)"/>
+            <text x="26" y="34" text-anchor="middle" font-size="22" font-weight="700" fill="#fff">{{ (profileModal.display_name || profileModal.username).charAt(0).toUpperCase() }}</text>
+          </svg>
+        }
+        <p class="text-26" style="font-size:16px;margin-bottom:4px"><span class="text-rgb-48-48-48">{{ profileModal.display_name || profileModal.username }}</span></p>
+        <p style="font-size:12px;color:var(--text-secondary);margin-bottom:8px">&#64;{{ profileModal.username }}</p>
+        @if (profileModal.bio) {
+          <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px">{{ profileModal.bio }}</p>
+        }
+        <div style="display:flex;gap:8px;justify-content:center;margin-top:12px">
+          <button class="cancel-btn" (click)="closeProfile()">Close</button>
+        </div>
+      </div>
+    </div>
+  }
+
 </div>
