@@ -8,7 +8,7 @@ import { MessagingService } from '../../services/messaging.service';
 import { ConversationService, ConversationMemberSummary } from '../../services/conversation.service';
 import { AuthService } from '../../services/auth.service';
 import { CryptoService } from '../../services/crypto.service';
-import { FriendService, FriendEntry } from '../../services/friend.service';
+import { FriendService, FriendEntry, PublicProfile } from '../../services/friend.service';
 
 interface ReactionUser {
   username: string;
@@ -28,6 +28,7 @@ interface MessageAttachment {
 interface Message {
   id: string;
   username: string;
+  loginName: string;
   time: string;
   content: string;
   isMine: boolean;
@@ -45,6 +46,8 @@ interface Conversation {
   lastMessageTime: string;
   messageLifetime?: number;
   memberCount: number;
+  pictureUrl: string;
+  otherUsername: string;
 }
 
 interface ConversationMember {
@@ -144,6 +147,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
   currentDisplayName: string = '';
   currentUserPictureUrl: string = '';
   activeConversationPictureUrl: string = '';
+  profileModal: PublicProfile | null = null;
   conversations: Conversation[] = [];
   conversationMembers: ConversationMember[] = [];
   isLoadingConversationMembers: boolean = false;
@@ -233,25 +237,47 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     this.messageSub = this.messagingService.messages$.subscribe({ next: async (incoming) => {
       if (incoming.type === 'profile_updated') {
         this.ngZone.run(() => {
-          if (incoming.username === this.currentUsername) {
-            // Update own picture on this tab (sent from account page on another tab).
-            this.currentUserPictureUrl = incoming.profile_picture_url ?? '';
+          const incomingUsername = incoming.username ?? '';
+          const incomingPicture = incoming.profile_picture_url ?? '';
+          const incomingDisplayName = incoming.display_name ?? '';
+
+          if (incomingUsername === this.currentUsername) {
+            // Update own profile on this tab (e.g. changed on profile page, or username/display name updated).
+            this.currentUserPictureUrl = incomingPicture;
+            if (incomingDisplayName) {
+              this.currentDisplayName = incomingDisplayName;
+            }
+            // Propagate to authService signal so friends tab nav avatar updates too.
+            this.authService.updateCurrentUser({
+              profile_picture_url: incomingPicture,
+              display_name: incomingDisplayName || undefined,
+            });
             for (const msg of this.messages) {
               if (msg.isMine) {
-                msg.profilePictureUrl = incoming.profile_picture_url ?? '';
+                msg.profilePictureUrl = incomingPicture;
               }
             }
           } else {
+            // Update messages from this user.
             for (const msg of this.messages) {
-              if (!msg.isMine && msg.username === incoming.username) {
-                msg.profilePictureUrl = incoming.profile_picture_url ?? '';
+              if (!msg.isMine && msg.loginName === incomingUsername) {
+                msg.profilePictureUrl = incomingPicture;
+                if (incomingDisplayName) msg.username = incomingDisplayName;
               }
             }
-            // Fix: update header picture even when there are zero messages from
-            // the other participant (previously stayed as the SVG placeholder).
-            const conv = this.conversations.find(c => c.id === this.conversationId);
-            if (conv && conv.name === incoming.username) {
-              this.activeConversationPictureUrl = incoming.profile_picture_url ?? '';
+            // Update sidebar and active header for every matching DM conversation.
+            for (const conv of this.conversations) {
+              if (conv.otherUsername === incomingUsername) {
+                conv.pictureUrl = incomingPicture;
+                // Also update the sidebar display name when the other user renames.
+                if (incomingDisplayName) {
+                  conv.fullName = incomingDisplayName;
+                  conv.name = this.formatConversationName(incomingDisplayName);
+                }
+                if (conv.id === this.conversationId) {
+                  this.activeConversationPictureUrl = conv.pictureUrl;
+                }
+              }
             }
           }
         });
@@ -324,6 +350,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
           // for real-time messages, matching the label shown in loaded history.
           incoming.expires_at ?? undefined
         );
+        msg.loginName = incoming.sender_id ?? '';
         this.ngZone.run(() => {
           this.messages.push(msg);
           this.shouldScrollToBottom = true;
@@ -336,6 +363,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
           this.messages.push({
             id: '',
             username: incoming.display_name || incoming.sender_id,
+            loginName: incoming.sender_id ?? '',
             time: this.formatTime(new Date()),
             content: '🔒 Could not decrypt message',
             isMine: false,
@@ -380,6 +408,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     this.activeConversationPictureUrl = '';
     this.stopPictureRefresh();
     const conv = this.conversations.find(c => c.id === convId);
+    this.activeConversationPictureUrl = conv?.pictureUrl ?? '';
     this.messageLifetime = conv?.messageLifetime ?? 0;
     this.selectedMessageLifetime = this.messageLifetime;
     if (!this.messagingService.isConnected()) {
@@ -694,6 +723,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
         const payload = await this.buildRichMessagePayload(text, this.pendingAttachments);
         ciphertext = await this.cryptoService.encryptMessage(JSON.stringify(payload), convKey);
         optimisticMessage = this.createRichMessageFromFiles(tempMessageId, this.currentDisplayName, this.formatTime(new Date()), true, text, this.pendingAttachments);
+        optimisticMessage.loginName = this.currentUsername;
         // Same local expiresAt estimate for rich messages.
         if (this.messageLifetime > 0) {
           optimisticMessage.expiresAt = Math.floor(Date.now() / 1000) + this.messageLifetime * 60;
@@ -703,6 +733,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
         optimisticMessage = {
           id: tempMessageId,
           username: this.currentDisplayName,
+          loginName: this.currentUsername,
           time: this.formatTime(new Date()),
           content: text,
           isMine: true,
@@ -949,6 +980,10 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     this.router.navigate(['/' + page]);
   }
 
+  getActiveConversationOtherUsername(): string {
+    return this.conversations.find(c => c.id === this.conversationId)?.otherUsername ?? '';
+  }
+
   getActiveConversationName(): string {
     const conv = this.conversations.find(c => c.id === this.conversationId);
     return conv ? (conv.fullName || conv.name) : this.conversationId.substring(0, 8);
@@ -1055,36 +1090,25 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
 
   private pictureRefreshInterval: ReturnType<typeof setInterval> | null = null;
 
-  private startPictureRefresh(convId: string): void {
-    this.stopPictureRefresh();
-    this.pictureRefreshInterval = setInterval(async () => {
-      const otherMsg = this.messages.find(m => !m.isMine && !m.isSystem);
-      if (!otherMsg) return;
-      try {
-        const res = await fetch(
-          `http://localhost:8080/api/profile/by-username/${otherMsg.username}`,
-          { credentials: 'include' }
-        );
-        if (!res.ok) return;
-        const data = await res.json();
-        this.ngZone.run(() => {
-          const newUrl = data.profile_picture_url || '';
-          this.activeConversationPictureUrl = newUrl;
-          for (const msg of this.messages) {
-            if (!msg.isMine) {
-              msg.profilePictureUrl = newUrl;
-            }
-          }
-        });
-      } catch {}
-    }, 15000);
-  }
-
   private stopPictureRefresh(): void {
     if (this.pictureRefreshInterval !== null) {
       clearInterval(this.pictureRefreshInterval);
       this.pictureRefreshInterval = null;
     }
+  }
+
+  async openProfile(username: string): Promise<void> {
+    try {
+      this.profileModal = await this.friendService.getPublicProfile(username);
+      this.cdr.detectChanges();
+    } catch {
+      // silently ignore
+    }
+  }
+
+  closeProfile(): void {
+    this.profileModal = null;
+    this.cdr.detectChanges();
   }
 
   ngOnDestroy(): void {
@@ -1162,12 +1186,15 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
             : '',
           messageLifetime: c.message_lifetime ?? 0,
           memberCount: c.member_count ?? 2,
+          pictureUrl: c.profile_picture_url ?? '',
+          otherUsername: c.other_username ?? '',
         }));
 
         const activeConversation = this.conversations.find(c => c.id === this.conversationId);
         if (activeConversation) {
           this.messageLifetime = activeConversation.messageLifetime ?? 0;
           this.selectedMessageLifetime = this.messageLifetime;
+          this.activeConversationPictureUrl = activeConversation.pictureUrl;
         }
       });
     } catch (e: any) {
@@ -1315,7 +1342,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
 
           try {
             const content = await this.cryptoService.decryptMessage(m.Ciphertext, convKey);
-            return this.buildMessageFromDecryptedContent(
+            const built = this.buildMessageFromDecryptedContent(
               messageId,
               username,
               createdAt,
@@ -1324,10 +1351,13 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
               m.ProfilePictureURL ?? '',
               m.ExpiresAt ?? undefined,
             );
+            built.loginName = m.Username ?? '';
+            return built;
           } catch {
             return {
               id: messageId,
               username,
+              loginName: m.Username ?? '',
               time: createdAt,
               content: '🔒 Could not decrypt message',
               isMine: (m.Username ?? '') === this.currentUsername,
@@ -1367,8 +1397,13 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
           this.shouldScrollToBottom = true;
         }
         const otherMsg = decrypted.find(m => !m.isMine && !m.isSystem);
-        this.activeConversationPictureUrl = otherMsg?.profilePictureUrl ?? '';
-        this.startPictureRefresh(convId);
+        // Only fall back to message-derived picture if sidebar didn't supply one.
+        const conv = this.conversations.find(c => c.id === convId);
+        if (conv?.pictureUrl) {
+          this.activeConversationPictureUrl = conv.pictureUrl;
+        } else {
+          this.activeConversationPictureUrl = otherMsg?.profilePictureUrl ?? '';
+        }
       });
     } catch (e) {
       console.error('[Messaging] Failed to load messages:', e);
@@ -1451,6 +1486,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     return {
       id,
       username: '',
+      loginName: '',
       time,
       content,
       isMine: false,
@@ -1466,6 +1502,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
       return {
         id,
         username,
+        loginName: '',
         time,
         content: plaintext,
         isMine,
@@ -1479,6 +1516,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     return {
       id,
       username,
+      loginName: '',
       time,
       content: payload.text,
       isMine,
@@ -1493,6 +1531,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     return {
       id,
       username,
+      loginName: '',
       time,
       content: text,
       isMine,
@@ -1639,6 +1678,8 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
       fullName: name,
       messageLifetime: 0,
       memberCount,
+      pictureUrl: '',
+      otherUsername: '',
     });
   }
 
