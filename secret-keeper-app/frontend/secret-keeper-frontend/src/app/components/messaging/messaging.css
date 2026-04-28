@@ -741,3 +741,34 @@
   border-radius: 2px;
   padding: 0 1px;
 }
+
+/* Profile modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.modal-overlay > div {
+  background: var(--bg-panel);
+  border-radius: 16px;
+  padding: 28px 32px;
+  width: 320px;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+}
+.cancel-btn {
+  padding: 10px 24px;
+  border-radius: 10px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-input);
+  color: var(--text-1);
+  font-family: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.cancel-btn:hover { background: var(--bg-hover); }
