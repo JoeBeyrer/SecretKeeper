@@ -14,6 +14,7 @@ type FriendEntry struct {
 	UserID string `json:"user_id"`
 	Username string `json:"username"`
 	DisplayName string `json:"display_name"`
+	ProfilePictureURL string `json:"profile_picture_url"`
 	Accepted bool `json:"accepted"`
 	Direction string `json:"direction"`
 }
@@ -24,6 +25,6 @@ type UserSearchResult struct {
 	UserID      string `json:"user_id"`
 	Username    string `json:"username"`
 	DisplayName string `json:"display_name"`
+	ProfilePictureURL string `json:"profile_picture_url"`
 	Status      string `json:"status"`
 }
- 
