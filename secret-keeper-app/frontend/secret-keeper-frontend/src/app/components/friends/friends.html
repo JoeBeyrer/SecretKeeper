@@ -93,7 +93,11 @@
         }
         @for (f of friends; track f.user_id) {
           <div class="friend-row">
-            <div class="avatar" [style.background]="friendService.avatarBg(f.username)" style="color:#fff">{{ displayName(f)[0].toUpperCase() }}</div>
+            @if (f.profile_picture_url) {
+              <img class="avatar avatar-img" [src]="f.profile_picture_url" [alt]="f.username" style="cursor:pointer" (click)="openProfile(f.username)" />
+            } @else {
+              <div class="avatar" [style.background]="friendService.avatarBg(f.username)" style="color:#fff;cursor:pointer" (click)="openProfile(f.username)">{{ displayName(f)[0].toUpperCase() }}</div>
+            }
             <div class="friend-info">
               <span class="friend-name">{{ displayName(f) }}</span>
               <span class="friend-sub">&#64;{{ f.username }}</span>
@@ -126,7 +130,11 @@
           <p class="section-label">Incoming</p>
           @for (f of incomingRequests; track f.user_id) {
             <div class="friend-row">
-              <div class="avatar incoming" [style.background]="friendService.avatarBg(f.username)" style="color:#fff">{{ displayName(f)[0].toUpperCase() }}</div>
+              @if (f.profile_picture_url) {
+                <img class="avatar avatar-img" [src]="f.profile_picture_url" [alt]="f.username" style="cursor:pointer" (click)="openProfile(f.username)" />
+              } @else {
+                <div class="avatar incoming" [style.background]="friendService.avatarBg(f.username)" style="color:#fff;cursor:pointer" (click)="openProfile(f.username)">{{ displayName(f)[0].toUpperCase() }}</div>
+              }
               <div class="friend-info">
                 <span class="friend-name">{{ displayName(f) }}</span>
                 <span class="friend-sub">&#64;{{ f.username }}</span>
@@ -151,7 +159,11 @@
           <p class="section-label">Sent</p>
           @for (f of outgoingRequests; track f.user_id) {
             <div class="friend-row">
-              <div class="avatar outgoing" [style.background]="friendService.avatarBg(f.username)" style="color:#fff">{{ displayName(f)[0].toUpperCase() }}</div>
+              @if (f.profile_picture_url) {
+                <img class="avatar avatar-img" [src]="f.profile_picture_url" [alt]="f.username" style="cursor:pointer" (click)="openProfile(f.username)" />
+              } @else {
+                <div class="avatar outgoing" [style.background]="friendService.avatarBg(f.username)" style="color:#fff;cursor:pointer" (click)="openProfile(f.username)">{{ displayName(f)[0].toUpperCase() }}</div>
+              }
               <div class="friend-info">
                 <span class="friend-name">{{ displayName(f) }}</span>
                 <span class="friend-sub">&#64;{{ f.username }}</span>
@@ -234,7 +246,11 @@
             <div class="search-results">
               @for (r of searchResults; track r.user_id) {
                 <div class="friend-row">
-                  <div class="avatar" [style.background]="friendService.avatarBg(r.username)" style="color:#fff">{{ (r.display_name || r.username)[0].toUpperCase() }}</div>
+                  @if (r.profile_picture_url) {
+                    <img class="avatar avatar-img" [src]="r.profile_picture_url" [alt]="r.username" style="cursor:pointer" (click)="openProfile(r.username)" />
+                  } @else {
+                    <div class="avatar" [style.background]="friendService.avatarBg(r.username)" style="color:#fff;cursor:pointer" (click)="openProfile(r.username)">{{ (r.display_name || r.username)[0].toUpperCase() }}</div>
+                  }
                   <div class="friend-info">
                     <span class="friend-name">{{ r.display_name || r.username }}</span>
                     <span class="friend-sub">&#64;{{ r.username }}</span>
@@ -297,6 +313,30 @@
         <div class="confirm-actions">
           <button class="confirm-cancel" (click)="dismissConfirm()">Cancel</button>
           <button class="confirm-ok" (click)="runConfirm()">Confirm</button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Profile viewer modal -->
+  @if (profileModal) {
+    <div class="confirm-overlay" (click)="closeProfile()">
+      <div class="confirm-box" style="max-width:320px;text-align:center" (click)="$event.stopPropagation()">
+        @if (profileModal.profile_picture_url) {
+          <img class="avatar-img" [src]="profileModal.profile_picture_url" [alt]="profileModal.username" style="width:72px;height:72px;margin:0 auto 12px" />
+        } @else {
+          <div class="avatar" [style.background]="friendService.avatarBg(profileModal.username)" style="color:#fff;width:72px;height:72px;font-size:28px;margin:0 auto 12px">{{ (profileModal.display_name || profileModal.username)[0].toUpperCase() }}</div>
+        }
+        <p class="friend-name" style="font-size:16px">{{ profileModal.display_name || profileModal.username }}</p>
+        <p class="friend-sub" style="margin-bottom:8px">&#64;{{ profileModal.username }}</p>
+        @if (profileModal.bio) {
+          <p style="font-size:13px;color:var(--text-2);margin-bottom:12px">{{ profileModal.bio }}</p>
+        }
+        <div class="confirm-actions">
+          <button class="confirm-cancel" (click)="closeProfile()">Close</button>
+          @if (profileModal.is_friend) {
+            <button class="action-btn primary" (click)="closeProfile(); router.navigate(['/messaging'], { queryParams: { chatWith: profileModal!.username } })">Message</button>
+          }
         </div>
       </div>
     </div>
