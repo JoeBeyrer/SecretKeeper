@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, signal } from '@angular/core';
 
 export interface UserProfile {
   username: string;
@@ -13,6 +13,8 @@ export interface UserProfile {
 })
 export class AuthService {
   private currentUser: UserProfile | null = null;
+  // Reactive signal so components can track profile changes without polling.
+  readonly currentUser$ = signal<UserProfile | null>(null);
 
   async reloadCurrentUser(): Promise<UserProfile | null> {
     this.currentUser = null;
@@ -36,6 +38,7 @@ export class AuthService {
 
       const data: UserProfile = await response.json();
       this.currentUser = data;
+      this.currentUser$.set(data);
       return data;
     } catch (e) {
       console.error('[AuthService] Failed to load user profile:', e);
@@ -47,7 +50,15 @@ export class AuthService {
     return this.currentUser;
   }
 
+  // Patches cached user and notifies all signal consumers (e.g. nav avatars).
+  updateCurrentUser(patch: Partial<UserProfile>): void {
+    if (!this.currentUser) return;
+    this.currentUser = { ...this.currentUser, ...patch };
+    this.currentUser$.set({ ...this.currentUser });
+  }
+
   clearCurrentUser(): void {
     this.currentUser = null;
+    this.currentUser$.set(null);
   }
 }
