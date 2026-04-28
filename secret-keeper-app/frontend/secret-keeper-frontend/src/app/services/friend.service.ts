@@ -4,6 +4,7 @@ export interface FriendEntry {
   user_id: string;
   username: string;
   display_name: string;
+  profile_picture_url: string;
   accepted: boolean;
   direction?: string;
 }
@@ -12,8 +13,17 @@ export interface UserSearchResult {
   user_id: string;
   username: string;
   display_name: string;
+  profile_picture_url: string;
   /** "none" | "friend" | "pending_outgoing" | "pending_incoming" | "blocked" */
   status: string;
+}
+
+export interface PublicProfile {
+  username: string;
+  display_name: string;
+  bio: string;
+  profile_picture_url: string;
+  is_friend: boolean;
 }
 
 @Injectable({
@@ -122,6 +132,14 @@ export class FriendService {
       credentials: 'include',
     });
     if (!res.ok) throw new Error(await res.text());
+  }
+
+  async getPublicProfile(username: string): Promise<PublicProfile> {
+    const res = await fetch(`${this.base}/profile/by-username/${encodeURIComponent(username)}`, {
+      credentials: 'include',
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
   }
 
   avatarBg(name: string): string {
