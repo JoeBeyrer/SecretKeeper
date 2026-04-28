@@ -244,12 +244,14 @@ func CreateConversationHandler(db *sql.DB, hub *messaging.Hub) http.HandlerFunc 
 }
 
 type ConversationSummary struct {
-	ID              string `json:"id"`
-	Name            string `json:"name"`
-	LastMessage     string `json:"last_message"`
-	LastMessageTime int64  `json:"last_message_time"`
-	MessageLifetime int    `json:"message_lifetime"`
-	MemberCount     int    `json:"member_count"`
+	ID                string `json:"id"`
+	Name              string `json:"name"`
+	LastMessage       string `json:"last_message"`
+	LastMessageTime   int64  `json:"last_message_time"`
+	MessageLifetime   int    `json:"message_lifetime"`
+	MemberCount       int    `json:"member_count"`
+	ProfilePictureURL string `json:"profile_picture_url"`
+	OtherUsername     string `json:"other_username"`
 }
 
 type ConversationMemberSummary struct {
@@ -302,12 +304,32 @@ func GetConversationsHandler(db *sql.DB) http.HandlerFunc {
                       AND (m.expires_at IS NULL OR m.expires_at > ?)
                     ORDER BY m.created_at DESC
                     LIMIT 1
-                ) AS last_message_time
+                ) AS last_message_time,
+                CASE WHEN (SELECT COUNT(*) FROM conversation_members WHERE conversation_id = c.id) = 2
+                    THEN COALESCE((
+                        SELECT up.profile_picture_url
+                        FROM conversation_members cm3
+                        JOIN user_profiles up ON up.user_id = cm3.user_id
+                        WHERE cm3.conversation_id = c.id AND cm3.user_id != ?
+                        LIMIT 1
+                    ), '')
+                    ELSE ''
+                END AS profile_picture_url,
+                CASE WHEN (SELECT COUNT(*) FROM conversation_members WHERE conversation_id = c.id) = 2
+                    THEN COALESCE((
+                        SELECT u2.username
+                        FROM conversation_members cm4
+                        JOIN users u2 ON u2.id = cm4.user_id
+                        WHERE cm4.conversation_id = c.id AND cm4.user_id != ?
+                        LIMIT 1
+                    ), '')
+                    ELSE ''
+                END AS other_username
             FROM conversations c
             JOIN conversation_members cm ON cm.conversation_id = c.id
             WHERE cm.user_id = ?
             ORDER BY COALESCE(last_message_time, 0) DESC
-        `, userID, now, now, userID)
+        `, userID, now, now, userID, userID, userID)
         if err != nil {
             http.Error(w, "could not fetch conversations", http.StatusInternalServerError)
             return
@@ -320,7 +342,9 @@ func GetConversationsHandler(db *sql.DB) http.HandlerFunc {
             var name sql.NullString
             var lastMsg sql.NullString
             var lastTime sql.NullInt64
-            if err := rows.Scan(&s.ID, &s.MessageLifetime, &s.MemberCount, &name, &lastMsg, &lastTime); err != nil {
+            var picURL sql.NullString
+            var otherUsername sql.NullString
+            if err := rows.Scan(&s.ID, &s.MessageLifetime, &s.MemberCount, &name, &lastMsg, &lastTime, &picURL, &otherUsername); err != nil {
                 continue
             }
             s.Name = name.String
@@ -329,6 +353,8 @@ func GetConversationsHandler(db *sql.DB) http.HandlerFunc {
             }
             s.LastMessage = lastMsg.String
             s.LastMessageTime = lastTime.Int64
+            s.ProfilePictureURL = picURL.String
+            s.OtherUsername = otherUsername.String
             result = append(result, s)
         }
 
