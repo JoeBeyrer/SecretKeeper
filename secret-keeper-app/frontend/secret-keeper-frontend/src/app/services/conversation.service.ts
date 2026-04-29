@@ -136,6 +136,33 @@ export class ConversationService {
     }
   }
 
+  async uploadGroupPicture(conversationId: string, file: File): Promise<string> {
+    const formData = new FormData();
+    formData.append('picture', file);
+    const response = await fetch(`http://localhost:8080/api/conversations/${conversationId}/group-picture`, {
+      method: 'POST',
+      credentials: 'include',
+      body: formData,
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(text || 'Failed to update group picture.');
+    }
+    const data = await response.json();
+    return data.group_picture_url as string;
+  }
+
+  async removeGroupPicture(conversationId: string): Promise<void> {
+    const response = await fetch(`http://localhost:8080/api/conversations/${conversationId}/group-picture`, {
+      method: 'DELETE',
+      credentials: 'include',
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(text || 'Failed to remove group picture.');
+    }
+  }
+
   async removeConversationMembers(conversationId: string, memberIds: string[]): Promise<void> {
     const response = await fetch(`http://localhost:8080/api/conversations/${conversationId}/members/remove`, {
       method: 'PATCH',
