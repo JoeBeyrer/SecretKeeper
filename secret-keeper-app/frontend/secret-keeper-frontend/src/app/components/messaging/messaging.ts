@@ -30,6 +30,7 @@ interface Message {
   id: string;
   username: string;
   loginName: string;
+  senderUserId: string;
   time: string;
   content: string;
   isMine: boolean;
@@ -49,6 +50,7 @@ interface Conversation {
   memberCount: number;
   pictureUrl: string;
   otherUsername: string;
+  otherUserId: string;
 }
 
 interface ConversationMember {
@@ -265,16 +267,20 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
           } else {
             // Update messages from this user.
             for (const msg of this.messages) {
-              if (!msg.isMine && msg.loginName === incomingUsername) {
+              if (!msg.isMine && msg.senderUserId === incoming.user_id) {
                 msg.profilePictureUrl = incomingPicture;
                 if (incomingDisplayName) msg.username = incomingDisplayName;
+                if (incomingUsername) msg.loginName = incomingUsername;
               }
             }
             // Update sidebar and active header for every matching DM conversation.
             for (const conv of this.conversations) {
-              if (conv.otherUsername === incomingUsername) {
+              if (conv.otherUserId === incoming.user_id) {
                 conv.pictureUrl = incomingPicture;
-                // Also update the sidebar display name when the other user renames.
+                // Also update the sidebar display name and username when the other user renames.
+                if (incomingUsername) {
+                  conv.otherUsername = incomingUsername;
+                }
                 if (incomingDisplayName) {
                   conv.fullName = incomingDisplayName;
                   conv.name = this.formatConversationName(incomingDisplayName);
@@ -356,6 +362,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
           incoming.expires_at ?? undefined
         );
         msg.loginName = incoming.sender_id ?? '';
+        msg.senderUserId = incoming.user_id ?? '';
         this.ngZone.run(() => {
           this.messages.push(msg);
           this.shouldScrollToBottom = true;
@@ -369,6 +376,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
             id: '',
             username: incoming.display_name || incoming.sender_id,
             loginName: incoming.sender_id ?? '',
+            senderUserId: incoming.user_id ?? '',
             time: this.formatTime(new Date()),
             content: '🔒 Could not decrypt message',
             isMine: false,
@@ -789,6 +797,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
           id: tempMessageId,
           username: this.currentDisplayName,
           loginName: this.currentUsername,
+          senderUserId: '',
           time: this.formatTime(new Date()),
           content: text,
           isMine: true,
@@ -1243,6 +1252,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
           memberCount: c.member_count ?? 2,
           pictureUrl: c.profile_picture_url ?? '',
           otherUsername: c.other_username ?? '',
+          otherUserId: c.other_user_id ?? '',
         }));
 
         const activeConversation = this.conversations.find(c => c.id === this.conversationId);
@@ -1454,12 +1464,14 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
               m.ExpiresAt ?? undefined,
             );
             built.loginName = m.Username ?? '';
+            built.senderUserId = senderID;
             return built;
           } catch {
             return {
               id: messageId,
               username,
               loginName: m.Username ?? '',
+              senderUserId: senderID,
               time: createdAt,
               content: '🔒 Could not decrypt message',
               isMine: (m.Username ?? '') === this.currentUsername,
@@ -1591,6 +1603,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
       id,
       username: '',
       loginName: '',
+      senderUserId: '',
       time,
       content,
       isMine: false,
@@ -1607,6 +1620,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
         id,
         username,
         loginName: '',
+        senderUserId: '',
         time,
         content: plaintext,
         isMine,
@@ -1621,6 +1635,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
       id,
       username,
       loginName: '',
+      senderUserId: '',
       time,
       content: payload.text,
       isMine,
@@ -1636,6 +1651,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
       id,
       username,
       loginName: '',
+      senderUserId: '',
       time,
       content: text,
       isMine,
@@ -1784,6 +1800,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
       memberCount,
       pictureUrl: '',
       otherUsername: '',
+      otherUserId: '',
     });
   }
 
