@@ -155,6 +155,7 @@ func readPump(c *messaging.Client, hub *messaging.Hub, db *sql.DB) {
 			ConversationID:    convID,
 			Ciphertext:        ciphertext,
 			SenderID:          senderUsername,
+			UserID:            senderID,
 			DisplayName:       senderDisplayName,
 			ProfilePictureURL: senderPictureURL,
 			MessageID:         id,
