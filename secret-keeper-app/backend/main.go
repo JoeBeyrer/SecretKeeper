@@ -55,7 +55,7 @@ func main() {
     mux.Handle("/api/profile/update", auth(http.HandlerFunc(handlers.UpdateProfileHandler(db, hub))))
     mux.Handle("/api/profile/picture", auth(http.HandlerFunc(handlers.UploadProfilePictureHandler(db, hub))))
     mux.Handle("/api/profile/by-username/{username}", auth(http.HandlerFunc(handlers.GetProfileByUsernameHandler(db))))
-    mux.Handle("/api/account", auth(http.HandlerFunc(handlers.UpdateAccountHandler(db))))
+    mux.Handle("/api/account", auth(http.HandlerFunc(handlers.UpdateAccountHandler(db, hub))))
 
     // CONVERSATION ROUTES
     mux.Handle("/api/conversations/create", auth(http.HandlerFunc(handlers.CreateConversationHandler(db, hub))))
@@ -66,6 +66,12 @@ func main() {
     mux.Handle("/api/conversations/{id}/lifetime", auth(http.HandlerFunc(handlers.SetMessageLifetimeHandler(db, hub))))
     mux.Handle("/api/messages/{id}/react", auth(http.HandlerFunc(handlers.ToggleMessageReactionHandler(db, hub))))
     mux.Handle("/api/messages/{id}", auth(http.HandlerFunc(handlers.MessageHandler(db, hub))))
+    mux.Handle("/api/conversations/{id}/leave", auth(http.HandlerFunc(handlers.LeaveConversationHandler(db, hub))))
+    mux.Handle("/api/conversations/{id}/members", auth(http.HandlerFunc(handlers.GetConversationMembersHandler(db))))
+    mux.Handle("/api/conversations/{id}/group-name", auth(http.HandlerFunc(handlers.UpdateGroupNameHandler(db, hub))))
+    mux.Handle("/api/conversations/{id}/group-picture", auth(http.HandlerFunc(handlers.UploadGroupPictureHandler(db, hub))))
+    mux.Handle("/api/conversations/{id}/members/remove", auth(http.HandlerFunc(handlers.RemoveConversationMembersHandler(db, hub))))
+    mux.Handle("/api/conversations/{id}/members/add", auth(http.HandlerFunc(handlers.AddConversationMembersHandler(db, hub))))
     
     // FRIENDS ROUTES
   	mux.Handle("/api/friends", auth(http.HandlerFunc(handlers.GetFriendsHandler(db))))

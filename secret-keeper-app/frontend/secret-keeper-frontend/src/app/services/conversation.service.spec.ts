@@ -20,16 +20,16 @@ describe('ConversationService', () => {
   });
 
   describe('createConversation()', () => {
-    it('should POST /conversations/create with member_ids and room_key', async () => {
+    it('should POST /conversations/create with member_ids, room_key, and optional group_name', async () => {
       const mockResponse = { conversation_id: 'conv-abc', created: true };
       fetchSpy = vi.spyOn(window, 'fetch').mockResolvedValue(
         new Response(JSON.stringify(mockResponse), { status: 200 })
       );
-      const result = await service.createConversation(['bob'], 'secret-key');
+      const result = await service.createConversation(['bob'], 'secret-key', 'Study Group');
       const [url, opts] = fetchSpy.mock.calls[0] as [string, RequestInit];
       expect(url).toContain('/conversations/create');
       expect(opts.method).toBe('POST');
-      expect(JSON.parse(opts.body as string)).toEqual({ member_ids: ['bob'], room_key: 'secret-key' });
+      expect(JSON.parse(opts.body as string)).toEqual({ member_ids: ['bob'], room_key: 'secret-key', group_name: 'Study Group' });
       expect(result).toEqual(mockResponse);
     });
 
@@ -113,6 +113,70 @@ describe('ConversationService', () => {
       expect(url).toContain('/messages/msg-1');
       expect(opts.method).toBe('PATCH');
       expect(JSON.parse(opts.body as string)).toEqual({ ciphertext: 'edited-ciphertext' });
+    });
+  });
+
+  describe('updateGroupName()', () => {
+    it('should PATCH /conversations/:id/group-name with group_name', async () => {
+      fetchSpy = vi.spyOn(window, 'fetch').mockResolvedValue(new Response('', { status: 204 }));
+      await service.updateGroupName('conv-1', 'Road Trip Crew');
+      const [url, opts] = fetchSpy.mock.calls[0] as [string, RequestInit];
+      expect(url).toContain('/conversations/conv-1/group-name');
+      expect(opts.method).toBe('PATCH');
+      expect(JSON.parse(opts.body as string)).toEqual({ group_name: 'Road Trip Crew' });
+    });
+
+    it('should throw on error', async () => {
+      vi.spyOn(window, 'fetch').mockResolvedValue(new Response('error', { status: 500 }));
+      await expect(service.updateGroupName('conv-1', 'Road Trip Crew')).rejects.toThrow();
+    });
+  });
+
+
+  describe('removeConversationMembers()', () => {
+    it('should PATCH /conversations/:id/members/remove with member_ids', async () => {
+      fetchSpy = vi.spyOn(window, 'fetch').mockResolvedValue(new Response('', { status: 204 }));
+      await service.removeConversationMembers('conv-1', ['user-2', 'user-3']);
+      const [url, opts] = fetchSpy.mock.calls[0] as [string, RequestInit];
+      expect(url).toContain('/conversations/conv-1/members/remove');
+      expect(opts.method).toBe('PATCH');
+      expect(JSON.parse(opts.body as string)).toEqual({ member_ids: ['user-2', 'user-3'] });
+    });
+
+    it('should throw on error', async () => {
+      vi.spyOn(window, 'fetch').mockResolvedValue(new Response('error', { status: 500 }));
+      await expect(service.removeConversationMembers('conv-1', ['user-2'])).rejects.toThrow();
+    });
+  });
+
+  describe('addConversationMembers()', () => {
+    it('should PATCH /conversations/:id/members/add with member_ids and room_key', async () => {
+      fetchSpy = vi.spyOn(window, 'fetch').mockResolvedValue(new Response('', { status: 204 }));
+      await service.addConversationMembers('conv-1', ['carol', 'dave'], 'group-room-key');
+      const [url, opts] = fetchSpy.mock.calls[0] as [string, RequestInit];
+      expect(url).toContain('/conversations/conv-1/members/add');
+      expect(opts.method).toBe('PATCH');
+      expect(JSON.parse(opts.body as string)).toEqual({ member_ids: ['carol', 'dave'], room_key: 'group-room-key' });
+    });
+
+    it('should throw on error', async () => {
+      vi.spyOn(window, 'fetch').mockResolvedValue(new Response('error', { status: 500 }));
+      await expect(service.addConversationMembers('conv-1', ['carol'], 'group-room-key')).rejects.toThrow();
+    });
+  });
+
+  describe('leaveConversation()', () => {
+    it('should POST /conversations/:id/leave', async () => {
+      fetchSpy = vi.spyOn(window, 'fetch').mockResolvedValue(new Response('', { status: 204 }));
+      await service.leaveConversation('conv-1');
+      const [url, opts] = fetchSpy.mock.calls[0] as [string, RequestInit];
+      expect(url).toContain('/conversations/conv-1/leave');
+      expect(opts.method).toBe('POST');
+    });
+
+    it('should throw on error', async () => {
+      vi.spyOn(window, 'fetch').mockResolvedValue(new Response('error', { status: 500 }));
+      await expect(service.leaveConversation('conv-1')).rejects.toThrow();
     });
   });
 

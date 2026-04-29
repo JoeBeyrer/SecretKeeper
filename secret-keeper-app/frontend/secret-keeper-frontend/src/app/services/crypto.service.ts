@@ -45,6 +45,99 @@ export class CryptoService {
     return new TextDecoder().decode(plaintext);
   }
 
+  // ── RSA key pair ────────────────────────────────────────────────────────────
+
+  async generateRsaKeyPair(): Promise<CryptoKeyPair> {
+    return window.crypto.subtle.generateKey(
+      { name: 'RSA-OAEP', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' },
+      true,
+      ['encrypt', 'decrypt']
+    );
+  }
+
+  async exportPublicKey(key: CryptoKey): Promise<string> {
+    const exported = await window.crypto.subtle.exportKey('spki', key);
+    return this.bytesToBase64(new Uint8Array(exported));
+  }
+
+  async importPublicKey(b64: string): Promise<CryptoKey> {
+    const buf = this.base64ToArrayBuffer(b64);
+    return window.crypto.subtle.importKey(
+      'spki', buf,
+      { name: 'RSA-OAEP', hash: 'SHA-256' },
+      false, ['encrypt']
+    );
+  }
+
+  async importPrivateKey(b64: string): Promise<CryptoKey> {
+    const buf = this.base64ToArrayBuffer(b64);
+    return window.crypto.subtle.importKey(
+      'pkcs8', buf,
+      { name: 'RSA-OAEP', hash: 'SHA-256' },
+      false, ['decrypt']
+    );
+  }
+
+  /** Encrypt a short string (e.g. room key passphrase) with an RSA public key. */
+  async rsaEncrypt(plaintext: string, publicKey: CryptoKey): Promise<string> {
+    const enc = new TextEncoder();
+    const cipher = await window.crypto.subtle.encrypt(
+      { name: 'RSA-OAEP' }, publicKey, enc.encode(plaintext)
+    );
+    return this.bytesToBase64(new Uint8Array(cipher));
+  }
+
+  /** Decrypt an RSA-encrypted ciphertext with a private key. */
+  async rsaDecrypt(ciphertextB64: string, privateKey: CryptoKey): Promise<string> {
+    const buf = this.base64ToArrayBuffer(ciphertextB64);
+    const plain = await window.crypto.subtle.decrypt(
+      { name: 'RSA-OAEP' }, privateKey, buf
+    );
+    return new TextDecoder().decode(plain);
+  }
+
+  // ── Private key wrapping (AES-GCM, password-derived) ──────────────────────
+
+  /** Derive an AES-GCM wrapping key from the user's password + username. */
+  async deriveWrappingKey(password: string, username: string): Promise<CryptoKey> {
+    const enc = new TextEncoder();
+    const keyMaterial = await window.crypto.subtle.importKey(
+      'raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']
+    );
+    return window.crypto.subtle.deriveKey(
+      { name: 'PBKDF2', salt: enc.encode('sk-wrap-' + username), iterations: 100000, hash: 'SHA-256' },
+      keyMaterial,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['wrapKey', 'unwrapKey']
+    );
+  }
+
+  /** Export + AES-GCM wrap the private key; returns "ivB64:wrappedB64". */
+  async wrapPrivateKey(privateKey: CryptoKey, wrappingKey: CryptoKey): Promise<string> {
+    const iv = window.crypto.getRandomValues(new Uint8Array(12));
+    const wrapped = await window.crypto.subtle.wrapKey(
+      'pkcs8', privateKey, wrappingKey, { name: 'AES-GCM', iv }
+    );
+    return this.bytesToBase64(iv) + ':' + this.bytesToBase64(new Uint8Array(wrapped));
+  }
+
+  /** Unwrap a private key from "ivB64:wrappedB64" format. */
+  async unwrapPrivateKey(wrapped: string, wrappingKey: CryptoKey): Promise<CryptoKey> {
+    const [ivB64, dataB64] = wrapped.split(':');
+    const ivBytes = this.base64ToBytes(ivB64);
+    const iv = ivBytes.buffer.slice(ivBytes.byteOffset, ivBytes.byteOffset + ivBytes.byteLength) as ArrayBuffer;
+    const data = this.base64ToArrayBuffer(dataB64) as ArrayBuffer;
+    return window.crypto.subtle.unwrapKey(
+      'pkcs8', data, wrappingKey,
+      { name: 'AES-GCM', iv },
+      { name: 'RSA-OAEP', hash: 'SHA-256' },
+      true, ['decrypt']
+    );
+  }
+
+  // ── Helpers ─────────────────────────────────────────────────────────────────
+
   bytesToBase64(bytes: Uint8Array): string {
     let binary = '';
     const chunkSize = 0x8000;
@@ -71,4 +164,3 @@ export class CryptoService {
     return buffer;
   }
 }
-

@@ -1,7 +1,7 @@
-# Sprint 3 Report
+# Sprint 4 Report
 
 ## Demo Video
-[Sprint 3 Demo Video](https://youtu.be/fTcQ_pKHunA)
+[Sprint 4 Demo Video]()
 
 ## User Stories
 1. As a user, I want to be able to login, so that my messages and data are associated with my personal account
@@ -28,51 +28,38 @@
 22. As a user, I want to access the app through the web, so that I can conveniently interface from any device
 
 ## Planned Issues
-We plan to implement functionality to support user stories 3, 7, 8, 10 (expanded), 11, 12, 15, 16, and 20.
-### Blocking and Safety Controls
-- Implement support for blocking users so that blocked users cannot contact or interact with one another through SecretKeeper
-- Ensure blocked-user relationships are enforced consistently across friend, messaging, and conversation flows
-### Message Management
-- Add support for editing sand deleting sent messages so users can correct incorrect or sensitive content after sending
-- Add support for disappearing messages / message expiration so conversations can automatically remove older content after a configured time
-### Friendship Enhancements
-- Improve user search functionality so users can more easily find users they wish to add as friends
-- Add support for cancelling outgoing friend requests that have not yet been accepted
-### Messaging Enhancements
-- Add support for sending file-type messages, including PDFs and other attachments, through encrypted chats
-- Display profile pictures in chats so users can more easily identify conversation participants
+We plan to implement functionality to support user stories 18, 21, and 22. Additional features were also added to this sprint as initial application goals were met.
+### Adding and Removing Friends from Group Conversations
+- Add support for removing members from group conversations.
+- Add support for adding friends to a group conversation.
+- Add system messages when members are added to or removed from group conversations.
+### Managing Group Conversations
+- Create an all-in-one settings popup for group conversation management such as leaving group conversations and managing disappearing messages.
+- Add support for sending friend requests to members of a group conversation.
+- Add support for changing group conversations names.
+- Add support for leaving conversations.
+- Add system messages for modifications to group conversations such as name changes and members leaving.
+### Creating Group Conversations
+- Implement frontend group conversation creation.
+- Allow users to add one or more friends during chat creation, optionally create conversation names, and set group conversation room keys.
+
 
 
 ## Successfully Completed
-- Authentication backend routes are implemented for register, login, logout, email verification, email-change verification, and password reset flow
-- Conversation backend routes are implemented for creating conversations, loading conversation lists, loading message history, verifying room keys, and one-time room key claiming
-- Friends backend routes are implemented for loading friends, loading pending requests, sending requests, accepting requests, declining requests, cancelling outgoing requests, and removing friends
-- Profile backend routes are implemented for loading profile data, updating profile data, uploading profile pictures, and updating account information
-- WebSocket messaging backend is implemented for real-time chat delivery
-- Database support is implemented for users, sessions, conversations, friendship data, encrypted message storage, and room-key verification state
-- Frontend-backend integration now exists for login, signup, password reset, profile loading, friends management, conversation loading, and messaging
-- Real-time messaging is working through the WebSocket connection between the Angular frontend and Go backend
-- Room and chat encryption is implemented on the client using a conversation key derived from the room key, and messages are encrypted before send and decrypted after receipt
-- Conversation access flow now supports room key verification for existing chats and one-time room key retrieval for recipients
-- Conversation list UI is implemented with names, encrypted-message previews, timestamps, and profile pictures in chat views
-- Key-management is implemented in the backend and frontend for storing user keys, retrieving public keys, saving encrypted conversation keys, and loading stored conversation keys
-- User search functionality is implemented for finding users and starting conversations with specific people
-- File-type messaging is implemented for sending images, videos, PDFs, and other attachments through encrypted chats
-- Message expiration is implemented so messages can disappear after a configured amount of time
-- Message deletion is implemented so users can remove previously sent messages
-- Message editing is implemented so users can update previously sent messages in real time
-- Backend and frontend support for profile pictures in chats is implemented so users can visually identify conversation participants
-- Blocking users is implemented so blocked users cannot send messages through SecretKeeper, and blocking also removes the existing friendship
-- Backend unit tests exist for database and handler coverage
-- Frontend test scaffolds exist for the app, services, and several components
+- Create group conversations.
+- Set group conversation room keys.
+- Create group conversation names.
+- Send friend requests to other members of a group conversation.
+- Add members to a group conversation.
+- Remove members from group conversations.
+- Change group conversation names.
+- Leave conversations.
+- Group conversation management settings all in one place.
+- View all members of group conversation.
+
 
 ## Incomplete / Carried Over
-All issues that were incomplete are due to time constraints. The team decided to continue prioritizing core messaging, privacy, authentication, and account functionality first for the MVP, while carrying lower-priority or unfinished features into the next sprint.
-- Group chats and all related group-chat features have not been completed yet
-- Unencrypted chat options for users who want easily accessible non-secret chats have not been implemented yet
-- Chat muting has not been implemented yet
-- Browser-based access validation across all intended web-facing workflows has not been completed yet
-- Additional frontend and backend test coverage
+None.
 
 ---
 

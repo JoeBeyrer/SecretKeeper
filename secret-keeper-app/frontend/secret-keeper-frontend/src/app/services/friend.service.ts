@@ -1,9 +1,10 @@
-import { Injectable } from '@angular/core';
+import { Injectable, signal } from '@angular/core';
 
 export interface FriendEntry {
   user_id: string;
   username: string;
   display_name: string;
+  profile_picture_url: string;
   accepted: boolean;
   direction?: string;
 }
@@ -12,8 +13,17 @@ export interface UserSearchResult {
   user_id: string;
   username: string;
   display_name: string;
+  profile_picture_url: string;
   /** "none" | "friend" | "pending_outgoing" | "pending_incoming" | "blocked" */
   status: string;
+}
+
+export interface PublicProfile {
+  username: string;
+  display_name: string;
+  bio: string;
+  profile_picture_url: string;
+  is_friend: boolean;
 }
 
 @Injectable({
@@ -21,6 +31,18 @@ export interface UserSearchResult {
 })
 export class FriendService {
   private base = 'http://localhost:8080/api';
+
+  readonly pendingCount = signal(0);
+
+  async refreshPendingCount(): Promise<void> {
+    try {
+      const requests = await this.getPendingRequests();
+      const incoming = (requests ?? []).filter(r => r.direction === 'incoming');
+      this.pendingCount.set(incoming.length);
+    } catch {
+      // silently ignore — badge just won't update
+    }
+  }
 
   async getFriends(): Promise<FriendEntry[]> {
     const res = await fetch(`${this.base}/friends`, { credentials: 'include' });
@@ -110,5 +132,21 @@ export class FriendService {
       credentials: 'include',
     });
     if (!res.ok) throw new Error(await res.text());
+  }
+
+  async getPublicProfile(username: string): Promise<PublicProfile> {
+    const res = await fetch(`${this.base}/profile/by-username/${encodeURIComponent(username)}`, {
+      credentials: 'include',
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  }
+
+  avatarBg(name: string): string {
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return `hsl(${Math.abs(hash) % 360}, 55%, 38%)`;
   }
 }

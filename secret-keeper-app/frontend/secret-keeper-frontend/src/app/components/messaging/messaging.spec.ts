@@ -9,6 +9,7 @@ import { MessagingService, IncomingMessage } from '../../services/messaging.serv
 import { ConversationService } from '../../services/conversation.service';
 import { AuthService } from '../../services/auth.service';
 import { CryptoService } from '../../services/crypto.service';
+import { FriendService } from '../../services/friend.service';
 
 describe('Messaging', () => {
   let component: Messaging;
@@ -18,6 +19,7 @@ describe('Messaging', () => {
   let conversationServiceSpy: any;
   let authServiceSpy: any;
   let cryptoServiceSpy: any;
+  let friendServiceSpy: any;
   let routerSpy: { navigate: ReturnType<typeof vi.fn> };
   let messageSubject: Subject<IncomingMessage>;
   let queryParamMap$: BehaviorSubject<any>;
@@ -31,7 +33,12 @@ describe('Messaging', () => {
   };
 
   const mockConversations = [
-    { id: 'conv-1', name: 'Bob', last_message: 'encrypted', last_message_time: 1700000000, message_lifetime: 1440 },
+    { id: 'conv-1', name: 'bob', last_message: 'encrypted', last_message_time: 1700000000, message_lifetime: 1440, member_count: 2 },
+  ];
+
+  const mockFriends = [
+    { user_id: 'friend-1', username: 'bob', display_name: 'Bob', accepted: true },
+    { user_id: 'friend-2', username: 'carol', display_name: 'Carol', accepted: true },
   ];
 
   beforeEach(async () => {
@@ -50,9 +57,13 @@ describe('Messaging', () => {
       getConversations: vi.fn().mockResolvedValue(mockConversations),
       createConversation: vi.fn(),
       getMessages: vi.fn().mockResolvedValue([]),
+      getConversationMembers: vi.fn().mockResolvedValue([]),
       verifyRoomKey: vi.fn(),
       claimRoomKey: vi.fn(),
       setMessageLifetime: vi.fn().mockResolvedValue(undefined),
+      updateGroupName: vi.fn().mockResolvedValue(undefined),
+      removeConversationMembers: vi.fn().mockResolvedValue(undefined),
+      leaveConversation: vi.fn().mockResolvedValue(undefined),
       editMessage: vi.fn().mockResolvedValue(undefined),
       DeleteMessage: vi.fn().mockResolvedValue(undefined),
     };
@@ -92,6 +103,10 @@ describe('Messaging', () => {
       }),
     };
 
+    friendServiceSpy = {
+      getFriends: vi.fn().mockResolvedValue(mockFriends),
+    };
+
     routerSpy = { navigate: vi.fn() };
 
     await TestBed.configureTestingModule({
@@ -101,6 +116,7 @@ describe('Messaging', () => {
         { provide: ConversationService, useValue: conversationServiceSpy },
         { provide: AuthService, useValue: authServiceSpy },
         { provide: CryptoService, useValue: cryptoServiceSpy },
+        { provide: FriendService, useValue: friendServiceSpy },
         { provide: Router, useValue: routerSpy },
         {
           provide: ActivatedRoute,
@@ -135,7 +151,7 @@ describe('Messaging', () => {
 
   it('should load and map conversations on init', () => {
     expect(component.conversations.length).toBe(1);
-    expect(component.conversations[0].name).toBe('Bob');
+    expect(component.conversations[0].name).toBe('bob');
     expect(component.conversations[0].id).toBe('conv-1');
     expect(component.conversations[0].messageLifetime).toBe(1440);
   });
@@ -148,30 +164,135 @@ describe('Messaging', () => {
     queryParamMap$.next(convertToParamMap({ chatWith: 'bob' }));
     await fixture.whenStable();
 
-    expect(component.modal).toEqual({ type: 'create-room-key', username: 'bob' });
+    expect(component.modal).toEqual({ type: 'create-room-key', memberUsernames: ['bob'] });
     expect(component.roomKeyInput).toBe('generated-room-key');
     expect(routerSpy.navigate).toHaveBeenCalled();
   });
 
-  it('startNewConversation() should set errorMessage when username is empty', async () => {
-    component.newConversationMemberId = '   ';
+  it('startNewConversation() should load friends and open the member picker', async () => {
     await component.startNewConversation();
-    expect(component.errorMessage).toBeTruthy();
+
+    expect(friendServiceSpy.getFriends).toHaveBeenCalled();
+    expect(component.modal).toEqual({ type: 'select-conversation-members' });
+    expect(component.availableFriends.length).toBe(2);
+  });
+
+  it('continueCreateConversation() should require at least one selected friend', () => {
+    component.modal = { type: 'select-conversation-members' };
+
+    component.continueCreateConversation();
+
+    expect(component.createConversationError).toContain('Please select at least one friend');
     expect(conversationServiceSpy.createConversation).not.toHaveBeenCalled();
   });
 
-  it('startNewConversation() should open a room-key modal with a generated key', async () => {
-    component.newConversationMemberId = 'bob';
+  it('continueCreateConversation() should open a room-key modal with the selected friends', () => {
+    component.selectedConversationMembers = ['bob', 'carol'];
 
-    await component.startNewConversation();
+    component.continueCreateConversation();
 
-    expect(component.modal).toEqual({ type: 'create-room-key', username: 'bob' });
+    expect(component.modal).toEqual({ type: 'create-room-key', memberUsernames: ['bob', 'carol'] });
     expect(component.roomKeyInput).toBe('generated-room-key');
-    expect(conversationServiceSpy.createConversation).not.toHaveBeenCalled();
+  });
+
+  it('submitCreateConversation() should pass an optional group name for group chats', async () => {
+    component.modal = { type: 'create-room-key', memberUsernames: ['bob', 'carol'] };
+    component.groupConversationNameInput = 'Weekend Plans';
+    component.roomKeyInput = 'long-enough-room-key';
+    conversationServiceSpy.createConversation.mockResolvedValue({ conversation_id: 'conv-group', created: true });
+    cryptoServiceSpy.deriveConversationKey.mockResolvedValue({} as CryptoKey);
+
+    await component.submitCreateConversation();
+
+    expect(conversationServiceSpy.createConversation).toHaveBeenCalledWith(['bob', 'carol'], 'long-enough-room-key', 'Weekend Plans');
+  });
+
+  it('toggleConversationMember() should clear the group name when only one friend remains selected', () => {
+    component.selectedConversationMembers = ['bob', 'carol'];
+    component.groupConversationNameInput = 'Weekend Plans';
+
+    component.toggleConversationMember('carol');
+
+    expect(component.selectedConversationMembers).toEqual(['bob']);
+    expect(component.groupConversationNameInput).toBe('');
+  });
+
+  it('saveConversationSettings() should rename the group and refresh messages', async () => {
+    component.conversations = [
+      {
+        id: 'conv-group',
+        name: 'Weekend Plans',
+        fullName: 'Weekend Plans',
+        lastMessage: '',
+        lastMessageTime: '',
+        messageLifetime: 1440,
+        memberCount: 3,
+      },
+    ];
+    component.conversationId = 'conv-group';
+    component.messageLifetime = 1440;
+    component.selectedMessageLifetime = 1440;
+    component.editedGroupName = 'Road Trip Crew';
+    component.modal = { type: 'conversation-settings', convId: 'conv-group' };
+    conversationServiceSpy.getConversations.mockResolvedValue([
+      { id: 'conv-group', name: 'Road Trip Crew', last_message: '', last_message_time: 1700000000, message_lifetime: 1440, member_count: 3 },
+    ]);
+    conversationServiceSpy.getMessages.mockResolvedValue([]);
+
+    await component.saveConversationSettings();
+
+    expect(conversationServiceSpy.updateGroupName).toHaveBeenCalledWith('conv-group', 'Road Trip Crew');
+    expect(component.modal).toEqual({ type: 'none' });
+  });
+
+
+  it('saveConversationSettings() should remove staged members when settings are saved', async () => {
+    component.conversations = [
+      {
+        id: 'conv-group',
+        name: 'Weekend Plans',
+        fullName: 'Weekend Plans',
+        lastMessage: '',
+        lastMessageTime: '',
+        messageLifetime: 1440,
+        memberCount: 3,
+      },
+    ];
+    component.conversationId = 'conv-group';
+    component.messageLifetime = 1440;
+    component.selectedMessageLifetime = 1440;
+    component.editedGroupName = 'Weekend Plans';
+    component.pendingRemovedMemberIds = ['user-2'];
+    component.modal = { type: 'conversation-settings', convId: 'conv-group' };
+    conversationServiceSpy.getConversations.mockResolvedValue([
+      { id: 'conv-group', name: 'bob', last_message: '', last_message_time: 1700000000, message_lifetime: 1440, member_count: 2 },
+    ]);
+    conversationServiceSpy.getMessages.mockResolvedValue([]);
+
+    await component.saveConversationSettings();
+
+    expect(conversationServiceSpy.removeConversationMembers).toHaveBeenCalledWith('conv-group', ['user-2']);
+    expect(component.modal).toEqual({ type: 'none' });
+  });
+
+  it('leaveConversation() should remove the active conversation and clear the chat state', async () => {
+    component.conversationId = 'conv-1';
+    component.isConnected = true;
+    component.messages = [{ id: 'msg-1', username: 'alice', time: 'Now', content: 'Hello', isMine: true, isSystem: false, attachments: [], profilePictureUrl: '' }];
+    component.modal = { type: 'conversation-settings', convId: 'conv-1' };
+
+    await component.leaveConversation();
+
+    expect(conversationServiceSpy.leaveConversation).toHaveBeenCalledWith('conv-1');
+    expect(component.conversations).toEqual([]);
+    expect(component.conversationId).toBe('');
+    expect(component.isConnected).toBe(false);
+    expect(component.messages).toEqual([]);
+    expect(component.modal).toEqual({ type: 'none' });
   });
 
   it('submitCreateConversation() should set roomKeyError when the key is too short', async () => {
-    component.modal = { type: 'create-room-key', username: 'bob' };
+    component.modal = { type: 'create-room-key', memberUsernames: ['bob'] };
     component.roomKeyInput = 'short';
 
     await component.submitCreateConversation();
@@ -314,7 +435,7 @@ describe('Messaging', () => {
   });
 
   it('getActiveConversationName() should return name of current conversation', () => {
-    component.conversations = [{ id: 'conv-1', name: 'Bob', lastMessage: '', lastMessageTime: '' }];
+    component.conversations = [{ id: 'conv-1', name: 'Bob', lastMessage: '', lastMessageTime: '', memberCount: 2, fullName: '' }];
     component.conversationId = 'conv-1';
     expect(component.getActiveConversationName()).toBe('Bob');
   });
@@ -360,7 +481,7 @@ describe('Messaging', () => {
     const refreshConversationListSpy = vi.spyOn(component as any, 'refreshConversationList').mockResolvedValue(undefined);
 
     component.conversationId = 'conv-1';
-    component.conversations = [{ id: 'conv-1', name: 'Bob', lastMessage: '', lastMessageTime: '', messageLifetime: 1440 }];
+    component.conversations = [{ id: 'conv-1', name: 'Bob', lastMessage: '', lastMessageTime: '', messageLifetime: 1440, memberCount: 2, fullName: ''  }];
     component.modal = { type: 'conversation-settings', convId: 'conv-1' };
     component.selectedMessageLifetime = 60;
 
@@ -385,6 +506,7 @@ describe('Messaging', () => {
       time: 'Today, 1.00pm',
       content: 'original text',
       isMine: true,
+      isSystem: false,
       attachments: [],
       profilePictureUrl: '',
     });
@@ -406,6 +528,7 @@ describe('Messaging', () => {
       time: 'Today, 1.00pm',
       content: 'original text',
       isMine: true,
+      isSystem: false,
       attachments: [],
       profilePictureUrl: '',
     };

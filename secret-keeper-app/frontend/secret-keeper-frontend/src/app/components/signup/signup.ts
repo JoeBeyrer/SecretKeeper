@@ -2,6 +2,9 @@ import { Component } from '@angular/core';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
+import { CryptoService } from '../../services/crypto.service';
+import { KeyService } from '../../services/key.service';
+import { AuthService } from '../../services/auth.service';
 
 @Component({
   selector: 'app-signup',
@@ -17,7 +20,10 @@ export class Signup {
   constructor(
     private http: HttpClient,
     private fb: FormBuilder,
-    private router: Router
+    private router: Router,
+    private cryptoService: CryptoService,
+    private keyService: KeyService,
+    private authService: AuthService,
   ) {
     this.signupForm = this.fb.group({
       username: ['', [Validators.required, Validators.minLength(3)]],
@@ -67,11 +73,13 @@ export class Signup {
     this.errorMessage = '';
     console.log('Information passed basic checks, sending request');
     this.http.post<{ message: string }>('http://localhost:8080/api/register', { username, email, password }).subscribe({
-      next: (res) => {
+      next: async (res) => {
         this.errorMessage = '';
         this.successMessage = res.message || 'Account created! Please check your email to verify your address before logging in.';
         this.signupForm.reset();
         console.log('Successfully registered with username', username);
+        // Note: key pair generation happens at first login (after email verification),
+        // since the session cookie is not set yet at registration time.
       },
       error: (err) => {
         this.successMessage = '';

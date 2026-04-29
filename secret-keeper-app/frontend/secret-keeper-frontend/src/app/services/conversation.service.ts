@@ -11,18 +11,29 @@ export interface ConversationSummary {
   last_message: string;
   last_message_time: number;
   message_lifetime?: number;
+  member_count?: number;
+  profile_picture_url?: string;
+  other_username?: string;
+}
+
+export interface ConversationMemberSummary {
+  user_id: string;
+  username: string;
+  display_name: string;
+  profile_picture_url: string;
+  friendship_status: 'self' | 'friend' | 'pending_outgoing' | 'pending_incoming' | 'none';
 }
 
 @Injectable({
   providedIn: 'root',
 })
 export class ConversationService {
-  async createConversation(memberIds: string[], roomKey: string): Promise<CreateConversationResponse> {
+  async createConversation(memberIds: string[], roomKey: string, groupName: string = ''): Promise<CreateConversationResponse> {
     const response = await fetch('http://localhost:8080/api/conversations/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ member_ids: memberIds, room_key: roomKey }),
+      body: JSON.stringify({ member_ids: memberIds, room_key: roomKey, group_name: groupName }),
     });
 
     if (!response.ok) {
@@ -41,6 +52,19 @@ export class ConversationService {
     if (!response.ok) {
       const text = await response.text();
       throw new Error(`Failed to load conversations: ${text}`);
+    }
+
+    return response.json();
+  }
+
+  async getConversationMembers(conversationId: string): Promise<ConversationMemberSummary[]> {
+    const response = await fetch(`http://localhost:8080/api/conversations/${conversationId}/members`, {
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Failed to load conversation members: ${text}`);
     }
 
     return response.json();
@@ -96,6 +120,87 @@ export class ConversationService {
     }
 
     throw new Error(text || 'Failed to retrieve room key.');
+  }
+
+  async updateGroupName(conversationId: string, groupName: string): Promise<void> {
+    const response = await fetch(`http://localhost:8080/api/conversations/${conversationId}/group-name`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ group_name: groupName }),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(text || 'Failed to update group name.');
+    }
+  }
+
+  async uploadGroupPicture(conversationId: string, file: File): Promise<string> {
+    const formData = new FormData();
+    formData.append('picture', file);
+    const response = await fetch(`http://localhost:8080/api/conversations/${conversationId}/group-picture`, {
+      method: 'POST',
+      credentials: 'include',
+      body: formData,
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(text || 'Failed to update group picture.');
+    }
+    const data = await response.json();
+    return data.group_picture_url as string;
+  }
+
+  async removeGroupPicture(conversationId: string): Promise<void> {
+    const response = await fetch(`http://localhost:8080/api/conversations/${conversationId}/group-picture`, {
+      method: 'DELETE',
+      credentials: 'include',
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(text || 'Failed to remove group picture.');
+    }
+  }
+
+  async removeConversationMembers(conversationId: string, memberIds: string[]): Promise<void> {
+    const response = await fetch(`http://localhost:8080/api/conversations/${conversationId}/members/remove`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ member_ids: memberIds }),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(text || 'Failed to remove conversation members.');
+    }
+  }
+
+  async addConversationMembers(conversationId: string, memberIds: string[], roomKey: string): Promise<void> {
+    const response = await fetch(`http://localhost:8080/api/conversations/${conversationId}/members/add`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ member_ids: memberIds, room_key: roomKey }),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(text || 'Failed to add conversation members.');
+    }
+  }
+
+  async leaveConversation(conversationId: string): Promise<void> {
+    const response = await fetch(`http://localhost:8080/api/conversations/${conversationId}/leave`, {
+      method: 'POST',
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(text || 'Failed to leave conversation.');
+    }
   }
 
   async setMessageLifetime(conversationId: string, lifetime: number): Promise<void> {

@@ -1,8 +1,7 @@
-// Opens or joins a conversation with Bob, handling all three modal states.
-// Call this once at the start of the suite via before().
+// Opens or joins a conversation with Bob via the chatWith URL param.
+// Handles all three possible modal states cleanly.
 function openConversationWithBob() {
-  cy.get('input[placeholder="Username to chat with"]').clear().type('Bob');
-  cy.contains('button', 'New').click();
+  cy.visit('/messaging?chatWith=Bob');
 
   cy.get('.modal').should('be.visible');
   cy.get('.modal-title').then(($title) => {
@@ -14,7 +13,7 @@ function openConversationWithBob() {
     } else if (title === 'Your Room Key') {
       cy.contains('button', "I've saved it").click();
     } else {
-      // Enter Room Key — existing conversation
+      // Enter Room Key — rejoin existing conversation
       cy.get('.modal input[type="text"], .modal input[type="password"]').first().type('testkey123');
       cy.contains('button', 'Join').click();
     }

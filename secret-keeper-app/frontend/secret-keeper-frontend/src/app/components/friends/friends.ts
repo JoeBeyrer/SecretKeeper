@@ -1,9 +1,11 @@
-import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef, HostListener, effect } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import { Subscription } from 'rxjs';
 
-import { FriendService, FriendEntry, UserSearchResult } from '../../services/friend.service';
+import { FriendService, FriendEntry, UserSearchResult, PublicProfile } from '../../services/friend.service';
 import { AuthService } from '../../services/auth.service';
+import { MessagingService } from '../../services/messaging.service';
 
 type Tab = 'friends' | 'requests' | 'add' | 'search';
 
@@ -15,7 +17,7 @@ const BLOCKED_STORAGE_KEY = 'sk_blocked_ids';
   templateUrl: './friends.html',
   styleUrl: './friends.css',
 })
-export class Friends implements OnInit {
+export class Friends implements OnInit, OnDestroy {
   activeTab: Tab = 'friends';
 
   friends: FriendEntry[] = [];
@@ -30,6 +32,10 @@ export class Friends implements OnInit {
 
   actionInProgress: Record<string, boolean> = {};
 
+  // Own profile picture for nav avatar — kept reactive via effect().
+  currentUserPictureUrl: string = '';
+  currentUsername: string = '';
+
   // User search state
   searchQuery: string = '';
   searchResults: UserSearchResult[] = [];
@@ -39,12 +45,44 @@ export class Friends implements OnInit {
 
   private blockedIds: Set<string> = new Set();
 
+  // Confirmation dialog
+  confirmDialog: { message: string; onConfirm: () => void } | null = null;
+
+  profileModal: PublicProfile | null = null;
+
+  private wsSub: Subscription | null = null;
+
+  private confirm(message: string, onConfirm: () => void): void {
+    this.confirmDialog = { message, onConfirm };
+    this.cdr.detectChanges();
+  }
+
+  dismissConfirm(): void {
+    this.confirmDialog = null;
+    this.cdr.detectChanges();
+  }
+
+  runConfirm(): void {
+    const action = this.confirmDialog?.onConfirm;
+    this.confirmDialog = null;
+    this.cdr.detectChanges();
+    action?.();
+  }
+
   constructor(
-    private friendService: FriendService,
+    public friendService: FriendService,
     private authService: AuthService,
-    private router: Router,
+    public router: Router,
     private cdr: ChangeDetectorRef,
-  ) {}
+    private messagingService: MessagingService,
+  ) {
+    // Keep nav avatar in sync with any profile change made on this or another tab.
+    effect(() => {
+      const u = this.authService.currentUser$();
+      this.currentUserPictureUrl = u?.profile_picture_url ?? '';
+      this.currentUsername = u?.username ?? '';
+    });
+  }
 
   async ngOnInit(): Promise<void> {
     const user = await this.authService.loadCurrentUser();
@@ -54,6 +92,50 @@ export class Friends implements OnInit {
     }
     this.loadBlockedIds();
     await this.loadAll(true);
+
+    this.messagingService.connect();
+    this.wsSub = this.messagingService.messages$.subscribe(incoming => {
+      if (incoming.type !== 'profile_updated') return;
+      const username = incoming.username ?? '';
+      const pictureURL = incoming.profile_picture_url ?? '';
+      const displayName = incoming.display_name ?? '';
+
+      // Update own nav avatar via signal (effect() handles the re-render).
+      if (username === this.authService.getCurrentUser()?.username) {
+        this.authService.updateCurrentUser({
+          profile_picture_url: pictureURL,
+          display_name: displayName || undefined,
+        });
+      }
+
+      // Update friends list: picture AND display name.
+      const friend = this.friends.find(f => f.username === username);
+      if (friend) {
+        friend.profile_picture_url = pictureURL;
+        if (displayName) friend.display_name = displayName;
+        this.cdr.detectChanges();
+      }
+
+      // Update pending requests list.
+      const pending = this.pendingRequests.find(f => f.username === username);
+      if (pending) {
+        pending.profile_picture_url = pictureURL;
+        if (displayName) pending.display_name = displayName;
+        this.cdr.detectChanges();
+      }
+
+      // Update search results.
+      const result = this.searchResults.find(r => r.username === username);
+      if (result) {
+        result.profile_picture_url = pictureURL;
+        if (displayName) result.display_name = displayName;
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.wsSub?.unsubscribe();
   }
 
   // ── localStorage helpers ───────────────────────────────────────────────────
@@ -87,6 +169,8 @@ export class Friends implements OnInit {
       ]);
       this.friends = friends ?? [];
       this.pendingRequests = requests ?? [];
+      const incoming = (requests ?? []).filter(r => r.direction === 'incoming');
+      this.friendService.pendingCount.set(incoming.length);
     } catch (e: any) {
       this.errorMessage = e.message || 'Failed to load friends.';
     } finally {
@@ -119,6 +203,15 @@ export class Friends implements OnInit {
 
   get incomingCount(): number {
     return this.incomingRequests.length;
+  }
+
+  @HostListener('document:keydown.escape')
+  onEscape(): void {
+    if (this.confirmDialog) {
+      this.dismissConfirm();
+    } else if (this.profileModal) {
+      this.closeProfile();
+    }
   }
 
   displayName(f: FriendEntry): string {
@@ -190,6 +283,10 @@ export class Friends implements OnInit {
     }
   }
 
+  confirmRemove(f: FriendEntry): void {
+    this.confirm(`Remove ${this.displayName(f)} as a friend?`, () => this.remove(f));
+  }
+
   async remove(f: FriendEntry): Promise<void> {
     this.actionInProgress = { ...this.actionInProgress, [f.username]: true };
     this.clearMessages();
@@ -204,6 +301,10 @@ export class Friends implements OnInit {
       this.actionInProgress = u;
       this.cdr.detectChanges();
     }
+  }
+
+  confirmBlock(f: FriendEntry): void {
+    this.confirm(`Block ${this.displayName(f)}? They won't be able to message you.`, () => this.block(f));
   }
 
   async block(f: FriendEntry): Promise<void> {
@@ -279,6 +380,10 @@ export class Friends implements OnInit {
     }
   }
 
+  confirmBlockFromSearch(result: UserSearchResult): void {
+    this.confirm(`Block ${result.display_name || result.username}?`, () => this.blockFromSearch(result));
+  }
+
   async blockFromSearch(result: UserSearchResult): Promise<void> {
     this.actionInProgress = { ...this.actionInProgress, [result.username]: true };
     this.searchError = '';
@@ -332,6 +437,20 @@ export class Friends implements OnInit {
       this.actionInProgress = u;
       this.cdr.detectChanges();
     }
+  }
+
+  async openProfile(username: string): Promise<void> {
+    try {
+      this.profileModal = await this.friendService.getPublicProfile(username);
+      this.cdr.detectChanges();
+    } catch {
+      // silently ignore
+    }
+  }
+
+  closeProfile(): void {
+    this.profileModal = null;
+    this.cdr.detectChanges();
   }
 
   goTo(page: string): void { this.router.navigate(['/' + page]); }
