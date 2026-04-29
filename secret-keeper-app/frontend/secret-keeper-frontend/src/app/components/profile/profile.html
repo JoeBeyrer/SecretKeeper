@@ -41,14 +41,14 @@
       </div>
       <div class="header-actions">
         <!-- Theme toggle -->
-        <div class="theme-row" title="{{ themeService.isDark() ? 'Switch to Light Mode' : 'Switch to Dark Mode' }}">
-          <span class="theme-icon" [class.dim]="themeService.isDark()">Light</span>
+        <div class="theme-row" title="{{ themeService.isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode' }}">
+          <span class="theme-icon" [class.dim]="themeService.isDark">Light</span>
           <button class="toggle-switch" (click)="themeService.toggle()">
-            <span class="toggle-track" [class.dark]="themeService.isDark()">
-              <span class="toggle-thumb" [class.dark]="themeService.isDark()"></span>
+            <span class="toggle-track" [class.dark]="themeService.isDark">
+              <span class="toggle-thumb" [class.dark]="themeService.isDark"></span>
             </span>
           </button>
-          <span class="theme-icon" [class.dim]="!themeService.isDark()">Dark</span>
+          <span class="theme-icon" [class.dim]="!themeService.isDark">Dark</span>
         </div>
         <!-- Logout -->
         <button class="btn-logout" (click)="onLogout()">Log Out</button>
