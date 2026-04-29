@@ -76,10 +76,8 @@ Select **E2E Testing**, choose a browser, then click any spec file to run it. He
 - go_to_password_reset.cy.ts — User navigates from login page to password reset page.
 - use_password_reset.cy.ts — User submits email for password reset and invalid email is rejected.
 - messaging_load_page.cy.ts — Messaging page loads with sidebar and empty conversation state.
-- messaging_create_conversation.cy.ts — User creates a new conversation and room key modal appears.
-- messaging_conversation_list.cy.ts — Conversation list renders with conversation items.
-- messaging_conversation_actions.cy.ts — User sends and edits a message, adds an emoji reaction, sends a file attachment, and deletes a sent message.
-- messaging_message_search.cy.ts — User opens the message search bar, filters messages by query with match highlighting, sees zero results for a non-matching query, and closes the bar to restore all messages.
+- messaging_create_conversation.cy.ts — User opens the create conversation modal and cancels; user opens Choose Room Key modal via chatWith URL param and dismisses.
+- messaging_full_flow.cy.ts — Creates a conversation with Bob once, then runs all conversation-dependent tests in sequence: conversation appears in sidebar, send and edit a message, add an emoji reaction, send a file attachment, delete a message, search messages with highlighting, show zero results for a non-matching query, close search bar and restore messages.
 - messaging_nav_to_profile.cy.ts — User navigates to profile page from messaging sidebar.
 - messaging_nav_to_friends.cy.ts — User navigates to friends page from messaging sidebar.
 - profile_update_display_name.cy.ts — User updates their display name and change is saved.
