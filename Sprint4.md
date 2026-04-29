@@ -88,17 +88,18 @@ Select **E2E Testing**, choose a browser, then click any spec file to run it. He
 - go_to_password_reset.cy.ts — User navigates from login page to password reset page.
 - use_password_reset.cy.ts — User submits email for password reset and invalid email is rejected.
 - messaging_load_page.cy.ts — Messaging page loads with sidebar and empty conversation state.
-- messaging_create_conversation.cy.ts — User creates a new conversation and room key modal appears.
-- messaging_conversation_list.cy.ts — Conversation list renders with conversation items.
-- messaging_edit_message.cy.ts — User edits a sent message inline from the message actions menu.
-- messaging_send_attachment.cy.ts — User queues an attachment before sending and sees it render in the chat after sending.
+- messaging_create_conversation.cy.ts — User opens the create conversation modal and cancels; user opens room key modal via chatWith URL param and dismisses.
+- messaging_conversation_list.cy.ts — Clicking a conversation item opens the chat area; shows empty state with Create Conversation button when no conversations exist.
+- messaging_conversation_actions.cy.ts — Opens a conversation with Bob then runs four sequential actions: send and edit a message, add an emoji reaction, send a file attachment, delete a message.
+- messaging_message_search.cy.ts — Search bar opens on toggle; filters messages by query and highlights matches; shows zero results for non-matching query; closing restores all messages.
 - messaging_nav_to_profile.cy.ts — User navigates to profile page from messaging sidebar.
 - messaging_nav_to_friends.cy.ts — User navigates to friends page from messaging sidebar.
 - profile_update_display_name.cy.ts — User updates their display name and change is saved.
 - profile_logout.cy.ts — User logs out and is redirected to login page.
-- friends_load_page.cy.ts — Friends page loads with Friends, Requests, and Add Friend tabs.
-- friends_send_request.cy.ts — User sends a friend request to another user.
+- friends_load_page.cy.ts — Friends page loads with Friends, Requests, Add Friend, and Search Users tabs.
+- friends_send_request.cy.ts — User sends a friend request to another user from the Add Friend tab.
 - friends_view_requests.cy.ts — User views incoming friend requests on the Requests tab.
+- friends_confirm_dialog.cy.ts — Remove button shows confirmation dialog; Cancel dismisses it; clicking backdrop dismisses it.
 
 ## Frontend Unit Tests
 
@@ -130,6 +131,12 @@ friends/friends.spec.ts
 - should navigate to messaging with chatWith param when startChat is called
 - should redirect to login if user is not authenticated
 - should track isActing correctly during actions
+- avatarBg() should return the same color for the same username
+- avatarBg() should return different colors for different usernames
+- confirmRemove() should set confirmDialog with remove message and action
+- confirmBlock() should set confirmDialog with block message and action
+- dismissConfirm() should clear confirmDialog
+- runConfirm() should execute the stored action and clear the dialog
 
 login/login.spec.ts
 - should create
@@ -160,6 +167,14 @@ messaging/messaging.spec.ts
 - selectConversation() should prompt for room key when claimRoomKey returns NOT_AVAILABLE
 - submitRoomKey() should set roomKeyError when input is empty
 - sendMessage() should set errorMessage when no room key is cached for the conversation
+- avatarBg() should return the same color for the same name on repeated calls
+- avatarBg() should return different colors for different names
+- filteredMessages should return all messages when msgSearchQuery is empty
+- filteredMessages should return only messages whose content contains the query
+- filteredMessages should match case-insensitively
+- highlight() should return the original text when msgSearchQuery is empty
+- highlight() should wrap matched substrings in mark.msg-highlight tags
+- highlight() should escape HTML special characters before wrapping
 
 password-reset/password-reset.spec.ts
 - should create
@@ -197,6 +212,7 @@ profile/profile.spec.ts
 - goToMessaging() should navigate to /messaging
 - should set accountSuccessMessage when email_updated query param is true
 - onPictureSelected() should set errorMessage for disallowed file type
+- avatarBg() should return a consistent color string for the same username
 
 signup/signup.spec.ts
 - should create
@@ -271,6 +287,9 @@ friend.service.spec.ts
 - declineRequest() should POST /friends/decline with correct username
 - removeFriend() should DELETE /friends/remove with correct username
 - removeFriend() should throw when response is not ok
+- pendingCount should be initialized to 0
+- refreshPendingCount() should set pendingCount to the number of incoming requests
+- refreshPendingCount() should not throw and leave pendingCount unchanged on fetch error
 
 key.service.spec.ts
 - should be created
@@ -873,6 +892,8 @@ Saves encrypted conversation keys for all conversation members.
 ### `GET /api/conversations/{id}/key`
 Returns the logged-in user's encrypted conversation key for a given conversation.
 - **Response:** `{ encrypted_key }`
+
+---
 
 ## WebSocket
 
