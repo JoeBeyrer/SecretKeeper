@@ -28,7 +28,7 @@
 22. As a user, I want to access the app through the web, so that I can conveniently interface from any device
 
 ## Planned Issues
-Additional features were added to this sprint as initial application goals were met. User story 22 (web access) was planned but left incomplete, as this is a class project rather than a full production application.
+Additional features were added to this sprint as initial application goals were met. User story 22 (web access) was planned but left incomplete.
 
 
 
@@ -48,8 +48,7 @@ Additional features were added to this sprint as initial application goals were 
 
 
 ## Incomplete / Carried Over
-- Access the app through the web (user story 22). As this project is a class assignment rather than a full production application, full web deployment was left out of scope for the final sprint.
-
+- Access the app through the web (user story 22). As this is not a full production application, web deployment was out of scope for the final sprint.
 ---
 
 # Testing
