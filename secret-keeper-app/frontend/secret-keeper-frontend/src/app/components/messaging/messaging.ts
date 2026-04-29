@@ -9,6 +9,7 @@ import { ConversationService, ConversationMemberSummary } from '../../services/c
 import { AuthService } from '../../services/auth.service';
 import { CryptoService } from '../../services/crypto.service';
 import { FriendService, FriendEntry, PublicProfile } from '../../services/friend.service';
+import { KeyService } from '../../services/key.service';
 
 interface ReactionUser {
   username: string;
@@ -158,6 +159,8 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
   selectedMessageLifetime: number = 0;
   settingsError: string = '';
   editedGroupName: string = '';
+  isUploadingGroupPicture: boolean = false;
+  groupPictureError: string = '';
   openMessageMenuId: string | null = null;
   editingMessageId: string | null = null;
   editDraft: string = '';
@@ -194,6 +197,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     private cryptoService: CryptoService,
     public friendService: FriendService,
     private sanitizer: DomSanitizer,
+    private keyService: KeyService,
   ) {}
 
   highlight(text: string): SafeHtml {
@@ -214,6 +218,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     this.currentUsername = user.username;
     this.currentDisplayName = user.display_name || user.username;
     this.currentUserPictureUrl = user.profile_picture_url || '';
+    await this.authService.restoreKeyPairFromSession();
     this.friendService.refreshPendingCount();
 
     this.routeQuerySub = this.route.queryParamMap.subscribe(params => {
@@ -354,7 +359,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
         this.ngZone.run(() => {
           this.messages.push(msg);
           this.shouldScrollToBottom = true;
-	  if (!this.activeConversationPictureUrl && msg.profilePictureUrl) {
+	  if (!this.activeConversationPictureUrl && msg.profilePictureUrl && !this.isActiveConversationGroup()) {
             this.activeConversationPictureUrl = msg.profilePictureUrl;
 	  }
         });
@@ -427,6 +432,12 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
       return;
     }
 
+    const loaded = await this.tryLoadConversationKeyFromServer(convId);
+    if (loaded) {
+      return;
+    }
+
+
     this.modal = { type: 'enter-room-key', convId };
     this.roomKeyInput = '';
     this.roomKeyError = '';
@@ -463,6 +474,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
 
       this.conversationKeys.set(convId, key);
       this.conversationPassphrases.set(convId, passphrase);
+      void this.persistConversationKey(convId, passphrase);
       this.conversationId = convId;
       this.isConnected = true;
       this.modal = { type: 'none' };
@@ -505,6 +517,8 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     this.editedGroupName = this.conversations.find(c => c.id === this.conversationId)?.fullName ?? '';
     this.settingsError = '';
     this.manageError = '';
+    this.isUploadingGroupPicture = false;
+    this.groupPictureError = '';
     this.memberActionInProgress = {};
     this.pendingRemovedMemberIds = [];
     this.modal = { type: 'conversation-settings', convId: this.conversationId };
@@ -605,6 +619,47 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     } catch (e: any) {
       console.error('[Messaging] Failed to save conversation settings:', e);
       this.settingsError = e?.message || 'Failed to update conversation settings.';
+    }
+  }
+
+  async uploadGroupPicture(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input?.files?.[0];
+    if (!file || !this.conversationId) return;
+    this.isUploadingGroupPicture = true;
+    this.groupPictureError = '';
+    try {
+      const pictureUrl = await this.conversationService.uploadGroupPicture(this.conversationId, file);
+      const conv = this.conversations.find(c => c.id === this.conversationId);
+      if (conv) { conv.pictureUrl = pictureUrl; }
+      if (this.conversationId === this.conversationId) {
+        this.activeConversationPictureUrl = pictureUrl;
+      }
+      this.cdr.detectChanges();
+    } catch (e: any) {
+      this.groupPictureError = e?.message || 'Failed to upload group picture.';
+    } finally {
+      this.isUploadingGroupPicture = false;
+      input.value = '';
+      this.cdr.detectChanges();
+    }
+  }
+
+  async removeGroupPicture(): Promise<void> {
+    if (!this.conversationId) return;
+    this.isUploadingGroupPicture = true;
+    this.groupPictureError = '';
+    try {
+      await this.conversationService.removeGroupPicture(this.conversationId);
+      const conv = this.conversations.find(c => c.id === this.conversationId);
+      if (conv) { conv.pictureUrl = ''; }
+      this.activeConversationPictureUrl = '';
+      this.cdr.detectChanges();
+    } catch (e: any) {
+      this.groupPictureError = e?.message || 'Failed to remove group picture.';
+    } finally {
+      this.isUploadingGroupPicture = false;
+      this.cdr.detectChanges();
     }
   }
 
@@ -1202,10 +1257,56 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
     }
   }
 
+
+  /**
+   * Encrypt the room key passphrase with the user's RSA public key and
+   * save it to the server. Silently no-ops if the public key is not available.
+   */
+  private async persistConversationKey(convId: string, passphrase: string): Promise<void> {
+    const publicKey = this.authService.publicKey;
+    if (!publicKey) {
+      console.warn("[Messaging] No public key available — conversation key not persisted.");
+      return;
+    }
+    try {
+      const encrypted = await this.cryptoService.rsaEncrypt(passphrase, publicKey);
+      const currentUser = this.authService.getCurrentUser();
+      if (!currentUser) return;
+      // Fetch our own user_id from the public key endpoint using our username.
+      const { user_id } = await this.keyService.getPublicKey(currentUser.username);
+      await this.keyService.saveConversationKeys(convId, [{ user_id, encrypted_key: encrypted }]);
+    } catch (e) {
+      console.error("[Messaging] Failed to persist conversation key:", e);
+    }
+  }
+
+  /**
+   * Try to fetch and decrypt the conversation key from the server using the
+   * user's RSA private key. Returns true if successful and the key is ready.
+   */
+  private async tryLoadConversationKeyFromServer(convId: string): Promise<boolean> {
+    const privateKey = this.authService.privateKey;
+    if (!privateKey) return false;
+    try {
+      const encryptedKey = await this.keyService.getConversationKey(convId);
+      const passphrase = await this.cryptoService.rsaDecrypt(encryptedKey, privateKey);
+      const key = await this.cryptoService.deriveConversationKey(passphrase, convId);
+      this.conversationKeys.set(convId, key);
+      this.conversationPassphrases.set(convId, passphrase);
+      this.conversationId = convId;
+      this.isConnected = true;
+      await this.loadMessages(convId);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   private async tryClaimRoomKey(convId: string): Promise<boolean> {
     try {
       const roomKey = await this.conversationService.claimRoomKey(convId);
       const key = await this.cryptoService.deriveConversationKey(roomKey, convId);
+      void this.persistConversationKey(convId, roomKey);
       this.conversationKeys.set(convId, key);
       this.conversationPassphrases.set(convId, roomKey);
 
@@ -1268,6 +1369,7 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
         const key = await this.cryptoService.deriveConversationKey(passphrase, result.conversation_id);
         this.conversationKeys.set(result.conversation_id, key);
         this.conversationPassphrases.set(result.conversation_id, passphrase);
+        void this.persistConversationKey(result.conversation_id, passphrase);
 
         this.ngZone.run(() => {
           this.modal = { type: 'show-room-key', convId: result.conversation_id, key: passphrase };
@@ -1401,8 +1503,10 @@ export class Messaging implements OnInit, OnDestroy, AfterViewChecked {
         const conv = this.conversations.find(c => c.id === convId);
         if (conv?.pictureUrl) {
           this.activeConversationPictureUrl = conv.pictureUrl;
-        } else {
+        } else if (!this.isActiveConversationGroup()) {
           this.activeConversationPictureUrl = otherMsg?.profilePictureUrl ?? '';
+        } else {
+          this.activeConversationPictureUrl = '';
         }
       });
     } catch (e) {
