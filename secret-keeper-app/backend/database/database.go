@@ -162,16 +162,16 @@ func InitDB(path string) *sql.DB {
         )
     `)
 
-    execOrFatal(db, `
-        CREATE TABLE IF NOT EXISTS conversation_keys (
-            conversation_id TEXT NOT NULL,
-            user_id TEXT NOT NULL,
-            encrypted_key TEXT NOT NULL,
-            PRIMARY KEY (conversation_id, user_id),
-            FOREIGN KEY (conversation_id) REFERENCES conversations(id),
-            FOREIGN KEY (user_id) REFERENCES users(id)
-        )
-    `)
+	execOrFatal(db, `
+	    CREATE TABLE IF NOT EXISTS conversations (
+	        id TEXT PRIMARY KEY,
+	        created_at INTEGER,
+	        room_key_hash TEXT,
+	        group_name TEXT,
+	        message_lifetime INTEGER DEFAULT 0,
+	        group_picture_url TEXT NOT NULL DEFAULT ''
+	    )
+	`)
 
 	execOrFatal(db, `
 		CREATE TABLE IF NOT EXISTS message_reactions (
@@ -199,10 +199,6 @@ func InitDB(path string) *sql.DB {
     //     UPDATE users
     //     SET email_verified = 1;
     // `)
-
-
-	// Migration: add group_picture_url to conversations if it doesn't exist yet.
-	db.Exec(`ALTER TABLE conversations ADD COLUMN group_picture_url TEXT NOT NULL DEFAULT ''`)
 
 	log.Println("Database initialized")
 	return db
