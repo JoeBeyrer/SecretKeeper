@@ -28,20 +28,7 @@
 22. As a user, I want to access the app through the web, so that I can conveniently interface from any device
 
 ## Planned Issues
-We plan to implement functionality to support user stories 18, 21, and 22. Additional features were also added to this sprint as initial application goals were met.
-### Adding and Removing Friends from Group Conversations
-- Add support for removing members from group conversations.
-- Add support for adding friends to a group conversation.
-- Add system messages when members are added to or removed from group conversations.
-### Managing Group Conversations
-- Create an all-in-one settings popup for group conversation management such as leaving group conversations and managing disappearing messages.
-- Add support for sending friend requests to members of a group conversation.
-- Add support for changing group conversations names.
-- Add support for leaving conversations.
-- Add system messages for modifications to group conversations such as name changes and members leaving.
-### Creating Group Conversations
-- Implement frontend group conversation creation.
-- Allow users to add one or more friends during chat creation, optionally create conversation names, and set group conversation room keys.
+Additional features were added to this sprint as initial application goals were met. User story 22 (web access) was planned but left incomplete.
 
 
 
@@ -56,11 +43,12 @@ We plan to implement functionality to support user stories 18, 21, and 22. Addit
 - Leave conversations.
 - Group conversation management settings all in one place.
 - View all members of group conversation.
+- Upload and remove group conversation pictures.
+- Mute conversations.
 
 
 ## Incomplete / Carried Over
-None.
-
+- Access the app through the web (user story 22). As this is not a full production application, web deployment was out of scope for the final sprint.
 ---
 
 # Testing
@@ -90,8 +78,8 @@ Select **E2E Testing**, choose a browser, then click any spec file to run it. He
 - messaging_load_page.cy.ts — Messaging page loads with sidebar and empty conversation state.
 - messaging_create_conversation.cy.ts — User creates a new conversation and room key modal appears.
 - messaging_conversation_list.cy.ts — Conversation list renders with conversation items.
-- messaging_edit_message.cy.ts — User edits a sent message inline from the message actions menu.
-- messaging_send_attachment.cy.ts — User queues an attachment before sending and sees it render in the chat after sending.
+- messaging_conversation_actions.cy.ts — User sends and edits a message, adds an emoji reaction, sends a file attachment, and deletes a sent message.
+- messaging_message_search.cy.ts — User opens the message search bar, filters messages by query with match highlighting, sees zero results for a non-matching query, and closes the bar to restore all messages.
 - messaging_nav_to_profile.cy.ts — User navigates to profile page from messaging sidebar.
 - messaging_nav_to_friends.cy.ts — User navigates to friends page from messaging sidebar.
 - profile_update_display_name.cy.ts — User updates their display name and change is saved.
@@ -99,6 +87,7 @@ Select **E2E Testing**, choose a browser, then click any spec file to run it. He
 - friends_load_page.cy.ts — Friends page loads with Friends, Requests, and Add Friend tabs.
 - friends_send_request.cy.ts — User sends a friend request to another user.
 - friends_view_requests.cy.ts — User views incoming friend requests on the Requests tab.
+- friends_confirm_dialog.cy.ts — Confirmation dialog appears when removing a friend, dismisses on cancel, and dismisses when clicking the overlay backdrop.
 
 ## Frontend Unit Tests
 
@@ -130,6 +119,12 @@ friends/friends.spec.ts
 - should navigate to messaging with chatWith param when startChat is called
 - should redirect to login if user is not authenticated
 - should track isActing correctly during actions
+- avatarBg() should return the same color for the same username
+- avatarBg() should return different colors for different usernames
+- confirmRemove() should set confirmDialog with remove message and action
+- confirmBlock() should set confirmDialog with block message and action
+- dismissConfirm() should clear confirmDialog
+- runConfirm() should execute the stored action and clear the dialog
 
 login/login.spec.ts
 - should create
@@ -148,18 +143,34 @@ messaging/messaging.spec.ts
 - should set currentUsername and currentDisplayName from the authenticated user
 - should load and map conversations on init
 - should call messagingService.connect() on init
-- startNewConversation() should set errorMessage when username is empty
-- sendMessage() should do nothing when newMessage is empty
-- sendMessage() should set errorMessage when no conversationId is set
-- sendMessage() should set errorMessage when socket is not connected
-- sendMessage() should encrypt and send the message
+- should open the room-key modal immediately from the chatWith route param
+- startNewConversation() should load friends and open the member picker
+- continueCreateConversation() should require at least one selected friend
+- continueCreateConversation() should open a room-key modal with the selected friends
+- submitCreateConversation() should pass an optional group name for group chats
+- toggleConversationMember() should clear the group name when only one friend remains selected
+- saveConversationSettings() should rename the group and refresh messages
+- saveConversationSettings() should remove staged members when settings are saved
+- leaveConversation() should remove the active conversation and clear the chat state
+- submitCreateConversation() should set roomKeyError when the key is too short
+- sendMessage() should do nothing when message and attachments are empty
+- sendMessage() should set composerError when no conversationId is set
+- sendMessage() should set composerError when socket is not connected
+- sendMessage() should encrypt and send a text-only message
+- onAttachmentsSelected() should queue files without sending them
+- sendMessage() should encrypt and send queued files together with text
 - closeModal() should reset modal state
 - goTo() should navigate to the given page
 - getActiveConversationName() should return name of current conversation
 - getActiveConversationName() should return truncated id when conversation is unknown
 - selectConversation() should prompt for room key when claimRoomKey returns NOT_AVAILABLE
 - submitRoomKey() should set roomKeyError when input is empty
-- sendMessage() should set errorMessage when no room key is cached for the conversation
+- sendMessage() should set composerError when no room key is cached for the conversation
+- openConversationSettings() should open the settings modal with the current lifetime
+- saveConversationSettings() should persist the selected lifetime and refresh messages
+- getMessageLifetimeLabel() should map preset values to labels
+- startEditingMessage() should open inline editing with the current message content
+- saveEditedMessage() should encrypt and persist a text edit
 
 password-reset/password-reset.spec.ts
 - should create
@@ -197,6 +208,7 @@ profile/profile.spec.ts
 - goToMessaging() should navigate to /messaging
 - should set accountSuccessMessage when email_updated query param is true
 - onPictureSelected() should set errorMessage for disallowed file type
+- avatarBg() should return a consistent color string for the same username
 
 signup/signup.spec.ts
 - should create
@@ -230,7 +242,7 @@ auth.service.spec.ts
 
 conversation.service.spec.ts
 - should be created
-- createConversation() should POST /conversations/create with member_ids and room_key
+- createConversation() should POST /conversations/create with member_ids, room_key, and optional group_name
 - createConversation() should throw on non-ok response
 - getConversations() should GET /conversations/get and return list
 - getConversations() should throw on error
@@ -242,6 +254,14 @@ conversation.service.spec.ts
 - claimRoomKey() should throw ROOM_KEY_NOT_AVAILABLE on 404
 - claimRoomKey() should throw on other errors
 - editMessage() should PATCH /messages/:id with ciphertext
+- updateGroupName() should PATCH /conversations/:id/group-name with group_name
+- updateGroupName() should throw on error
+- removeConversationMembers() should PATCH /conversations/:id/members/remove with member_ids
+- removeConversationMembers() should throw on error
+- addConversationMembers() should PATCH /conversations/:id/members/add with member_ids and room_key
+- addConversationMembers() should throw on error
+- leaveConversation() should POST /conversations/:id/leave
+- leaveConversation() should throw on error
 
 crypto.service.spec.ts
 - should be created
@@ -271,6 +291,9 @@ friend.service.spec.ts
 - declineRequest() should POST /friends/decline with correct username
 - removeFriend() should DELETE /friends/remove with correct username
 - removeFriend() should throw when response is not ok
+- pendingCount should be initialized to 0
+- refreshPendingCount() should set pendingCount to the number of incoming requests
+- refreshPendingCount() should not throw and leave pendingCount unchanged on fetch error
 
 key.service.spec.ts
 - should be created
@@ -353,12 +376,19 @@ go test ./tests/... -v
 
 **conversations_test.go**
 - Test_create_conversation_handler — Missing room key, unknown member, valid creation, duplicate returns existing, unauthorized.
-- Test_get_conversations_handler — Empty list, list after creation, unauthorized.
+- Test_get_conversations_handler — Empty list, list after creation, named group conversation with member count, unauthorized.
+- Test_get_conversation_members_handler — Returns all members with friendship status, non-member returns 403.
+- Test_add_group_conversation_members_handler — Adds member to group, pending room key stored for new member, system message recorded.
+- Test_update_group_name_handler — Valid rename updates group name, system message recorded, non-member returns 403.
+- Test_remove_conversation_members_handler — Removes member from group, system message recorded, non-member and self-remove edge cases.
 - Test_get_conversation_messages_handler — Empty message list, non-member forbidden access.
 - Test_verify_conversation_room_key_handler — Correct key returns 204, wrong key returns 401, empty key returns 400.
+- Test_claim_group_conversation_room_key_handler — Newly added member claims pending key successfully.
 - Test_claim_conversation_room_key_handler — Recipient claims key, double-claim returns 404, non-member returns 403.
 - Test_edit_message_handler — Missing ciphertext returns 400, editing another user's message returns 404, valid edit updates ciphertext.
 - Test_get_conversation_messages_handler_attachment_ciphertext — Attachment-message ciphertext is returned unchanged by the messages endpoint.
+- Test_leave_two_person_conversation_handler — Leaving a 1-on-1 conversation deletes it and all associated data.
+- Test_leave_group_conversation_handler — Leaving a group conversation removes only the leaving member; conversation and remaining members persist.
 
 **keys_test.go**
 - Test_save_keys_handler — Empty keys return 400, valid save returns 204, unauthorized returns 401.
@@ -433,11 +463,11 @@ go test ./tests/... -v
 
 ## ConversationService
 
-### `createConversation(memberIds: string[], roomKey: string): Promise<CreateConversationResponse>`
-- **Params:** `memberIds`, `roomKey`
-- **Input:** `{ member_ids, room_key }`
+### `createConversation(memberIds: string[], roomKey: string, groupName?: string): Promise<CreateConversationResponse>`
+- **Params:** `memberIds`, `roomKey`, `groupName?`
+- **Input:** `{ member_ids, room_key, group_name? }`
 - **Output:** `{ conversation_id, created }`
-- **Description:** Creates a conversation or returns an existing one
+- **Description:** Creates a conversation or returns an existing one. For group conversations (3+ members), an optional `group_name` may be provided.
 
 ### `getConversations(): Promise<ConversationSummary[]>`
 - **Params:** none
@@ -487,6 +517,48 @@ go test ./tests/... -v
 - **Output:** `void`
 - **Description:** Toggles an emoji reaction on a message. Adds the reaction if not present, removes it if already set
 
+### `getConversationMembers(conversationId: string): Promise<ConversationMemberSummary[]>`
+- **Params:** `conversationId`
+- **Input:** conversation ID in URL
+- **Output:** list of member summaries
+- **Description:** Returns all members of a conversation with username, display name, and friendship status
+
+### `updateGroupName(conversationId: string, groupName: string): Promise<void>`
+- **Params:** `conversationId`, `groupName`
+- **Input:** `{ group_name }`
+- **Output:** `void`
+- **Description:** Renames a group conversation. Posts a system message to the conversation.
+
+### `removeConversationMembers(conversationId: string, memberIds: string[]): Promise<void>`
+- **Params:** `conversationId`, `memberIds`
+- **Input:** `{ member_ids }`
+- **Output:** `void`
+- **Description:** Removes one or more members from a group conversation. Posts a system message per removal.
+
+### `addConversationMembers(conversationId: string, usernames: string[], roomKey: string): Promise<void>`
+- **Params:** `conversationId`, `usernames`, `roomKey`
+- **Input:** `{ member_ids, room_key }`
+- **Output:** `void`
+- **Description:** Adds one or more friends to a group conversation and stores a pending room key for each new member.
+
+### `leaveConversation(conversationId: string): Promise<void>`
+- **Params:** `conversationId`
+- **Input:** conversation ID in URL
+- **Output:** `void`
+- **Description:** Leaves a group conversation. If it is a 1-on-1 conversation, the entire conversation is deleted.
+
+### `uploadGroupPicture(conversationId: string, file: File): Promise<string>`
+- **Params:** `conversationId`, `file`
+- **Input:** `multipart/form-data` with `picture` field
+- **Output:** `group_picture_url` string
+- **Description:** Uploads a group picture for a group conversation (3+ members). Accepted formats: JPEG, PNG, GIF, WebP up to 2 MB.
+
+### `removeGroupPicture(conversationId: string): Promise<void>`
+- **Params:** `conversationId`
+- **Input:** conversation ID in URL
+- **Output:** `void`
+- **Description:** Removes the group picture from a group conversation.
+
 ### `CreateConversationResponse`
 - `conversation_id: string`
 - `created: boolean`
@@ -497,6 +569,12 @@ go test ./tests/... -v
 - `last_message: string`
 - `last_message_time: number`
 - `message_lifetime: number`
+
+### `ConversationMemberSummary`
+- `user_id: string`
+- `username: string`
+- `display_name: string`
+- `friendship_status: string`
 
 
 ## CryptoService
@@ -778,9 +856,41 @@ Verifies a room key against the stored hash without consuming it.
 Claims the one-time pending room key stored for the recipient. Can only be claimed once.
 - **Response:** `{ room_key }` or `404 Not Found`
 
+### `GET /api/conversations/{id}/members`
+Returns all members of a conversation along with their username, display name, and friendship status relative to the caller. Requires membership.
+- **Response:** array of `{ user_id, username, display_name, friendship_status }`
+
 ### `PATCH /api/conversations/{id}/lifetime`
 Sets the message expiry lifetime for a conversation. Applies to all existing and future messages. Notifies members via WebSocket.
 - **Body:** `{ message_lifetime }` — minutes: `60`, `1440`, `10080`, `43200`, `525600`, or `0` (never)
+- **Response:** `204 No Content`
+
+### `PATCH /api/conversations/{id}/group-name`
+Renames a group conversation. Posts a system message describing the change. Requires membership.
+- **Body:** `{ group_name }`
+- **Response:** `204 No Content`
+
+### `POST /api/conversations/{id}/group-picture`
+Uploads or replaces the group picture for a group conversation. Accepts JPEG, PNG, GIF, or WebP up to 2 MB. Notifies members via WebSocket. Only valid for conversations with more than 2 members.
+- **Body:** `multipart/form-data` with `picture` field
+- **Response:** `{ message, group_picture_url }`
+
+### `DELETE /api/conversations/{id}/group-picture`
+Removes the group picture from a group conversation. Notifies members via WebSocket.
+- **Response:** `204 No Content`
+
+### `PATCH /api/conversations/{id}/members/add`
+Adds one or more users to a group conversation. Stores a pending room key for each new member and posts a system message per addition. Notifies all members via WebSocket.
+- **Body:** `{ member_ids, room_key }`
+- **Response:** `204 No Content`
+
+### `PATCH /api/conversations/{id}/members/remove`
+Removes one or more members from a group conversation. Posts a system message per removal and notifies remaining members via WebSocket.
+- **Body:** `{ member_ids }`
+- **Response:** `204 No Content`
+
+### `POST /api/conversations/{id}/leave`
+Removes the calling user from a conversation. For 1-on-1 conversations, the entire conversation and all associated data are deleted. For group conversations, only the caller is removed and a system message is posted. Notifies remaining members via WebSocket.
 - **Response:** `204 No Content`
 
 ## Message Routes
