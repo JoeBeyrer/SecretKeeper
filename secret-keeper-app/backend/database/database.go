@@ -201,6 +201,9 @@ func InitDB(path string) *sql.DB {
     // `)
 
 
+	// Migration: add group_picture_url to conversations if it doesn't exist yet.
+	db.Exec(`ALTER TABLE conversations ADD COLUMN group_picture_url TEXT NOT NULL DEFAULT ''`)
+
 	log.Println("Database initialized")
 	return db
 }
