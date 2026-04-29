@@ -733,9 +733,10 @@ func Test_claim_group_conversation_room_key_handler(t *testing.T) {
 		db.Exec(`UPDATE users SET email_verified = 1 WHERE username = ?`, u.name)
 	}
 
-	var aliceID, bobID string
+	var aliceID, bobID, carolID string
 	db.QueryRow(`SELECT id FROM users WHERE username = 'alice'`).Scan(&aliceID)
 	db.QueryRow(`SELECT id FROM users WHERE username = 'bob'`).Scan(&bobID)
+	db.QueryRow(`SELECT id FROM users WHERE username = 'carol'`).Scan(&carolID)
 
 	body := `{"member_ids":["bob","carol"],"room_key":"shared-group-room-key"}`
 	req := requestWithUserID("POST", "/api/conversations/create", body, aliceID)
@@ -791,9 +792,10 @@ func Test_claim_conversation_room_key_handler(t *testing.T) {
 		db.Exec(`UPDATE users SET email_verified = 1 WHERE username = ?`, u.name)
 	}
 
-	var aliceID, bobID string
+	var aliceID, bobID, carolID string
 	db.QueryRow(`SELECT id FROM users WHERE username = 'alice'`).Scan(&aliceID)
 	db.QueryRow(`SELECT id FROM users WHERE username = 'bob'`).Scan(&bobID)
+	db.QueryRow(`SELECT id FROM users WHERE username = 'carol'`).Scan(&carolID)
 
 	// Alice creates conversation with bob
 	body := `{"member_ids":["bob"],"room_key":"the-real-room-key"}`
@@ -1073,9 +1075,10 @@ func Test_leave_group_conversation_handler(t *testing.T) {
 		db.Exec(`UPDATE users SET email_verified = 1 WHERE username = ?`, u.name)
 	}
 
-	var aliceID, bobID string
+	var aliceID, bobID, carolID string
 	db.QueryRow(`SELECT id FROM users WHERE username = 'alice'`).Scan(&aliceID)
 	db.QueryRow(`SELECT id FROM users WHERE username = 'bob'`).Scan(&bobID)
+	db.QueryRow(`SELECT id FROM users WHERE username = 'carol'`).Scan(&carolID)
 
 	body := `{"member_ids":["bob","carol"],"room_key":"groupsecret","group_name":"Weekend Plans"}`
 	req := requestWithUserID("POST", "/api/conversations/create", body, aliceID)

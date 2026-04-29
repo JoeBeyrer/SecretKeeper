@@ -356,7 +356,7 @@ func Test_update_account_handler(t *testing.T) {
 	req := httptest.NewRequest("PUT", "/api/account", strings.NewReader(`{"new_username":"newname"}`))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
-	handlers.UpdateAccountHandler(db)(w, req)
+	handlers.UpdateAccountHandler(db, messaging.NewHub())(w, req)
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("expected 401 without user in context, got %d", w.Code)
 	} else {
@@ -366,7 +366,7 @@ func Test_update_account_handler(t *testing.T) {
 	// Password too short
 	req = requestWithUserID("PUT", "/api/account", `{"new_password":"short"}`, "u1")
 	w = httptest.NewRecorder()
-	handlers.UpdateAccountHandler(db)(w, req)
+	handlers.UpdateAccountHandler(db, messaging.NewHub())(w, req)
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400 for short password, got %d", w.Code)
 	} else {
@@ -376,7 +376,7 @@ func Test_update_account_handler(t *testing.T) {
 	// Username too short
 	req = requestWithUserID("PUT", "/api/account", `{"new_username":"ab"}`, "u1")
 	w = httptest.NewRecorder()
-	handlers.UpdateAccountHandler(db)(w, req)
+	handlers.UpdateAccountHandler(db, messaging.NewHub())(w, req)
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400 for short username, got %d", w.Code)
 	} else {
@@ -386,7 +386,7 @@ func Test_update_account_handler(t *testing.T) {
 	// Valid username update
 	req = requestWithUserID("PUT", "/api/account", `{"new_username":"brandnewname"}`, "u1")
 	w = httptest.NewRecorder()
-	handlers.UpdateAccountHandler(db)(w, req)
+	handlers.UpdateAccountHandler(db, messaging.NewHub())(w, req)
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200 for valid username update, got %d", w.Code)
 	} else {
@@ -404,7 +404,7 @@ func Test_update_account_handler(t *testing.T) {
 	// Valid password update
 	req = requestWithUserID("PUT", "/api/account", `{"new_password":"newpassword123"}`, "u1")
 	w = httptest.NewRecorder()
-	handlers.UpdateAccountHandler(db)(w, req)
+	handlers.UpdateAccountHandler(db, messaging.NewHub())(w, req)
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200 for valid password update, got %d", w.Code)
 	} else {
@@ -422,7 +422,7 @@ func Test_update_account_handler(t *testing.T) {
 	// Same email rejected
 	req = requestWithUserID("PUT", "/api/account", `{"new_email":"account@test.com"}`, "u1")
 	w = httptest.NewRecorder()
-	handlers.UpdateAccountHandler(db)(w, req)
+	handlers.UpdateAccountHandler(db, messaging.NewHub())(w, req)
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400 for same email, got %d", w.Code)
 	} else {

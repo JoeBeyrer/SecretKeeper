@@ -1,6 +1,9 @@
 package main
 
 import (
+	"context"
+	"database/sql"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"secret-keeper-app/backend/database"
@@ -306,5 +309,173 @@ func Test_login_handler_func(t *testing.T) {
 		t.Fatal("session was not created in the database after login")
 	} else {
 		t.Log("session correctly created in database after login")
+	}
+}
+
+func Test_block_user_func(t *testing.T) {
+	db := database.InitDB(":memory:")
+	defer db.Close()
+
+	for _, u := range []struct{ name, email string }{
+		{"alice", "alice@test.com"},
+		{"bob", "bob@test.com"},
+	} {
+		body := `{"username":"` + u.name + `","email":"` + u.email + `","password":"password123"}`
+		req := httptest.NewRequest("POST", "/api/register", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		handlers.RegisterHandler(db)(w, req)
+		if w.Code != http.StatusCreated {
+			t.Fatalf("setup: register %s got %d", u.name, w.Code)
+		}
+		db.Exec(`UPDATE users SET email_verified = 1 WHERE username = ?`, u.name)
+	}
+
+	var aliceID, bobID string
+	db.QueryRow(`SELECT id FROM users WHERE username = 'alice'`).Scan(&aliceID)
+	db.QueryRow(`SELECT id FROM users WHERE username = 'bob'`).Scan(&bobID)
+
+	//not json
+	body := `not json`
+	req := httptest.NewRequest("POST", "/api/blocks/block", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := context.WithValue(req.Context(), handlers.UserIDKey, bobID)
+	req = req.WithContext(ctx)
+	w := httptest.NewRecorder()
+	handlers.BlockUser(db)(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Fatal("invalid json did not return correct code")
+	} else {
+		t.Log("invalid json returned correct code ")
+	}
+
+	//self block
+	body = fmt.Sprintf(`{"blockee_id": "%s"}`, bobID)
+	req = httptest.NewRequest("POST", "/api/blocks/block", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	ctx = context.WithValue(req.Context(), handlers.UserIDKey, bobID)
+	req = req.WithContext(ctx)
+	w = httptest.NewRecorder()
+	handlers.BlockUser(db)(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Fatal("self block did not return correct code")
+	} else {
+		t.Log("self block returned correct code ")
+	}
+
+	//valid block
+	body = fmt.Sprintf(`{"blockee_id": "%s"}`, bobID)
+	req = httptest.NewRequest("POST", "/api/blocks/block", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	ctx = context.WithValue(req.Context(), handlers.UserIDKey, aliceID)
+	req = req.WithContext(ctx)
+	w = httptest.NewRecorder()
+	handlers.BlockUser(db)(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatal("block did not return correct code")
+	} else {
+		t.Log("block returned correct code ")
+	}
+
+	var blockeeID string
+	err := db.QueryRow(
+		`SELECT blockee_id FROM blocks WHERE blocker_id = ?`, aliceID,
+	).Scan(&blockeeID)
+
+	if err == sql.ErrNoRows {
+		t.Fatal("block not found in db")
+	} else if blockeeID == bobID {
+		t.Log("block found in db")
+	} else {
+		t.Fatal("found block in db but the blockeeID was incorrect")
+	}
+
+	//duplicate block
+	body = fmt.Sprintf(`{"blockee_id": "%s"}`, bobID)
+	req = httptest.NewRequest("POST", "/api/blocks/block", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	ctx = context.WithValue(req.Context(), handlers.UserIDKey, aliceID)
+	req = req.WithContext(ctx)
+	w = httptest.NewRecorder()
+	handlers.BlockUser(db)(w, req)
+	if w.Code != http.StatusConflict {
+		t.Fatal("duplicate block did not return correct code")
+	} else {
+		t.Log("duplicate block returned correct code ")
+	}
+}
+
+func Test_unblock_user_func(t *testing.T) {
+	db := database.InitDB(":memory:")
+	defer db.Close()
+
+	for _, u := range []struct{ name, email string }{
+		{"alice", "alice@test.com"},
+		{"bob", "bob@test.com"},
+	} {
+		body := `{"username":"` + u.name + `","email":"` + u.email + `","password":"password123"}`
+		req := httptest.NewRequest("POST", "/api/register", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		handlers.RegisterHandler(db)(w, req)
+		if w.Code != http.StatusCreated {
+			t.Fatalf("setup: register %s got %d", u.name, w.Code)
+		}
+		db.Exec(`UPDATE users SET email_verified = 1 WHERE username = ?`, u.name)
+	}
+
+	var aliceID, bobID string
+	db.QueryRow(`SELECT id FROM users WHERE username = 'alice'`).Scan(&aliceID)
+	db.QueryRow(`SELECT id FROM users WHERE username = 'bob'`).Scan(&bobID)
+
+	// test block: alice has blocked bob
+	db.Exec(`INSERT INTO blocks (id, blocker_id, blockee_id, created_at) VALUES (?, ?, ?, ?)`,
+		"test-block-id", aliceID, bobID, time.Now().Unix())
+
+	// missing blockee_id in path
+	req := httptest.NewRequest("DELETE", "/api/blocks/unblock/", nil)
+	ctx := context.WithValue(req.Context(), handlers.UserIDKey, aliceID)
+	req = req.WithContext(ctx)
+	w := httptest.NewRecorder()
+	handlers.UnblockUser(db)(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for missing blockee_id, got %d", w.Code)
+	} else {
+		t.Log("missing blockee_id correctly returned 400")
+	}
+
+	// valid unblock
+	req = httptest.NewRequest("DELETE", "/api/blocks/unblock/"+bobID, nil)
+	ctx = context.WithValue(req.Context(), handlers.UserIDKey, aliceID)
+	req = req.WithContext(ctx)
+	req.SetPathValue("blockee_id", bobID)
+	w = httptest.NewRecorder()
+	handlers.UnblockUser(db)(w, req)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("expected 204 for valid unblock, got %d", w.Code)
+	} else {
+		t.Log("valid unblock correctly returned 204")
+	}
+
+	// check if removed from db
+	var count int
+	db.QueryRow(`SELECT COUNT(*) FROM blocks WHERE blocker_id = ? AND blockee_id = ?`, aliceID, bobID).Scan(&count)
+	if count != 0 {
+		t.Fatal("block still exists in db after unblock")
+	} else {
+		t.Log("block correctly removed from db")
+	}
+
+	// unblock someone not blocked
+	req = httptest.NewRequest("DELETE", "/api/blocks/unblock/"+bobID, nil)
+	ctx = context.WithValue(req.Context(), handlers.UserIDKey, aliceID)
+	req = req.WithContext(ctx)
+	req.SetPathValue("blockee_id", bobID)
+	w = httptest.NewRecorder()
+	handlers.UnblockUser(db)(w, req)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("expected 204 for unblocking non-blocked user, got %d", w.Code)
+	} else {
+		t.Log("unblocking non-blocked user correctly returned 204")
 	}
 }
