@@ -2,15 +2,17 @@ package handlers
 
 import (
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"github.com/google/uuid"
+	"io"
 	"log"
 	"net/http"
 	"secret-keeper-app/backend/database"
-    "secret-keeper-app/backend/messaging"
-    "secret-keeper-app/backend/models"
-    "time"
-    "strings"
+	"secret-keeper-app/backend/messaging"
+	"secret-keeper-app/backend/models"
+	"time"
+	"strings"
 )
 var NotifyAsync = true
 
@@ -313,7 +315,7 @@ func GetConversationsHandler(db *sql.DB) http.HandlerFunc {
                         WHERE cm3.conversation_id = c.id AND cm3.user_id != ?
                         LIMIT 1
                     ), '')
-                    ELSE ''
+                    ELSE COALESCE(c.group_picture_url, '')
                 END AS profile_picture_url,
                 CASE WHEN (SELECT COUNT(*) FROM conversation_members WHERE conversation_id = c.id) = 2
                     THEN COALESCE((
@@ -1334,4 +1336,98 @@ func DeleteMessageHandler(db *sql.DB, hub *messaging.Hub) http.HandlerFunc {
         notifyConversationMembers(db, hub, convID)
         w.WriteHeader(http.StatusNoContent)
     }
+}
+
+// UploadGroupPictureHandler accepts a multipart image upload and stores it as a
+// base64 data URL on the conversation. Any member of the group may change it.
+func UploadGroupPictureHandler(db *sql.DB, hub *messaging.Hub) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost && r.Method != http.MethodDelete {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		userID, ok := GetUserIDFromContext(r)
+		if !ok {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		convID := r.PathValue("id")
+		if convID == "" {
+			http.Error(w, "missing conversation id", http.StatusBadRequest)
+			return
+		}
+
+		if !database.IsUserInConversation(db, userID, convID) {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+
+		// Only group conversations (member_count > 2) get a group picture.
+		var memberCount int
+		if err := db.QueryRow(`SELECT COUNT(*) FROM conversation_members WHERE conversation_id = ?`, convID).Scan(&memberCount); err != nil {
+			http.Error(w, "could not load conversation", http.StatusInternalServerError)
+			return
+		}
+		if memberCount <= 2 {
+			http.Error(w, "group picture can only be set for group conversations", http.StatusBadRequest)
+			return
+		}
+
+		if r.Method == http.MethodDelete {
+			if _, err := db.Exec(`UPDATE conversations SET group_picture_url = '' WHERE id = ?`, convID); err != nil {
+				http.Error(w, "server error", http.StatusInternalServerError)
+				return
+			}
+			notifyConversationMembers(db, hub, convID)
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		r.Body = http.MaxBytesReader(w, r.Body, 2<<20)
+		if err := r.ParseMultipartForm(2 << 20); err != nil {
+			http.Error(w, "file too large (max 2 MB)", http.StatusBadRequest)
+			return
+		}
+
+		file, header, err := r.FormFile("picture")
+		if err != nil {
+			http.Error(w, "picture field required", http.StatusBadRequest)
+			return
+		}
+		defer file.Close()
+
+		contentType := header.Header.Get("Content-Type")
+		allowed := map[string]bool{
+			"image/jpeg": true,
+			"image/png":  true,
+			"image/gif":  true,
+			"image/webp": true,
+		}
+		if !allowed[contentType] {
+			http.Error(w, "only jpeg, png, gif, and webp images are accepted", http.StatusBadRequest)
+			return
+		}
+
+		data, err := io.ReadAll(file)
+		if err != nil {
+			http.Error(w, "server error", http.StatusInternalServerError)
+			return
+		}
+
+		encoded := base64.StdEncoding.EncodeToString(data)
+		dataURL := "data:" + contentType + ";base64," + encoded
+
+		if _, err := db.Exec(`UPDATE conversations SET group_picture_url = ? WHERE id = ?`, dataURL, convID); err != nil {
+			http.Error(w, "server error", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"message":"Group picture updated.","group_picture_url":"` + strings.ReplaceAll(dataURL, `"`, `\"`) + `"}`))
+
+		// Notify all members so their conversation list and header refresh.
+		notifyConversationMembers(db, hub, convID)
+	}
 }
