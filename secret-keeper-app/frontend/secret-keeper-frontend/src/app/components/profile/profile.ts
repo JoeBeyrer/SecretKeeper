@@ -4,6 +4,9 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { ThemeService } from '../../services/theme.service';
 import { FriendService } from '../../services/friend.service';
+import { CryptoService } from '../../services/crypto.service';
+import { KeyService } from '../../services/key.service';
+import { AuthService } from '../../services/auth.service';
 
 interface ProfileData {
   username: string;
@@ -39,6 +42,9 @@ export class Profile implements OnInit {
     private route: ActivatedRoute,
     public themeService: ThemeService,
     public friendService: FriendService,
+    private cryptoService: CryptoService,
+    private keyService: KeyService,
+    private authService: AuthService,
   ) {
     this.profileForm = this.fb.group({
       display_name: ['', [Validators.maxLength(50)]],
@@ -151,6 +157,9 @@ export class Profile implements OnInit {
           if (new_username) this.profile.username = new_username;
           if (new_email) this.profile.email = new_email;
         }
+        if (new_password) {
+          void this.rewrapPrivateKey(new_username || this.profile?.username || '', new_password);
+        }
       },
       error: (err) => {
         if (err.status === 409) {
@@ -170,7 +179,6 @@ export class Profile implements OnInit {
     if (!input.files || input.files.length === 0) return;
 
     const file = input.files[0];
-    // Reset input value so the same file triggers change event again after a remove.
     input.value = '';
     const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
     if (!allowed.includes(file.type)) {
@@ -239,5 +247,28 @@ export class Profile implements OnInit {
 
   goTo(page: string): void {
     this.router.navigate(['/' + page]);
+  }
+
+  /**
+   * After a password change, re-wrap the in-memory RSA private key with the
+   * new wrapping key and save it to the server, keeping conversation keys
+   * accessible on future logins.
+   */
+  private async rewrapPrivateKey(username: string, newPassword: string): Promise<void> {
+    const privateKey = this.authService.privateKey;
+    const publicKey = this.authService.publicKey;
+    if (!privateKey || !publicKey) {
+      console.warn('[Profile] No in-memory key pair — cannot re-wrap after password change.');
+      return;
+    }
+    try {
+      const newWrappingKey = await this.cryptoService.deriveWrappingKey(newPassword, username);
+      const wrapped = await this.cryptoService.wrapPrivateKey(privateKey, newWrappingKey);
+      const publicKeyB64 = await this.cryptoService.exportPublicKey(publicKey);
+      await this.keyService.saveKeys(publicKeyB64, wrapped);
+      console.log('[Profile] Private key re-wrapped with new password.');
+    } catch (e) {
+      console.error('[Profile] Failed to re-wrap private key:', e);
+    }
   }
 }
