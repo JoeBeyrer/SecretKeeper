@@ -772,3 +772,12 @@
   transition: background 0.15s;
 }
 .cancel-btn:hover { background: var(--bg-hover); }
+.group-picture-upload { display: flex; align-items: center; gap: 12px; }
+.group-picture-preview { width: 56px; height: 56px; min-width: 56px; border-radius: 50%; object-fit: cover; }
+.group-picture-placeholder { width: 56px; height: 56px; min-width: 56px; border-radius: 50%; background: var(--bg-elevated); display: flex; align-items: center; justify-content: center; color: var(--text-2); }
+.group-picture-actions { display: flex; flex-direction: column; gap: 6px; }
+.group-picture-btn { cursor: pointer; font-size: 13px; padding: 6px 14px; }
+.group-picture-btn.disabled { opacity: 0.6; pointer-events: none; }
+.group-picture-remove-btn { font-size: 13px; padding: 6px 14px; background: transparent; border: 1px solid var(--danger, #e55); color: var(--danger, #e55); border-radius: 8px; cursor: pointer; }
+.group-picture-remove-btn:hover { background: var(--danger, #e55); color: #fff; }
+.group-picture-remove-btn:disabled { opacity: 0.6; pointer-events: none; }
