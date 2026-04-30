@@ -17,7 +17,7 @@ import (
 )
 
 type contextKey string
-const userIDKey contextKey = "userID"
+const UserIDKey contextKey = "userID"
 
 type registerReq struct {
     Username string `json:"username"`
@@ -189,20 +189,20 @@ func AuthMiddleware(db *sql.DB) func(http.Handler) http.Handler {
                 return
             }
 
-            ctx := context.WithValue(r.Context(), userIDKey, userID)
+            ctx := context.WithValue(r.Context(), UserIDKey, userID)
             next.ServeHTTP(w, r.WithContext(ctx))
         })
     }
 }
 
 func GetUserIDFromContext(r *http.Request) (string, bool) {
-    userID, ok := r.Context().Value(userIDKey).(string)
+    userID, ok := r.Context().Value(UserIDKey).(string)
     return userID, ok
 }
 
 // SetTestUserID is a test helper injecting a userID into a request context -
 // simulating what AuthMiddleware does.
 func SetTestUserID(r *http.Request, userID string) *http.Request {
-    ctx := context.WithValue(r.Context(), userIDKey, userID)
+    ctx := context.WithValue(r.Context(), UserIDKey, userID)
     return r.WithContext(ctx)
 }

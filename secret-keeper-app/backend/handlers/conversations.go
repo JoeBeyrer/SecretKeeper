@@ -418,18 +418,22 @@ func GetConversationMembersHandler(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "could not load conversation members", http.StatusInternalServerError)
 			return
 		}
-		defer rows.Close()
 
 		members := []ConversationMemberSummary{}
 		for rows.Next() {
 			var member ConversationMemberSummary
 			if err := rows.Scan(&member.UserID, &member.Username, &member.DisplayName, &member.ProfilePictureURL); err != nil {
+				rows.Close()
 				http.Error(w, "could not load conversation members", http.StatusInternalServerError)
 				return
 			}
+			members = append(members, member)
+		}
+		rows.Close()
 
+		for i, member := range members {
 			if member.UserID == userID {
-				member.FriendshipStatus = "self"
+				members[i].FriendshipStatus = "self"
 			} else {
 				exists, accepted, direction, err := database.FriendshipExists(db, userID, member.UserID)
 				if err != nil {
@@ -439,17 +443,15 @@ func GetConversationMembersHandler(db *sql.DB) http.HandlerFunc {
 
 				switch {
 				case accepted:
-					member.FriendshipStatus = "friend"
+					members[i].FriendshipStatus = "friend"
 				case exists && direction == "outgoing":
-					member.FriendshipStatus = "pending_outgoing"
+					members[i].FriendshipStatus = "pending_outgoing"
 				case exists && direction == "incoming":
-					member.FriendshipStatus = "pending_incoming"
+					members[i].FriendshipStatus = "pending_incoming"
 				default:
-					member.FriendshipStatus = "none"
+					members[i].FriendshipStatus = "none"
 				}
 			}
-
-			members = append(members, member)
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -1058,24 +1060,6 @@ func AddConversationMembersHandler(db *sql.DB, hub *messaging.Hub) http.HandlerF
 			existingMembers[memberID] = struct{}{}
 		}
 
-		tx, err := db.Begin()
-		if err != nil {
-			http.Error(w, "could not update conversation", http.StatusInternalServerError)
-			return
-		}
-		defer tx.Rollback()
-
-		var actorName string
-		if err := tx.QueryRow(`
-			SELECT COALESCE(NULLIF(p.display_name, ''), u.username)
-			FROM users u
-			LEFT JOIN user_profiles p ON p.user_id = u.id
-			WHERE u.id = ?
-		`, userID).Scan(&actorName); err != nil {
-			http.Error(w, "could not load acting user", http.StatusInternalServerError)
-			return
-		}
-
 		type additionTarget struct {
 			UserID   string
 			Name     string
@@ -1084,7 +1068,7 @@ func AddConversationMembersHandler(db *sql.DB, hub *messaging.Hub) http.HandlerF
 		targets := make([]additionTarget, 0, len(targetUsernames))
 		for _, username := range targetUsernames {
 			var target additionTarget
-			err := tx.QueryRow(`
+			err := db.QueryRow(`
 				SELECT
 					u.id,
 					COALESCE(NULLIF(p.display_name, ''), u.username),
@@ -1124,6 +1108,24 @@ func AddConversationMembersHandler(db *sql.DB, hub *messaging.Hub) http.HandlerF
 			targets = append(targets, target)
 		}
 
+		tx, err := db.Begin()
+		if err != nil {
+			http.Error(w, "could not update conversation", http.StatusInternalServerError)
+			return
+		}
+		defer tx.Rollback()
+
+		var actorName string
+		if err := tx.QueryRow(`
+			SELECT COALESCE(NULLIF(p.display_name, ''), u.username)
+			FROM users u
+			LEFT JOIN user_profiles p ON p.user_id = u.id
+			WHERE u.id = ?
+		`, userID).Scan(&actorName); err != nil {
+			http.Error(w, "could not load acting user", http.StatusInternalServerError)
+			return
+		}
+
 		now := time.Now().Unix()
 		addedUserIDs := make([]string, 0, len(targets))
 		for _, target := range targets {
@@ -1157,7 +1159,6 @@ func AddConversationMembersHandler(db *sql.DB, hub *messaging.Hub) http.HandlerF
 		w.WriteHeader(http.StatusNoContent)
 	}
 }
-
 
 
 

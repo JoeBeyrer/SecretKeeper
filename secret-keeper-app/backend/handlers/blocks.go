@@ -6,11 +6,12 @@ import (
     "net/http"
     "time"
     "github.com/google/uuid"
+	"secret-keeper-app/backend/database"
 )
 
 func BlockUser(db *sql.DB) http.HandlerFunc {
     return func(w http.ResponseWriter, r *http.Request) {
-        blockerID, ok := GetUserIDFromContext(r)
+        BlockerID, ok := GetUserIDFromContext(r)
         if !ok {
             http.Error(w, "Unauthorized", http.StatusUnauthorized)
             return
@@ -22,7 +23,7 @@ func BlockUser(db *sql.DB) http.HandlerFunc {
             http.Error(w, "Invalid request", http.StatusBadRequest)
             return
         }
-        if blockerID == body.BlockeeID {
+        if BlockerID == body.BlockeeID {
             http.Error(w, "Cannot block yourself", http.StatusBadRequest)
             return
         }
@@ -30,15 +31,12 @@ func BlockUser(db *sql.DB) http.HandlerFunc {
         _, err := db.ExecContext(r.Context(), `
             INSERT INTO blocks (id, blocker_id, blockee_id, created_at)
             VALUES (?, ?, ?, ?)
-        `, id, blockerID, body.BlockeeID, time.Now().Unix())
+        `, id, BlockerID, body.BlockeeID, time.Now().Unix())
         if err != nil {
             http.Error(w, "Already blocked", http.StatusConflict)
             return
         }
-        _, err = db.Exec(`
-            DELETE FROM friendships
-            WHERE requester_id = ? AND addressee_id = ? AND accepted = 1
-        `, blockerID, body.BlockeeID)
+        database.RemoveFriend(db, BlockerID, body.BlockeeID)
 
         w.WriteHeader(http.StatusCreated)
     }
