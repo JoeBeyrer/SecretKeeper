@@ -8,6 +8,8 @@ import (
 	"net/http/httptest"
 	"secret-keeper-app/backend/database"
 	"secret-keeper-app/backend/handlers"
+	"secret-keeper-app/backend/models"
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -477,5 +479,103 @@ func Test_unblock_user_func(t *testing.T) {
 		t.Fatalf("expected 204 for unblocking non-blocked user, got %d", w.Code)
 	} else {
 		t.Log("unblocking non-blocked user correctly returned 204")
+	}
+}
+
+func Test_search_users_handler(t *testing.T) {
+	db := database.InitDB(":memory:")
+	defer db.Close()
+
+	//test user that will search
+	if _, err := db.Exec(`
+		INSERT INTO users (id, username, email, password_hash, created_at, email_verified)
+		VALUES ("testuser123", "calleruser", "caller@gmail.com", "hashedpassword", 1740067200, 1)
+	`); err != nil {
+		t.Fatalf("error inserting caller user: %v", err)
+	}
+
+	//user that will be searched
+	if _, err := db.Exec(`
+		INSERT INTO users (id, username, email, password_hash, created_at, email_verified)
+		VALUES ("target-001", "alice", "alice@gmail.com", "hashedpassword", 1740067200, 1)
+	`); err != nil {
+		t.Fatalf("error inserting target user: %v", err)
+	}
+
+	//wrong method
+	req := httptest.NewRequest("POST", "/api/search-users?q=alice", nil)
+	w := httptest.NewRecorder()
+	ctx := context.WithValue(req.Context(), handlers.UserIDKey, "testuser123")
+	handlers.SearchUsersHandler(db)(w, req.WithContext(ctx))
+
+	if w.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("POST method did not return 405, got %d", w.Code)
+	} else {
+		t.Log("POST method correctly returned 405")
+	}
+
+	//no auth in context
+	req = httptest.NewRequest("GET", "/api/search-users?q=alice", nil)
+	w = httptest.NewRecorder()
+	handlers.SearchUsersHandler(db)(w, req)
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("missing auth did not return 401, got %d", w.Code)
+	} else {
+		t.Log("missing auth correctly returned 401")
+	}
+
+	//empty query returns empty array
+	req = httptest.NewRequest("GET", "/api/search-users", nil)
+	w = httptest.NewRecorder()
+	ctx = context.WithValue(req.Context(), handlers.UserIDKey, "testuser123")
+	handlers.SearchUsersHandler(db)(w, req.WithContext(ctx))
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("empty query did not return 200, got %d", w.Code)
+	}
+	if strings.TrimSpace(w.Body.String()) != "[]" {
+		t.Fatalf("empty query did not return empty array, got %s", w.Body.String())
+	} else {
+		t.Log("empty query correctly returned empty array")
+	}
+
+	//valid query
+	req = httptest.NewRequest("GET", "/api/search-users?q=alice", nil)
+	w = httptest.NewRecorder()
+	ctx = context.WithValue(req.Context(), handlers.UserIDKey, "testuser123")
+	handlers.SearchUsersHandler(db)(w, req.WithContext(ctx))
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("valid query did not return 200, got %d", w.Code)
+	}
+
+	var results []models.UserSearchResult
+	if err := json.NewDecoder(w.Body).Decode(&results); err != nil {
+		t.Fatalf("could not decode response body: %v", err)
+	}
+	if len(results) == 0 {
+		t.Fatal("valid query returned no results")
+	} else {
+		t.Logf("valid query returned %d result(s)", len(results))
+	}
+
+	//query with no matches returns empty array
+	req = httptest.NewRequest("GET", "/api/search-users?q=zzznomatch", nil)
+	w = httptest.NewRecorder()
+	ctx = context.WithValue(req.Context(), handlers.UserIDKey, "testuser123")
+	handlers.SearchUsersHandler(db)(w, req.WithContext(ctx))
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("no-match query did not return 200, got %d", w.Code)
+	}
+
+	var empty []models.UserSearchResult
+	if err := json.NewDecoder(w.Body).Decode(&empty); err != nil {
+		t.Fatalf("could not decode no-match response: %v", err)
+	}
+	if len(empty) != 0 {
+		t.Fatalf("no-match query should return empty array, got %d results", len(empty))
+	} else {
+		t.Log("no-match query correctly returned empty array")
 	}
 }
