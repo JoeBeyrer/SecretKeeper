@@ -14,6 +14,7 @@ export interface ConversationSummary {
   member_count?: number;
   profile_picture_url?: string;
   other_username?: string;
+  other_user_id?: string;
 }
 
 export interface ConversationMemberSummary {

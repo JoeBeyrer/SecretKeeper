@@ -254,6 +254,7 @@ type ConversationSummary struct {
 	MemberCount       int    `json:"member_count"`
 	ProfilePictureURL string `json:"profile_picture_url"`
 	OtherUsername     string `json:"other_username"`
+	OtherUserID       string `json:"other_user_id"`
 }
 
 type ConversationMemberSummary struct {
@@ -326,12 +327,21 @@ func GetConversationsHandler(db *sql.DB) http.HandlerFunc {
                         LIMIT 1
                     ), '')
                     ELSE ''
-                END AS other_username
+                END AS other_username,
+                CASE WHEN (SELECT COUNT(*) FROM conversation_members WHERE conversation_id = c.id) = 2
+                    THEN COALESCE((
+                        SELECT cm5.user_id
+                        FROM conversation_members cm5
+                        WHERE cm5.conversation_id = c.id AND cm5.user_id != ?
+                        LIMIT 1
+                    ), '')
+                    ELSE ''
+                END AS other_user_id
             FROM conversations c
             JOIN conversation_members cm ON cm.conversation_id = c.id
             WHERE cm.user_id = ?
             ORDER BY COALESCE(last_message_time, 0) DESC
-        `, userID, now, now, userID, userID, userID)
+        `, userID, now, now, userID, userID, userID, userID)
         if err != nil {
             http.Error(w, "could not fetch conversations", http.StatusInternalServerError)
             return
@@ -346,7 +356,8 @@ func GetConversationsHandler(db *sql.DB) http.HandlerFunc {
             var lastTime sql.NullInt64
             var picURL sql.NullString
             var otherUsername sql.NullString
-            if err := rows.Scan(&s.ID, &s.MessageLifetime, &s.MemberCount, &name, &lastMsg, &lastTime, &picURL, &otherUsername); err != nil {
+            var otherUserID sql.NullString
+            if err := rows.Scan(&s.ID, &s.MessageLifetime, &s.MemberCount, &name, &lastMsg, &lastTime, &picURL, &otherUsername, &otherUserID); err != nil {
                 continue
             }
             s.Name = name.String
@@ -357,6 +368,7 @@ func GetConversationsHandler(db *sql.DB) http.HandlerFunc {
             s.LastMessageTime = lastTime.Int64
             s.ProfilePictureURL = picURL.String
             s.OtherUsername = otherUsername.String
+            s.OtherUserID = otherUserID.String
             result = append(result, s)
         }
 
