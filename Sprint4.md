@@ -1,7 +1,7 @@
 # Sprint 4 Report
 
 ## Demo Video
-[Sprint 4 Demo Video](https://www.youtube.com/watch?v=jcXYxj6Kgzc)
+[Sprint 4 Demo Video](https://youtu.be/A4GNfi3MoAk)
 [Final Project Demo Video](https://drive.google.com/file/d/14qmGXGX_CK4mVLP77YictF920rlfYKXZ/view?usp=sharing)
 
 ## User Stories
